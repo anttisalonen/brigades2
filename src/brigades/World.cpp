@@ -9,15 +9,34 @@ Tree::Tree(boost::shared_ptr<World> w)
 {
 }
 
-Soldier::Soldier(boost::shared_ptr<World> w)
-	: Entity<WorldPtr>(w)
+Side::Side(bool first)
+	: mFirst(first)
 {
+}
+
+bool Side::isFirst() const
+{
+	return mFirst;
+}
+
+Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
+	: Entity<WorldPtr>(w),
+	mSide(w->getSide(firstside))
+{
+}
+
+SidePtr Soldier::getSide() const
+{
+	return mSide;
 }
 
 World::World()
 	: mWidth(100.0f),
 	mHeight(100.0f)
 {
+	for(int i = 0; i < NUM_SIDES; i++) {
+		mSides[i] = SidePtr(new Side(i == 0));
+	}
 }
 
 // accessors
@@ -41,6 +60,11 @@ float World::getWidth() const
 float World::getHeight() const
 {
 	return mHeight;
+}
+
+SidePtr World::getSide(bool first) const
+{
+	return mSides[first ? 0 : 1];
 }
 
 

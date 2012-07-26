@@ -6,8 +6,10 @@
 #include <SDL.h>
 #include <SDL_ttf.h>
 
+#include "common/Clock.h"
 #include "common/Texture.h"
 #include "common/Color.h"
+#include "common/FontConfig.h"
 
 #include "World.h"
 
@@ -22,14 +24,34 @@ class Driver {
 
 	protected:
 		WorldPtr mWorld;
+		Common::Clock mClock;
 		SDL_Surface* mScreen;
 		TTF_Font* mFont;
+		bool mPaused;
+		float mScaleLevel;
+		float mScaleLevelVelocity;
+		bool mFreeCamera;
+		Vector3 mCamera;
+		Vector3 mCameraVelocity;
+		Vector3 mPlayerControlVelocity;
+		boost::shared_ptr<Common::Texture> mSoldierTexture[NUM_SIDES][4];
+		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
+		boost::shared_ptr<Common::Texture> mGrassTexture;
+		Common::TextMap mTextMap;
 
 	private:
 		void loadTextures();
 		void loadFont();
-		boost::shared_ptr<Common::Texture> mSoldierTexture[2][4];
 		Common::Color mapSideColor(bool first, const Common::Color& c);
+		bool handleInput(float frameTime);
+		void handleInputState(float frameTime);
+		float restrictCameraCoordinate(float t, float w);
+		void startFrame();
+		void finishFrame();
+		void drawTerrain();
+		void drawTexts();
+		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p);
+		void drawSoldiers();
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;
