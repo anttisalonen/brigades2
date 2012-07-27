@@ -2,7 +2,9 @@
 #define BRIGADES_WORLD_H
 
 #include <vector>
+#include <map>
 
+#include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 
 #include "common/Entity.h"
@@ -35,9 +37,12 @@ class Soldier : public Common::Entity<boost::shared_ptr<World>> {
 	public:
 		Soldier(boost::shared_ptr<World> w, bool firstside);
 		SidePtr getSide() const;
+		int getID();
 
 	private:
 		SidePtr mSide;
+		int mID;
+		static int getNextID();
 };
 
 typedef boost::shared_ptr<Soldier> SoldierPtr;
@@ -47,7 +52,7 @@ class SoldierAction {
 
 typedef boost::shared_ptr<SoldierAction> SoldierActionPtr;
 
-class World {
+class World : public boost::enable_shared_from_this<World> {
 
 	public:
 		World();
@@ -63,10 +68,12 @@ class World {
 		void update(float time);
 		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
 
-	protected:
+	private:
+		void addSoldier(bool first);
 		float mWidth;
 		float mHeight;
 		SidePtr mSides[NUM_SIDES];
+		std::map<int, SoldierPtr> mSoldiers;
 };
 
 typedef boost::shared_ptr<World> WorldPtr;

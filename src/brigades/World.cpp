@@ -21,13 +21,25 @@ bool Side::isFirst() const
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
 	: Entity<WorldPtr>(w),
-	mSide(w->getSide(firstside))
+	mSide(w->getSide(firstside)),
+	mID(getNextID())
 {
 }
 
 SidePtr Soldier::getSide() const
 {
 	return mSide;
+}
+
+int Soldier::getID()
+{
+	return mID;
+}
+
+int Soldier::getNextID()
+{
+	static int id = 0;
+	return ++id;
 }
 
 World::World()
@@ -78,6 +90,13 @@ bool World::addSoldierAction(const SoldierPtr s, const SoldierAction& a)
 {
 	/* TODO */
 	return true;
+}
+
+void World::addSoldier(bool first)
+{
+	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first));
+	int id = s->getID();
+	mSoldiers.insert(std::make_pair(id, s));
 }
 
 
