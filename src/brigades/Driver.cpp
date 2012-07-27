@@ -17,7 +17,7 @@ Driver::Driver(WorldPtr w)
 	mScaleLevelVelocity(0.0f),
 	mFreeCamera(false)
 {
-	mScreen = SDL_utils::initSDL(screenWidth, screenHeight);
+	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
 	loadTextures();
 	loadFont();
