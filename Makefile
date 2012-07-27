@@ -34,8 +34,11 @@ all: $(BRIGADESBIN)
 $(BINDIR):
 	mkdir -p $(BINDIR)
 
-$(COMMONLIB):
-	make -C src/common
+COMMONDIR = src/common
+COMMONSRCS = $(shell (find $(COMMONDIR) \( -name '*.cpp' -o -name '*.h' \)))
+
+$(COMMONLIB): $(COMMONSRCS)
+	make -C $(COMMONDIR)
 
 $(BRIGADESBIN): $(BINDIR) $(BRIGADESOBJS) $(COMMONLIB)
 	$(CXX) $(LDFLAGS) $(BRIGADESLIBS) $(BRIGADESOBJS) $(COMMONLIB) -o $(BRIGADESBIN)
