@@ -15,7 +15,7 @@ Driver::Driver(WorldPtr w)
 	mPaused(false),
 	mScaleLevel(11.5f),
 	mScaleLevelVelocity(0.0f),
-	mFreeCamera(false)
+	mFreeCamera(true)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
