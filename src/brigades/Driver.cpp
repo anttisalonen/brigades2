@@ -274,15 +274,15 @@ void Driver::drawTexts()
 const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p)
 {
 	float r = p->getXYRotation();
-	int dir = 1; // west
+	int dir = 3; // west
 	if(r < QUARTER_PI && r >= -QUARTER_PI) {
-		dir = 3; // east
+		dir = 1; // east
 	}
 	else if(r < 3.0 * QUARTER_PI && r >= QUARTER_PI) {
 		dir = 0; // north
 	}
 	else if(r >= -3.0 * QUARTER_PI && r < -QUARTER_PI) {
-		dir = 1; // south
+		dir = 2; // south
 	}
 
 	return mSoldierTexture[p->getSide()->isFirst() ? 0 : 1][dir];

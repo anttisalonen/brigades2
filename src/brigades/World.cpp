@@ -47,9 +47,10 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
-	Vector3 vel = mSteering.arrive(Vector3());
+	Vector3 vel = mSteering.wander();
 	mAcceleration = vel * (10.0f / time);
 	Vehicle::update(time);
+	setAutomaticHeading();
 }
 
 World::World()
