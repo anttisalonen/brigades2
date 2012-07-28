@@ -14,7 +14,7 @@ int main(int argc, char** argv)
 	WorldPtr world(new World());
 	DriverPtr driver(new Driver(world));
 
-	//srand(time(NULL));
+	srand(time(NULL));
 	world->create();
 	driver->init();
 

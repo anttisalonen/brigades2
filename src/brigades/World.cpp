@@ -7,14 +7,9 @@ using namespace Common;
 namespace Brigades {
 
 Tree::Tree(const Vector3& pos, float radius)
-	: mRadius(radius)
+	: Obstacle(radius)
 {
 	mPosition = pos;
-}
-
-float Tree::getRadius() const
-{
-	return mRadius;
 }
 
 Side::Side(bool first)
@@ -28,7 +23,8 @@ bool Side::isFirst() const
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
-	: Common::Vehicle(10.0f, 100.0f),
+	: Common::Vehicle(0.5f, 10.0f, 100.0f),
+	mWorld(w),
 	mSide(w->getSide(firstside)),
 	mID(getNextID()),
 	mSteering(*this)
@@ -56,8 +52,18 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
+	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mPosition, mVelocity.length());
+	std::vector<Obstacle*> obstacles(trees.size());
+	for(unsigned int i = 0; i < trees.size(); i++) {
+		obstacles[i] = trees[i].get();
+	}
+
+	Vector3 obs = mSteering.obstacleAvoidance(obstacles);
 	Vector3 vel = mSteering.wander();
-	mAcceleration = vel * (10.0f / time);
+	Vector3 tot;
+	mSteering.accumulate(tot, obs);
+	mSteering.accumulate(tot, vel);
+	mAcceleration = tot * (10.0f / time);
 	Vehicle::update(time);
 	setAutomaticHeading();
 }
@@ -139,8 +145,8 @@ void World::addSoldier(bool first)
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
 
-	float x = mWidth * 0.4f;
-	float y = mHeight * 0.4f;
+	float x = mWidth * 0.3f;
+	float y = mHeight * 0.3f;
 	if(first) {
 		x = -x;
 		y = -y;
@@ -157,12 +163,12 @@ void World::addTrees()
 
 		x *= mWidth;
 		y *= mHeight;
-		r = Common::clamp(5.0f, r * 10.0f, 10.0f);
+		r = Common::clamp(3.0f, r * 8.0f, 8.0f);
 
 		bool tooclose = false;
 		for(auto t : mTrees) {
-			float maxdist = std::max(r, t->getRadius());
-			if((Vector3(x, y, 0.0f) - t->getPosition()).length2() <
+			float maxdist = r + t->getRadius();
+			if(Vector3(x, y, 0.0f).distance2(t->getPosition()) <
 					maxdist * maxdist) {
 				tooclose = true;
 				break;

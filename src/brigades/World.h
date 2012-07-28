@@ -16,13 +16,9 @@ namespace Brigades {
 
 class World;
 
-class Tree : public Common::Entity {
+class Tree : public Common::Obstacle {
 	public:
 		Tree(const Common::Vector3& pos, float radius);
-		float getRadius() const;
-
-	private:
-		float mRadius;
 };
 
 typedef boost::shared_ptr<Tree> TreePtr;
@@ -46,6 +42,7 @@ class Soldier : public Common::Vehicle {
 		void update(float time) override;
 
 	private:
+		boost::shared_ptr<World> mWorld;
 		SidePtr mSide;
 		int mID;
 		Common::Steering mSteering;

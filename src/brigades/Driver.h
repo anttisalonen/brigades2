@@ -24,13 +24,19 @@ enum class SpriteType {
 struct Sprite {
 	Sprite(boost::shared_ptr<Common::Entity> e, SpriteType t, float scale,
 			boost::shared_ptr<Common::Texture> texture,
-			boost::shared_ptr<Common::Texture> shadow)
-		: mEntity(e), mSpriteType(t), mScale(scale), mTexture(texture), mShadowTexture(shadow) { }
+			boost::shared_ptr<Common::Texture> shadow, float xp, float yp,
+			float sxp, float syp)
+		: mEntity(e), mSpriteType(t), mScale(scale), mTexture(texture), mShadowTexture(shadow),
+		mXP(xp), mYP(yp), mSXP(sxp), mSYP(syp) { }
 	boost::shared_ptr<Common::Entity> mEntity;
 	SpriteType mSpriteType;
 	float mScale;
 	boost::shared_ptr<Common::Texture> mTexture;
 	boost::shared_ptr<Common::Texture> mShadowTexture;
+	float mXP;
+	float mYP;
+	float mSXP;
+	float mSYP;
 	bool operator<(const Sprite& s1) const;
 };
 

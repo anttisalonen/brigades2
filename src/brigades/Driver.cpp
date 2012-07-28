@@ -15,15 +15,13 @@ bool Sprite::operator<(const Sprite& s1) const
 	/* Important to define strict weak ordering or face segmentation fault. */
 	auto e1 = mEntity;
 	auto e2 = s1.mEntity;
-	if(e1->getPosition().z == e2->getPosition().z && e1->getPosition().y == e2->getPosition().y)
-		return false;
-	if(e1->getPosition().z > e2->getPosition().z)
-		return false;
 	if(e1->getPosition().z < e2->getPosition().z)
 		return true;
-	if(e1->getPosition().y < e2->getPosition().y)
+	if(e1->getPosition().z > e2->getPosition().z)
 		return false;
-	return true;
+	if(e1->getPosition().y > e2->getPosition().y)
+		return true;
+	return false;
 }
 
 Driver::Driver(WorldPtr w)
@@ -164,6 +162,10 @@ bool Driver::handleInput(float frameTime)
 							mCameraVelocity.x = 1.0f;
 						else
 							mPlayerControlVelocity.x = -1.0f;
+						break;
+
+					case SDLK_f:
+						mFreeCamera = !mFreeCamera;
 						break;
 
 					case SDLK_p:
@@ -311,15 +313,28 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p)
 
 void Driver::drawEntities()
 {
+	static const float treeScale = 3.0f;
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, 10.0f);
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
-		sprites.push_back(Sprite(s, SpriteType::Soldier, 2.0f, soldierTexture(s), mSoldierShadowTexture));
+		sprites.push_back(Sprite(s, SpriteType::Soldier, 2.0f, soldierTexture(s), mSoldierShadowTexture, -0.4f, 0.0f,
+					-0.4f, -0.5f));
 	}
 
 	auto trees = mWorld->getTreesAt(mCamera, 10.0f);
 	for(auto t : trees) {
-		sprites.push_back(Sprite(t, SpriteType::Tree, t->getRadius(), mTreeTexture, mTreeShadowTexture));
+		sprites.push_back(Sprite(t, SpriteType::Tree, t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
+					-0.5f, -0.8f));
+	}
+
+	for(auto s : sprites) {
+		const Vector3& v(s.mEntity->getPosition());
+
+		SDL_utils::drawSprite(*s.mShadowTexture,
+				Rectangle((-mCamera.x + v.x + s.mSXP * s.mScale + v.z * 0.15f * s.mScale) * mScaleLevel + screenWidth * 0.5f,
+					  (-mCamera.y + v.y + s.mSYP * s.mScale - v.z * 0.20f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
+					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
+				Rectangle(1, 1, -1, -1), 0.0f);
 	}
 
 	std::sort(sprites.begin(), sprites.end());
@@ -327,17 +342,17 @@ void Driver::drawEntities()
 	for(auto s : sprites) {
 		const Vector3& v(s.mEntity->getPosition());
 
-		SDL_utils::drawSprite(*s.mShadowTexture,
-				Rectangle((-mCamera.x + v.x - 0.8f + v.z * 0.3f) * mScaleLevel + screenWidth * 0.5f,
-					(-mCamera.y + v.y - 0.8f - v.z * 0.4f) * mScaleLevel + screenHeight * 0.5f,
+		SDL_utils::drawSprite(*s.mTexture,
+				Rectangle((-mCamera.x + v.x + s.mXP * s.mScale) * mScaleLevel + screenWidth * 0.5f,
+					  (-mCamera.y + v.y + s.mYP * s.mScale + v.z * 0.3f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
 					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
 				Rectangle(1, 1, -1, -1), 0.0f);
 
-		SDL_utils::drawSprite(*s.mTexture,
-				Rectangle((-mCamera.x + v.x - 0.8f) * mScaleLevel + screenWidth * 0.5f,
-					(-mCamera.y + v.y + v.z * 0.6f) * mScaleLevel + screenHeight * 0.5f,
-					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
-				Rectangle(1, 1, -1, -1), 0.0f);
+#if 0
+		SDL_utils::drawCircle((-mCamera.x + v.x) * mScaleLevel + screenWidth * 0.5f,
+				(-mCamera.y  + v.y) * mScaleLevel + screenHeight * 0.5f,
+				mScaleLevel * s.mScale / treeScale);
+#endif
 	}
 }
 
