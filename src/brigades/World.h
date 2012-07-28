@@ -7,7 +7,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 
-#include "common/Entity.h"
+#include "common/Vehicle.h"
 #include "common/Steering.h"
 
 #define NUM_SIDES 2
@@ -34,7 +34,7 @@ class Side {
 
 typedef boost::shared_ptr<Side> SidePtr;
 
-class Soldier : public Common::Entity {
+class Soldier : public Common::Vehicle {
 	public:
 		Soldier(boost::shared_ptr<World> w, bool firstside);
 		SidePtr getSide() const;

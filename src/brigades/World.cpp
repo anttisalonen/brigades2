@@ -19,7 +19,8 @@ bool Side::isFirst() const
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
-	: mSide(w->getSide(firstside)),
+	: Common::Vehicle(10.0f, 100.0f),
+	mSide(w->getSide(firstside)),
 	mID(getNextID()),
 	mSteering(*this)
 {
@@ -46,9 +47,9 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
-	Vector3 vel = mSteering.seek(Vector3());
+	Vector3 vel = mSteering.arrive(Vector3());
 	mAcceleration = vel * (10.0f / time);
-	updateComplete(time, 10.0f);
+	Vehicle::update(time);
 }
 
 World::World()
@@ -135,7 +136,5 @@ void World::addSoldier(bool first)
 	}
 	s->setPosition(Vector3(x, y, 0.0f));
 }
-
-
 
 }
