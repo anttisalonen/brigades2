@@ -10,6 +10,22 @@ namespace Brigades {
 static int screenWidth = 800;
 static int screenHeight = 600;
 
+bool Sprite::operator<(const Sprite& s1) const
+{
+	/* Important to define strict weak ordering or face segmentation fault. */
+	auto e1 = mEntity;
+	auto e2 = s1.mEntity;
+	if(e1->getPosition().z == e2->getPosition().z && e1->getPosition().y == e2->getPosition().y)
+		return false;
+	if(e1->getPosition().z > e2->getPosition().z)
+		return false;
+	if(e1->getPosition().z < e2->getPosition().z)
+		return true;
+	if(e1->getPosition().y < e2->getPosition().y)
+		return false;
+	return true;
+}
+
 Driver::Driver(WorldPtr w)
 	: mWorld(w),
 	mPaused(false),
@@ -22,7 +38,10 @@ Driver::Driver(WorldPtr w)
 	loadTextures();
 	loadFont();
 	SDL_utils::setupOrthoScreen(screenWidth, screenHeight);
+}
 
+void Driver::init()
+{
 	setFocusSoldier();
 }
 
@@ -43,7 +62,7 @@ void Driver::run()
 
 		startFrame();
 		drawTerrain();
-		drawSoldiers();
+		drawEntities();
 		drawTexts();
 		finishFrame();
 	}
@@ -69,6 +88,8 @@ void Driver::loadTextures()
 
 	mGrassTexture = boost::shared_ptr<Texture>(new Texture("share/grass1.png", 0, 0));
 	mSoldierShadowTexture = boost::shared_ptr<Texture>(new Texture("share/soldier1shadow.png", 0, 32));
+	mTreeTexture = boost::shared_ptr<Texture>(new Texture("share/tree.png", 0, 0));
+	mTreeShadowTexture = mSoldierShadowTexture;
 }
 
 void Driver::loadFont()
@@ -288,22 +309,34 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p)
 	return mSoldierTexture[p->getSide()->isFirst() ? 0 : 1][dir];
 }
 
-void Driver::drawSoldiers()
+void Driver::drawEntities()
 {
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, 10.0f);
+	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
-		const Vector3& v(s->getPosition());
+		sprites.push_back(Sprite(s, SpriteType::Soldier, 2.0f, soldierTexture(s), mSoldierShadowTexture));
+	}
 
-		SDL_utils::drawSprite(*mSoldierShadowTexture,
+	auto trees = mWorld->getTreesAt(mCamera, 10.0f);
+	for(auto t : trees) {
+		sprites.push_back(Sprite(t, SpriteType::Tree, t->getRadius(), mTreeTexture, mTreeShadowTexture));
+	}
+
+	std::sort(sprites.begin(), sprites.end());
+
+	for(auto s : sprites) {
+		const Vector3& v(s.mEntity->getPosition());
+
+		SDL_utils::drawSprite(*s.mShadowTexture,
 				Rectangle((-mCamera.x + v.x - 0.8f + v.z * 0.3f) * mScaleLevel + screenWidth * 0.5f,
 					(-mCamera.y + v.y - 0.8f - v.z * 0.4f) * mScaleLevel + screenHeight * 0.5f,
-					mScaleLevel * 2.0f, mScaleLevel * 2.0f),
+					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
 				Rectangle(1, 1, -1, -1), 0.0f);
 
-		SDL_utils::drawSprite(*soldierTexture(s),
+		SDL_utils::drawSprite(*s.mTexture,
 				Rectangle((-mCamera.x + v.x - 0.8f) * mScaleLevel + screenWidth * 0.5f,
 					(-mCamera.y + v.y + v.z * 0.6f) * mScaleLevel + screenHeight * 0.5f,
-					mScaleLevel * 2.0f, mScaleLevel * 2.0f),
+					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
 				Rectangle(1, 1, -1, -1), 0.0f);
 	}
 }
@@ -316,3 +349,4 @@ void Driver::setFocusSoldier()
 }
 
 }
+

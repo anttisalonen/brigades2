@@ -1,11 +1,20 @@
 #include "World.h"
 
+#include "common/Random.h"
+
 using namespace Common;
 
 namespace Brigades {
 
-Tree::Tree(boost::shared_ptr<World> w)
+Tree::Tree(const Vector3& pos, float radius)
+	: mRadius(radius)
 {
+	mPosition = pos;
+}
+
+float Tree::getRadius() const
+{
+	return mRadius;
 }
 
 Side::Side(bool first)
@@ -64,6 +73,7 @@ World::World()
 
 void World::create()
 {
+	addTrees();
 	setupSides();
 }
 
@@ -71,7 +81,7 @@ void World::create()
 std::vector<TreePtr> World::getTreesAt(const Vector3& v, float radius) const
 {
 	/* TODO */
-	return std::vector<TreePtr>();
+	return mTrees;
 }
 
 std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius) const
@@ -136,6 +146,36 @@ void World::addSoldier(bool first)
 		y = -y;
 	}
 	s->setPosition(Vector3(x, y, 0.0f));
+}
+
+void World::addTrees()
+{
+	for(int i = 0; i < mWidth * mHeight * 0.1f; i++) {
+		float x = Random::clamped();
+		float y = Random::clamped();
+		float r = Random::uniform();
+
+		x *= mWidth;
+		y *= mHeight;
+		r = Common::clamp(5.0f, r * 10.0f, 10.0f);
+
+		bool tooclose = false;
+		for(auto t : mTrees) {
+			float maxdist = std::max(r, t->getRadius());
+			if((Vector3(x, y, 0.0f) - t->getPosition()).length2() <
+					maxdist * maxdist) {
+				tooclose = true;
+				break;
+			}
+		}
+		if(tooclose) {
+			continue;
+		}
+
+		TreePtr tree(new Tree(Vector3(x, y, 0), r));
+		mTrees.push_back(tree);
+	}
+	std::cout << "Added " << mTrees.size() << " trees.\n";
 }
 
 }

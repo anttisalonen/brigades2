@@ -16,10 +16,28 @@
 
 namespace Brigades {
 
-class Driver {
+enum class SpriteType {
+	Soldier,
+	Tree,
+};
 
+struct Sprite {
+	Sprite(boost::shared_ptr<Common::Entity> e, SpriteType t, float scale,
+			boost::shared_ptr<Common::Texture> texture,
+			boost::shared_ptr<Common::Texture> shadow)
+		: mEntity(e), mSpriteType(t), mScale(scale), mTexture(texture), mShadowTexture(shadow) { }
+	boost::shared_ptr<Common::Entity> mEntity;
+	SpriteType mSpriteType;
+	float mScale;
+	boost::shared_ptr<Common::Texture> mTexture;
+	boost::shared_ptr<Common::Texture> mShadowTexture;
+	bool operator<(const Sprite& s1) const;
+};
+
+class Driver {
 	public:
 		Driver(WorldPtr w);
+		void init();
 		void run();
 
 	private:
@@ -34,7 +52,7 @@ class Driver {
 		void drawTerrain();
 		void drawTexts();
 		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p);
-		void drawSoldiers();
+		void drawEntities();
 		void setFocusSoldier();
 
 		WorldPtr mWorld;
@@ -51,6 +69,8 @@ class Driver {
 		boost::shared_ptr<Common::Texture> mSoldierTexture[NUM_SIDES][4];
 		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
 		boost::shared_ptr<Common::Texture> mGrassTexture;
+		boost::shared_ptr<Common::Texture> mTreeTexture;
+		boost::shared_ptr<Common::Texture> mTreeShadowTexture;
 		Common::TextMap mTextMap;
 		SoldierPtr mFocusSoldier;
 };

@@ -18,7 +18,11 @@ class World;
 
 class Tree : public Common::Entity {
 	public:
-		Tree(boost::shared_ptr<World> w);
+		Tree(const Common::Vector3& pos, float radius);
+		float getRadius() const;
+
+	private:
+		float mRadius;
 };
 
 typedef boost::shared_ptr<Tree> TreePtr;
@@ -75,10 +79,12 @@ class World : public boost::enable_shared_from_this<World> {
 	private:
 		void setupSides();
 		void addSoldier(bool first);
+		void addTrees();
 		float mWidth;
 		float mHeight;
 		SidePtr mSides[NUM_SIDES];
 		std::map<int, SoldierPtr> mSoldiers;
+		std::vector<TreePtr> mTrees;
 };
 
 typedef boost::shared_ptr<World> WorldPtr;
