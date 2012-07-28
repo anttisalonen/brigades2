@@ -10,6 +10,7 @@ int main(int argc, char** argv)
 	std::cout << "Brigades\n";
 
 	WorldPtr world(new World());
+	world->create();
 
 	DriverPtr driver(new Driver(world));
 

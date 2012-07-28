@@ -56,6 +56,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 	public:
 		World();
+		void create();
 
 		// accessors
 		std::vector<TreePtr> getTreesAt(const Vector3& v, float radius) const;
@@ -69,6 +70,7 @@ class World : public boost::enable_shared_from_this<World> {
 		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
 
 	private:
+		void setupSides();
 		void addSoldier(bool first);
 		float mWidth;
 		float mHeight;
