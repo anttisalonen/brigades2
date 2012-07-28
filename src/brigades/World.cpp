@@ -5,7 +5,6 @@ using namespace Common;
 namespace Brigades {
 
 Tree::Tree(boost::shared_ptr<World> w)
-	: Entity<WorldPtr>(w)
 {
 }
 
@@ -20,9 +19,9 @@ bool Side::isFirst() const
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
-	: Entity<WorldPtr>(w),
-	mSide(w->getSide(firstside)),
-	mID(getNextID())
+	: mSide(w->getSide(firstside)),
+	mID(getNextID()),
+	mSteering(*this)
 {
 }
 
@@ -44,7 +43,11 @@ int Soldier::getNextID()
 
 void Soldier::update(float time)
 {
-	mAcceleration.x = 10.0f;
+	if(!time)
+		return;
+
+	Vector3 vel = mSteering.seek(Vector3());
+	mAcceleration = vel * (10.0f / time);
 	updateComplete(time, 10.0f);
 }
 

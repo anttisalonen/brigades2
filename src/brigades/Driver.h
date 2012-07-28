@@ -45,9 +45,9 @@ class Driver {
 		float mScaleLevel;
 		float mScaleLevelVelocity;
 		bool mFreeCamera;
-		Vector3 mCamera;
-		Vector3 mCameraVelocity;
-		Vector3 mPlayerControlVelocity;
+		Common::Vector3 mCamera;
+		Common::Vector3 mCameraVelocity;
+		Common::Vector3 mPlayerControlVelocity;
 		boost::shared_ptr<Common::Texture> mSoldierTexture[NUM_SIDES][4];
 		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
 		boost::shared_ptr<Common::Texture> mGrassTexture;

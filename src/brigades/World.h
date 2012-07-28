@@ -8,6 +8,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "common/Entity.h"
+#include "common/Steering.h"
 
 #define NUM_SIDES 2
 
@@ -15,7 +16,7 @@ namespace Brigades {
 
 class World;
 
-class Tree : public Common::Entity<boost::shared_ptr<World>> {
+class Tree : public Common::Entity {
 	public:
 		Tree(boost::shared_ptr<World> w);
 };
@@ -33,7 +34,7 @@ class Side {
 
 typedef boost::shared_ptr<Side> SidePtr;
 
-class Soldier : public Common::Entity<boost::shared_ptr<World>> {
+class Soldier : public Common::Entity {
 	public:
 		Soldier(boost::shared_ptr<World> w, bool firstside);
 		SidePtr getSide() const;
@@ -43,6 +44,7 @@ class Soldier : public Common::Entity<boost::shared_ptr<World>> {
 	private:
 		SidePtr mSide;
 		int mID;
+		Common::Steering mSteering;
 		static int getNextID();
 };
 
@@ -60,8 +62,8 @@ class World : public boost::enable_shared_from_this<World> {
 		void create();
 
 		// accessors
-		std::vector<TreePtr> getTreesAt(const Vector3& v, float radius) const;
-		std::vector<SoldierPtr> getSoldiersAt(const Vector3& v, float radius) const;
+		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
+		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius) const;
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
