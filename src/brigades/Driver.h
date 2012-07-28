@@ -22,7 +22,21 @@ class Driver {
 		Driver(WorldPtr w);
 		void run();
 
-	protected:
+	private:
+		void loadTextures();
+		void loadFont();
+		Common::Color mapSideColor(bool first, const Common::Color& c);
+		bool handleInput(float frameTime);
+		void handleInputState(float frameTime);
+		float restrictCameraCoordinate(float t, float w);
+		void startFrame();
+		void finishFrame();
+		void drawTerrain();
+		void drawTexts();
+		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p);
+		void drawSoldiers();
+		void setFocusSoldier();
+
 		WorldPtr mWorld;
 		Common::Clock mClock;
 		SDL_Surface* mScreen;
@@ -38,20 +52,7 @@ class Driver {
 		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
 		boost::shared_ptr<Common::Texture> mGrassTexture;
 		Common::TextMap mTextMap;
-
-	private:
-		void loadTextures();
-		void loadFont();
-		Common::Color mapSideColor(bool first, const Common::Color& c);
-		bool handleInput(float frameTime);
-		void handleInputState(float frameTime);
-		float restrictCameraCoordinate(float t, float w);
-		void startFrame();
-		void finishFrame();
-		void drawTerrain();
-		void drawTexts();
-		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p);
-		void drawSoldiers();
+		SoldierPtr mFocusSoldier;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

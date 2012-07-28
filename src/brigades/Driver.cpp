@@ -15,13 +15,15 @@ Driver::Driver(WorldPtr w)
 	mPaused(false),
 	mScaleLevel(11.5f),
 	mScaleLevelVelocity(0.0f),
-	mFreeCamera(true)
+	mFreeCamera(false)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
 	loadTextures();
 	loadFont();
 	SDL_utils::setupOrthoScreen(screenWidth, screenHeight);
+
+	setFocusSoldier();
 }
 
 void Driver::run()
@@ -215,6 +217,9 @@ void Driver::handleInputState(float frameTime)
 	if(mFreeCamera) {
 		mCamera -= mCameraVelocity * frameTime * 10.0f;
 	}
+	else if(mFocusSoldier) {
+		mCamera = mFocusSoldier->getPosition();
+	}
 	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
 	mScaleLevel = clamp(10.0f, mScaleLevel, 20.0f);
 }
@@ -301,6 +306,13 @@ void Driver::drawSoldiers()
 					mScaleLevel * 2.0f, mScaleLevel * 2.0f),
 				Rectangle(1, 1, -1, -1), 0.0f);
 	}
+}
+
+void Driver::setFocusSoldier()
+{
+	const auto soldiers = mWorld->getSoldiersAt(mCamera, 1000.0f);
+	if(!soldiers.empty())
+		mFocusSoldier = soldiers[0];
 }
 
 }
