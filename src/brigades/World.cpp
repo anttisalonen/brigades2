@@ -31,7 +31,7 @@ SidePtr Soldier::getSide() const
 	return mSide;
 }
 
-int Soldier::getID()
+int Soldier::getID() const
 {
 	return mID;
 }
@@ -40,6 +40,12 @@ int Soldier::getNextID()
 {
 	static int id = 0;
 	return ++id;
+}
+
+void Soldier::update(float time)
+{
+	mAcceleration.x = 10.0f;
+	updateComplete(time, 10.0f);
 }
 
 World::World()
@@ -94,7 +100,9 @@ SidePtr World::getSide(bool first) const
 // modifiers
 void World::update(float time)
 {
-	/* TODO */
+	for(auto s : mSoldiers) {
+		s.second->update(time);
+	}
 }
 
 bool World::addSoldierAction(const SoldierPtr s, const SoldierAction& a)

@@ -37,7 +37,8 @@ class Soldier : public Common::Entity<boost::shared_ptr<World>> {
 	public:
 		Soldier(boost::shared_ptr<World> w, bool firstside);
 		SidePtr getSide() const;
-		int getID();
+		int getID() const;
+		void update(float time) override;
 
 	private:
 		SidePtr mSide;
