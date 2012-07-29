@@ -14,7 +14,9 @@ int main(int argc, char** argv)
 	WorldPtr world(new World());
 	DriverPtr driver(new Driver(world));
 
-	srand(time(NULL));
+	int seed = time(NULL);
+	srand(seed);
+	std::cout << "Seed: " << seed << "\n";
 	world->create();
 	driver->init();
 

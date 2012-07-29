@@ -56,6 +56,8 @@ class SoldierAction {
 
 typedef boost::shared_ptr<SoldierAction> SoldierActionPtr;
 
+typedef boost::shared_ptr<Common::Wall> WallPtr;
+
 class World : public boost::enable_shared_from_this<World> {
 
 	public:
@@ -68,6 +70,7 @@ class World : public boost::enable_shared_from_this<World> {
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
+		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
 
 		// modifiers
 		void update(float time);
@@ -77,11 +80,13 @@ class World : public boost::enable_shared_from_this<World> {
 		void setupSides();
 		void addSoldier(bool first);
 		void addTrees();
+		void addWalls();
 		float mWidth;
 		float mHeight;
 		SidePtr mSides[NUM_SIDES];
 		std::map<int, SoldierPtr> mSoldiers;
 		std::vector<TreePtr> mTrees;
+		std::vector<WallPtr> mWalls;
 };
 
 typedef boost::shared_ptr<World> WorldPtr;

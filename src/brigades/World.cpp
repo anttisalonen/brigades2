@@ -54,13 +54,19 @@ void Soldier::update(float time)
 
 	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mPosition, mVelocity.length());
 	std::vector<Obstacle*> obstacles(trees.size());
-	for(unsigned int i = 0; i < trees.size(); i++) {
+	for(unsigned int i = 0; i < trees.size(); i++)
 		obstacles[i] = trees[i].get();
-	}
+
+	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mPosition, mVelocity.length());
+	std::vector<Wall*> walls(wallptrs.size());
+	for(unsigned int i = 0; i < wallptrs.size(); i++)
+		walls[i] = wallptrs[i].get();
 
 	Vector3 obs = mSteering.obstacleAvoidance(obstacles);
+	Vector3 wal = mSteering.wallAvoidance(walls);
 	Vector3 vel = mSteering.wander();
 	Vector3 tot;
+	mSteering.accumulate(tot, wal);
 	mSteering.accumulate(tot, obs);
 	mSteering.accumulate(tot, vel);
 	mAcceleration = tot * (10.0f / time);
@@ -79,6 +85,7 @@ World::World()
 
 void World::create()
 {
+	addWalls();
 	addTrees();
 	setupSides();
 }
@@ -115,6 +122,12 @@ float World::getHeight() const
 SidePtr World::getSide(bool first) const
 {
 	return mSides[first ? 0 : 1];
+}
+
+std::vector<WallPtr> World::getWallsAt(const Common::Vector3& v, float radius) const
+{
+	/* TODO */
+	return mWalls;
 }
 
 
@@ -156,7 +169,7 @@ void World::addSoldier(bool first)
 
 void World::addTrees()
 {
-	for(int i = 0; i < mWidth * mHeight * 0.1f; i++) {
+	for(int i = 0; i < mWidth * mHeight * 0.01f; i++) {
 		float x = Random::clamped();
 		float y = Random::clamped();
 		float r = Random::uniform();
@@ -184,4 +197,18 @@ void World::addTrees()
 	std::cout << "Added " << mTrees.size() << " trees.\n";
 }
 
+void World::addWalls()
+{
+	Vector3 a(-mWidth * 0.5f + 5.0f, -mHeight * 0.5f + 5.0f, 0.0f);
+	Vector3 b( mWidth * 0.5f - 5.0f, -mHeight * 0.5f + 5.0f, 0.0f);
+	Vector3 c(-mWidth * 0.5f + 5.0f,  mHeight * 0.5f - 5.0f, 0.0f);
+	Vector3 d( mWidth * 0.5f - 5.0f,  mHeight * 0.5f - 5.0f, 0.0f);
+
+	mWalls.push_back(WallPtr(new Wall(a, b)));
+	mWalls.push_back(WallPtr(new Wall(a, c)));
+	mWalls.push_back(WallPtr(new Wall(b, d)));
+	mWalls.push_back(WallPtr(new Wall(c, d)));
 }
+
+}
+
