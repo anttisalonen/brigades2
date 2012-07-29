@@ -19,6 +19,7 @@ namespace Brigades {
 enum class SpriteType {
 	Soldier,
 	Tree,
+	Bullet,
 };
 
 struct Sprite {

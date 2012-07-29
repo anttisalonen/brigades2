@@ -14,6 +14,48 @@ Tree::Tree(const Vector3& pos, float radius)
 	mPosition = pos;
 }
 
+Weapon::Weapon(float range, float velocity, float loadtime)
+	: mRange(range),
+	mVelocity(velocity),
+	mLoadTime(loadtime)
+{
+}
+
+void Weapon::update(float time)
+{
+	mLoadTime.doCountdown(time);
+	mLoadTime.check();
+}
+
+bool Weapon::canShoot() const
+{
+	return !mLoadTime.running();
+}
+
+float Weapon::getRange() const
+{
+	return mRange;
+}
+
+float Weapon::getVelocity() const
+{
+	return mVelocity;
+}
+
+void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
+{
+	if(!canShoot())
+		return;
+
+	w->addBullet(shared_from_this(), s, dir);
+	mLoadTime.rewind();
+}
+
+AssaultRifle::AssaultRifle()
+	: Weapon(25.0f, 20.0f, 0.1f)
+{
+}
+
 Side::Side(bool first)
 	: mFirst(first)
 {
@@ -41,7 +83,9 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
 	mWorld(w),
 	mSide(w->getSide(firstside)),
 	mID(getNextID()),
-	mFOV(PI)
+	mFOV(PI),
+	mAlive(true),
+	mWeapon(WeaponPtr(new AssaultRifle()))
 {
 }
 
@@ -71,6 +115,7 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
+	mWeapon->update(time);
 	if(mController) {
 		mController->act(time);
 	}
@@ -86,10 +131,54 @@ void Soldier::setController(SoldierControllerPtr p)
 	mController = p;
 }
 
+void Soldier::die()
+{
+	mAlive = false;
+}
+
+bool Soldier::isDead() const
+{
+	return !mAlive;
+}
+
+WeaponPtr Soldier::getWeapon()
+{
+	return mWeapon;
+}
+
+Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
+	: mShooter(shooter),
+	mTimer(timeleft)
+{
+	mTimer.rewind();
+	mPosition = pos;
+	mVelocity = vel;
+}
+
+void Bullet::update(float time)
+{
+	if(!isAlive())
+		return;
+
+	Entity::update(time);
+	mTimer.doCountdown(time);
+	mTimer.check();
+}
+
+bool Bullet::isAlive() const
+{
+	return mTimer.running();
+}
+
+SoldierPtr Bullet::getShooter() const
+{
+	return mShooter;
+}
+
 World::World()
 	: mWidth(100.0f),
 	mHeight(100.0f),
-	mVisibility(25.0f)
+	mVisibility(150.0f)
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
 		mSides[i] = SidePtr(new Side(i == 0));
@@ -120,6 +209,12 @@ std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius) con
 	}
 
 	return ret;
+}
+
+std::vector<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius) const
+{
+	/* TODO */
+	return mBullets;
 }
 
 float World::getWidth() const
@@ -185,8 +280,52 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p) const
 void World::update(float time)
 {
 	for(auto s : mSoldiers) {
-		s.second->update(time);
+		if(!s.second->isDead())
+			s.second->update(time);
 	}
+
+	auto bit = mBullets.begin();
+	while(bit != mBullets.end()) {
+		bool erase = false;
+		auto soldiers = getSoldiersAt((*bit)->getPosition(), (*bit)->getVelocity().length());
+		for(auto s : soldiers) {
+			if(s == (*bit)->getShooter())
+				continue;
+
+			if(s->isDead())
+				continue;
+
+			if(Math::segmentCircleIntersect((*bit)->getPosition(),
+						(*bit)->getPosition() + (*bit)->getVelocity() * time,
+						s->getPosition(), s->getRadius())) {
+				s->die();
+				erase = true;
+				break;
+			}
+		}
+
+		if(!erase) {
+			(*bit)->update(time);
+			if(!(*bit)->isAlive()) {
+				erase = true;
+			}
+		}
+
+		if(erase) {
+			bit = mBullets.erase(bit);
+		} else {
+			++bit;
+		}
+	}
+}
+
+void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
+{
+	float time = w->getRange() / w->getVelocity();
+	mBullets.push_back(BulletPtr(new Bullet(s,
+				s->getPosition(),
+				dir.normalized() * w->getVelocity(),
+				time)));
 }
 
 void World::setupSides()

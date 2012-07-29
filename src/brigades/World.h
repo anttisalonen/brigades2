@@ -7,6 +7,7 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "common/Clock.h"
 #include "common/Vehicle.h"
 #include "common/Steering.h"
 
@@ -15,6 +16,7 @@
 namespace Brigades {
 
 class World;
+class Soldier;
 
 class Tree : public Common::Obstacle {
 	public:
@@ -22,6 +24,31 @@ class Tree : public Common::Obstacle {
 };
 
 typedef boost::shared_ptr<Tree> TreePtr;
+typedef boost::shared_ptr<Soldier> SoldierPtr;
+typedef boost::shared_ptr<World> WorldPtr;
+
+class Weapon : public boost::enable_shared_from_this<Weapon> {
+	public:
+		Weapon(float range, float velocity, float loadtime);
+		virtual ~Weapon() { }
+		void update(float time);
+		bool canShoot() const;
+		float getRange() const;
+		float getVelocity() const;
+		void shoot(WorldPtr w, const SoldierPtr s, const Common::Vector3& dir);
+
+	protected:
+		float mRange;
+		float mVelocity;
+		Common::Countdown mLoadTime;
+};
+
+class AssaultRifle : public Weapon {
+	public:
+		AssaultRifle();
+};
+
+typedef boost::shared_ptr<Weapon> WeaponPtr;
 
 class Side {
 	public:
@@ -60,6 +87,9 @@ class Soldier : public Common::Vehicle {
 		void update(float time) override;
 		float getFOV() const; // total FOV in radians
 		void setController(SoldierControllerPtr p);
+		void die();
+		bool isDead() const;
+		WeaponPtr getWeapon();
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -67,11 +97,11 @@ class Soldier : public Common::Vehicle {
 		int mID;
 		float mFOV;
 		SoldierControllerPtr mController;
+		bool mAlive;
+		WeaponPtr mWeapon;
 
 		static int getNextID();
 };
-
-typedef boost::shared_ptr<Soldier> SoldierPtr;
 
 class SoldierAction {
 	public:
@@ -87,6 +117,20 @@ typedef boost::shared_ptr<SoldierAction> SoldierActionPtr;
 
 typedef boost::shared_ptr<Common::Wall> WallPtr;
 
+class Bullet : public Common::Entity {
+	public:
+		Bullet(const SoldierPtr shooter, const Common::Vector3& pos, const Common::Vector3& vel, float timeleft);
+		void update(float time) override;
+		bool isAlive() const;
+		SoldierPtr getShooter() const;
+
+	private:
+		SoldierPtr mShooter;
+		Common::Countdown mTimer;
+};
+
+typedef boost::shared_ptr<Bullet> BulletPtr;
+
 class World : public boost::enable_shared_from_this<World> {
 
 	public:
@@ -96,6 +140,7 @@ class World : public boost::enable_shared_from_this<World> {
 		// accessors
 		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius) const;
+		std::vector<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
@@ -105,6 +150,7 @@ class World : public boost::enable_shared_from_this<World> {
 		// modifiers
 		void update(float time);
 		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
+		void addBullet(const WeaponPtr w, const SoldierPtr s, const Common::Vector3& dir);
 
 	private:
 		void setupSides();
@@ -118,9 +164,8 @@ class World : public boost::enable_shared_from_this<World> {
 		std::vector<TreePtr> mTrees;
 		std::vector<WallPtr> mWalls;
 		float mVisibility;
+		std::vector<BulletPtr> mBullets;
 };
-
-typedef boost::shared_ptr<World> WorldPtr;
 
 };
 

@@ -342,26 +342,42 @@ void Driver::drawEntities()
 					-0.5f, -0.8f));
 	}
 
+	auto bullets = mWorld->getBulletsAt(mCamera, 10.0f);
+	for(auto b : bullets) {
+		sprites.push_back(Sprite(b, SpriteType::Bullet, 1.0f, boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
+					0.0f, -0.5f,
+					-0.8f, -1.0f));
+	}
+
 	for(auto s : sprites) {
 		const Vector3& v(s.mEntity->getPosition());
+		Rectangle r = Rectangle((-mCamera.x + v.x + s.mSXP * s.mScale + v.z * 0.15f * s.mScale) * mScaleLevel + screenWidth * 0.5f,
+				(-mCamera.y + v.y + s.mSYP * s.mScale - v.z * 0.20f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
+				mScaleLevel * s.mScale, mScaleLevel * s.mScale);
 
-		SDL_utils::drawSprite(*s.mShadowTexture,
-				Rectangle((-mCamera.x + v.x + s.mSXP * s.mScale + v.z * 0.15f * s.mScale) * mScaleLevel + screenWidth * 0.5f,
-					  (-mCamera.y + v.y + s.mSYP * s.mScale - v.z * 0.20f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
-					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
-				Rectangle(1, 1, -1, -1), 0.0f);
+		if(s.mSpriteType != SpriteType::Bullet) {
+			SDL_utils::drawSprite(*s.mShadowTexture,
+					r,
+					Rectangle(1, 1, -1, -1), 0.0f);
+		} else {
+			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), 1.0f, Color::Black);
+		}
 	}
 
 	std::sort(sprites.begin(), sprites.end());
 
 	for(auto s : sprites) {
 		const Vector3& v(s.mEntity->getPosition());
+		Rectangle r = Rectangle((-mCamera.x + v.x + s.mXP * s.mScale) * mScaleLevel + screenWidth * 0.5f,
+				(-mCamera.y + v.y + s.mYP * s.mScale + v.z * 0.3f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
+				mScaleLevel * s.mScale, mScaleLevel * s.mScale);
 
-		SDL_utils::drawSprite(*s.mTexture,
-				Rectangle((-mCamera.x + v.x + s.mXP * s.mScale) * mScaleLevel + screenWidth * 0.5f,
-					  (-mCamera.y + v.y + s.mYP * s.mScale + v.z * 0.3f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
-					mScaleLevel * s.mScale, mScaleLevel * s.mScale),
-				Rectangle(1, 1, -1, -1), 0.0f);
+		if(s.mSpriteType != SpriteType::Bullet) {
+			SDL_utils::drawSprite(*s.mTexture, r,
+					Rectangle(1, 1, -1, -1), 0.0f);
+		} else {
+			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), 1.0f, Color::White);
+		}
 
 #if 0
 		SDL_utils::drawCircle((-mCamera.x + v.x) * mScaleLevel + screenWidth * 0.5f,

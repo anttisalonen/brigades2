@@ -17,28 +17,12 @@ SoldierController::SoldierController(WorldPtr w, SoldierPtr p)
 void SoldierController::act(float time)
 {
 	if(mVisionUpdater.check(time)) {
-		auto soldiers = mWorld->getSoldiersInFOV(mSoldier);
-		float distToNearest = FLT_MAX;
-		SoldierPtr nearest;
-		for(auto s : soldiers) {
-			if(s->getSideNum() != mSoldier->getSideNum()) {
-				float thisdist = Entity::distanceBetween(*mSoldier, *s);
-				if(thisdist < distToNearest) {
-					distToNearest = thisdist;
-					nearest = s;
-				}
-			}
-		}
-
-		if(nearest) {
-			mTargetSoldier = nearest;
-		}
-		else {
-			mTargetSoldier = SoldierPtr();
-		}
+		updateTargetSoldier();
 	}
 
 	move(time);
+	tryToShoot();
+
 }
 
 void SoldierController::move(float time)
@@ -74,6 +58,42 @@ void SoldierController::move(float time)
 	mSoldier->setAutomaticHeading();
 }
 
+void SoldierController::updateTargetSoldier()
+{
+	auto soldiers = mWorld->getSoldiersInFOV(mSoldier);
+	float distToNearest = FLT_MAX;
+	SoldierPtr nearest;
+	for(auto s : soldiers) {
+		if(!s->isDead() && s->getSideNum() != mSoldier->getSideNum()) {
+			float thisdist = Entity::distanceBetween(*mSoldier, *s);
+			if(thisdist < distToNearest) {
+				distToNearest = thisdist;
+				nearest = s;
+			}
+		}
+	}
+
+	if(nearest) {
+		mTargetSoldier = nearest;
+	}
+	else {
+		mTargetSoldier = SoldierPtr();
+	}
+}
+
+void SoldierController::tryToShoot()
+{
+	if(!mTargetSoldier) {
+		return;
+	}
+
+	float dist = Entity::distanceBetween(*mTargetSoldier, *mSoldier);
+	if(dist < mSoldier->getWeapon()->getRange()) {
+		if(mSoldier->getWeapon()->canShoot()) {
+			mSoldier->getWeapon()->shoot(mWorld, mSoldier, mTargetSoldier->getPosition() - mSoldier->getPosition());
+		}
+	}
+}
 
 }
 

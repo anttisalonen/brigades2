@@ -20,6 +20,8 @@ class SoldierController : public Brigades::SoldierController {
 
 	private:
 		void move(float time);
+		void updateTargetSoldier();
+		void tryToShoot();
 };
 
 }
