@@ -52,7 +52,7 @@ class Driver {
 		Common::Color mapSideColor(bool first, const Common::Color& c);
 		bool handleInput(float frameTime);
 		void handleInputState(float frameTime);
-		float restrictCameraCoordinate(float t, float w);
+		float restrictCameraCoordinate(float t, float w, float res);
 		void startFrame();
 		void finishFrame();
 		void drawTerrain();

@@ -247,26 +247,27 @@ void Driver::handleInputState(float frameTime)
 	mScaleLevel = clamp(10.0f, mScaleLevel, 20.0f);
 }
 
-float Driver::restrictCameraCoordinate(float t, float w)
+float Driver::restrictCameraCoordinate(float t, float w, float res)
 {
-	const float minX = w * -0.5f - 5.0f;
-	const float maxX = w * 0.5f + 5.0f;
-	const float minXCamPix = minX * mScaleLevel + screenWidth * 0.5f;
-	const float maxXCamPix = maxX * mScaleLevel - screenWidth * 0.5f;
+	const float minX = w * -0.5f;
+	const float maxX = w * 0.5f;
+	const float minXCamPix = minX * mScaleLevel + res * 0.5f;
+	const float maxXCamPix = maxX * mScaleLevel - res * 0.5f;
 	const float minXCam = minXCamPix / mScaleLevel;
 	const float maxXCam = maxXCamPix / mScaleLevel;
-	if(minXCam > maxXCam)
+	if(minXCam > maxXCam) {
 		return 0.0f;
-	else
+	} else {
 		return clamp(minXCam, t, maxXCam);
+	}
 }
 
 void Driver::startFrame()
 {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	mCamera.x = restrictCameraCoordinate(mCamera.x, mWorld->getWidth());
-	mCamera.y = restrictCameraCoordinate(mCamera.y, mWorld->getWidth());
+	mCamera.x = restrictCameraCoordinate(mCamera.x, mWorld->getWidth(), screenWidth);
+	mCamera.y = restrictCameraCoordinate(mCamera.y, mWorld->getHeight(), screenHeight);
 }
 
 void Driver::finishFrame()
