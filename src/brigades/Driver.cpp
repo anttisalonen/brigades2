@@ -29,7 +29,8 @@ Driver::Driver(WorldPtr w)
 	mPaused(false),
 	mScaleLevel(11.5f),
 	mScaleLevelVelocity(0.0f),
-	mFreeCamera(false)
+	mFreeCamera(false),
+	mSoldierVisible(false)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -292,6 +293,19 @@ void Driver::drawTexts()
 		SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
 				screenWidth / 2, screenHeight / 2, FontConfig("Paused", Color(255, 255, 255), 2.0f),
 				true, true);
+	}
+	if(mFocusSoldier) {
+		char posbuf[128];
+		sprintf(posbuf, "%3.1f %3.1f", mFocusSoldier->getPosition().x, mFocusSoldier->getPosition().y);
+		SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+				40.0f, 40.0f, FontConfig(posbuf, Color(255, 255, 255), 1.5f),
+				true, false);
+		mSoldierVisible = !mWorld->getSoldiersInFOV(mFocusSoldier).empty();
+		if(mSoldierVisible) {
+			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+					40.0f, screenHeight - 40.0f, FontConfig("Soldier Visible", Color(255, 255, 255), 1.5f),
+					true, false);
+		}
 	}
 }
 

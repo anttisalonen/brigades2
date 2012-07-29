@@ -79,6 +79,7 @@ class Driver {
 		boost::shared_ptr<Common::Texture> mTreeShadowTexture;
 		Common::TextMap mTextMap;
 		SoldierPtr mFocusSoldier;
+		bool mSoldierVisible;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

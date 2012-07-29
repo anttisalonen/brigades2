@@ -40,12 +40,15 @@ class Soldier : public Common::Vehicle {
 		SidePtr getSide() const;
 		int getID() const;
 		void update(float time) override;
+		float getFOV() const; // total FOV in radians
 
 	private:
 		boost::shared_ptr<World> mWorld;
 		SidePtr mSide;
 		int mID;
 		Common::Steering mSteering;
+		float mFOV;
+
 		static int getNextID();
 };
 
@@ -71,6 +74,7 @@ class World : public boost::enable_shared_from_this<World> {
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
 		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
+		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p) const;
 
 		// modifiers
 		void update(float time);
@@ -87,6 +91,7 @@ class World : public boost::enable_shared_from_this<World> {
 		std::map<int, SoldierPtr> mSoldiers;
 		std::vector<TreePtr> mTrees;
 		std::vector<WallPtr> mWalls;
+		float mVisibility;
 };
 
 typedef boost::shared_ptr<World> WorldPtr;

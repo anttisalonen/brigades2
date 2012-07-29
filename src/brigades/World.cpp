@@ -27,7 +27,8 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
 	mWorld(w),
 	mSide(w->getSide(firstside)),
 	mID(getNextID()),
-	mSteering(*this)
+	mSteering(*this),
+	mFOV(PI)
 {
 }
 
@@ -74,9 +75,15 @@ void Soldier::update(float time)
 	setAutomaticHeading();
 }
 
+float Soldier::getFOV() const
+{
+	return mFOV;
+}
+
 World::World()
 	: mWidth(100.0f),
-	mHeight(100.0f)
+	mHeight(100.0f),
+	mVisibility(25.0f)
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
 		mSides[i] = SidePtr(new Side(i == 0));
@@ -130,6 +137,43 @@ std::vector<WallPtr> World::getWallsAt(const Common::Vector3& v, float radius) c
 	return mWalls;
 }
 
+std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p) const
+{
+	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibility);
+	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibility);
+	std::vector<SoldierPtr> ret;
+
+	for(auto s : nearbysoldiers) {
+		if(s.get() == p.get())
+			continue;
+
+		float distToMe = Entity::distanceBetween(*p, *s);
+		if(distToMe > mVisibility) {
+			continue;
+		}
+
+		float dot = p->getHeadingVector().normalized().dot((s->getPosition() - p->getPosition()).normalized());
+		if(acos(dot) > p->getFOV() * 0.5f) {
+			continue;
+		}
+
+		bool treeblocks = false;
+		for(auto t : nearbytrees) {
+			if(Math::segmentCircleIntersect(p->getPosition(), s->getPosition(),
+						t->getPosition(), t->getRadius())) {
+				treeblocks = true;
+				break;
+			}
+		}
+		if(treeblocks) {
+			continue;
+		}
+
+		ret.push_back(s);
+	}
+
+	return ret;
+}
 
 // modifiers
 void World::update(float time)
