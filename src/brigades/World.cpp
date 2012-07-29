@@ -2,6 +2,8 @@
 
 #include "common/Random.h"
 
+#include "ai/SoldierController.h"
+
 using namespace Common;
 
 namespace Brigades {
@@ -22,12 +24,23 @@ bool Side::isFirst() const
 	return mFirst;
 }
 
+int Side::getSideNum() const
+{
+	return mFirst ? 0 : 1;
+}
+
+SoldierController::SoldierController(boost::shared_ptr<World> w, boost::shared_ptr<Soldier> s)
+	: mWorld(w),
+	mSoldier(s),
+	mSteering(*s)
+{
+}
+
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),
 	mWorld(w),
 	mSide(w->getSide(firstside)),
 	mID(getNextID()),
-	mSteering(*this),
 	mFOV(PI)
 {
 }
@@ -42,6 +55,11 @@ int Soldier::getID() const
 	return mID;
 }
 
+int Soldier::getSideNum() const
+{
+	return mSide->getSideNum();
+}
+
 int Soldier::getNextID()
 {
 	static int id = 0;
@@ -53,31 +71,19 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
-	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mPosition, mVelocity.length());
-	std::vector<Obstacle*> obstacles(trees.size());
-	for(unsigned int i = 0; i < trees.size(); i++)
-		obstacles[i] = trees[i].get();
-
-	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mPosition, mVelocity.length());
-	std::vector<Wall*> walls(wallptrs.size());
-	for(unsigned int i = 0; i < wallptrs.size(); i++)
-		walls[i] = wallptrs[i].get();
-
-	Vector3 obs = mSteering.obstacleAvoidance(obstacles);
-	Vector3 wal = mSteering.wallAvoidance(walls);
-	Vector3 vel = mSteering.wander();
-	Vector3 tot;
-	mSteering.accumulate(tot, wal);
-	mSteering.accumulate(tot, obs);
-	mSteering.accumulate(tot, vel);
-	mAcceleration = tot * (10.0f / time);
-	Vehicle::update(time);
-	setAutomaticHeading();
+	if(mController) {
+		mController->act(time);
+	}
 }
 
 float Soldier::getFOV() const
 {
 	return mFOV;
+}
+
+void Soldier::setController(SoldierControllerPtr p)
+{
+	mController = p;
 }
 
 World::World()
@@ -183,12 +189,6 @@ void World::update(float time)
 	}
 }
 
-bool World::addSoldierAction(const SoldierPtr s, const SoldierAction& a)
-{
-	/* TODO */
-	return true;
-}
-
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
@@ -199,6 +199,7 @@ void World::setupSides()
 void World::addSoldier(bool first)
 {
 	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first));
+	s->setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this(), s)));
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
 

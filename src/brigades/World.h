@@ -27,6 +27,7 @@ class Side {
 	public:
 		Side(bool first);
 		bool isFirst() const;
+		int getSideNum() const;
 
 	private:
 		bool mFirst;
@@ -34,20 +35,38 @@ class Side {
 
 typedef boost::shared_ptr<Side> SidePtr;
 
+class Soldier;
+
+class SoldierController {
+	public:
+		SoldierController(boost::shared_ptr<World> w, boost::shared_ptr<Soldier> s);
+		virtual ~SoldierController() { }
+		virtual void act(float time) = 0;
+
+	protected:
+		boost::shared_ptr<World> mWorld;
+		boost::shared_ptr<Soldier> mSoldier;
+		Common::Steering mSteering;
+};
+
+typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;
+
 class Soldier : public Common::Vehicle {
 	public:
 		Soldier(boost::shared_ptr<World> w, bool firstside);
 		SidePtr getSide() const;
 		int getID() const;
+		int getSideNum() const;
 		void update(float time) override;
 		float getFOV() const; // total FOV in radians
+		void setController(SoldierControllerPtr p);
 
 	private:
 		boost::shared_ptr<World> mWorld;
 		SidePtr mSide;
 		int mID;
-		Common::Steering mSteering;
 		float mFOV;
+		SoldierControllerPtr mController;
 
 		static int getNextID();
 };
@@ -55,6 +74,13 @@ class Soldier : public Common::Vehicle {
 typedef boost::shared_ptr<Soldier> SoldierPtr;
 
 class SoldierAction {
+	public:
+		SoldierAction(SoldierPtr p) : mSoldier(p) { }
+		virtual ~SoldierAction() { }
+		virtual void apply() = 0;
+
+	protected:
+		SoldierPtr mSoldier;
 };
 
 typedef boost::shared_ptr<SoldierAction> SoldierActionPtr;
