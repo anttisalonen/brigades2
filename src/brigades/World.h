@@ -146,6 +146,8 @@ class World : public boost::enable_shared_from_this<World> {
 		SidePtr getSide(bool first) const;
 		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p) const;
+		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
+		int soldiersAlive(int t) const;
 
 		// modifiers
 		void update(float time);
@@ -157,6 +159,10 @@ class World : public boost::enable_shared_from_this<World> {
 		void addSoldier(bool first);
 		void addTrees();
 		void addWalls();
+		void checkSoldierPosition(SoldierPtr s);
+		void checkForWin();
+		void killSoldier(SoldierPtr s);
+
 		float mWidth;
 		float mHeight;
 		SidePtr mSides[NUM_SIDES];
@@ -165,6 +171,9 @@ class World : public boost::enable_shared_from_this<World> {
 		std::vector<WallPtr> mWalls;
 		float mVisibility;
 		std::vector<BulletPtr> mBullets;
+		int mTeamWon;
+		int mSoldiersAlive[NUM_SIDES];
+		Common::SteadyTimer mWinTimer;
 };
 
 };

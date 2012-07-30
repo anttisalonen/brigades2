@@ -22,7 +22,6 @@ void SoldierController::act(float time)
 
 	move(time);
 	tryToShoot();
-
 }
 
 void SoldierController::move(float time)
@@ -44,7 +43,8 @@ void SoldierController::move(float time)
 	if(mTargetSoldier) {
 		vel = mSteering.pursuit(*mTargetSoldier);
 	} else {
-		vel = mSteering.wander();
+		if(mWorld->teamWon() < 0)
+			vel = mSteering.wander();
 	}
 	vel.truncate(10.0f);
 
@@ -55,7 +55,8 @@ void SoldierController::move(float time)
 
 	mSoldier->setAcceleration(tot * (10.0f / time));
 	mSoldier->Vehicle::update(time);
-	mSoldier->setAutomaticHeading();
+	if(mSoldier->getVelocity().length() > 0.3f)
+		mSoldier->setAutomaticHeading();
 }
 
 void SoldierController::updateTargetSoldier()

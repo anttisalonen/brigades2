@@ -77,12 +77,18 @@ void Driver::loadTextures()
 
 	int i = 0;
 	for(auto& s : surfs) {
-		for(int j = 0; j < 2; j++) {
+		for(int j = 0; j < NUM_SIDES; j++) {
 			SDLSurface surf(s);
 			surf.mapPixelColor( [&] (const Color& c) { return mapSideColor(j == 0, c); } );
 			mSoldierTexture[j][i] = boost::shared_ptr<Texture>(new Texture(surf, 0, 32));
 		}
 		i++;
+	}
+
+	for(int j = 0; j < NUM_SIDES; j++) {
+		SDLSurface surf("share/soldier1-fallen.png");
+		surf.mapPixelColor( [&] (const Color& c) { return mapSideColor(j == 0, c); } );
+		mFallenSoldierTexture[j] = boost::shared_ptr<Texture>(new Texture(surf, 0, 32));
 	}
 
 	mGrassTexture = boost::shared_ptr<Texture>(new Texture("share/grass1.png", 0, 0));
@@ -102,12 +108,17 @@ void Driver::loadFont()
 
 Common::Color Driver::mapSideColor(bool first, const Common::Color& c)
 {
-	if(c.r == 255 && c.b == 255) {
+	if(c.r == 240 && c.g == 240 && c.b == 0) {
 		if(first) {
 			return Common::Color::Red;
 		} else {
 			return Common::Color::Blue;
 		}
+	}
+
+	if((c.r == 255) ||
+			(c.r == 0 && c.g == 0 && c.b == 255)) {
+		return Color(25, 68, 29);
 	}
 
 	return c;
@@ -307,10 +318,53 @@ void Driver::drawTexts()
 					true, false);
 		}
 	}
+
+	{
+		for(int i = 0; i < NUM_SIDES; i++) {
+			char alivebuf[128];
+			Color c = i == 0 ? Color::Red : Color::Blue;
+			int alive = mWorld->soldiersAlive(i);
+			sprintf(alivebuf, "%d soldier%s", alive, alive == 1 ? "" : "s");
+			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+					40.0f, screenHeight - 40.0f - 15.0f * (i + 2), FontConfig(alivebuf, c, 1.0f),
+					true, false);
+		}
+	}
+
+	switch(mWorld->teamWon()) {
+		case -1:
+		default:
+			break;
+
+		case 0:
+		case 1:
+			{
+				char buf[128];
+				Color c = mWorld->teamWon() == 0 ? Color::Red : Color::Blue;
+				sprintf(buf, "%s team won", mWorld->teamWon() == 0 ? "Red" : "Blue");
+				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+						screenWidth * 0.5f, screenHeight * 0.5f - 40.0f, FontConfig(buf, c, 3.0f),
+						true, true);
+			}
+			break;
+
+		case -2:
+			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+					screenWidth * 0.5f, screenHeight * 0.5f - 40.0f, FontConfig("Draw", Color::White, 3.0f),
+					true, true);
+			break;
+
+	}
 }
 
-const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p)
+const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, float& sxp, float& syp)
 {
+	if(p->isDead()) {
+		sxp = -0.4f;
+		syp = -0.1f;
+		return mFallenSoldierTexture[p->getSide()->isFirst() ? 0 : 1];
+	}
+
 	float r = p->getXYRotation();
 	int dir = 3; // west
 	if(r < QUARTER_PI && r >= -QUARTER_PI) {
@@ -323,6 +377,8 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p)
 		dir = 2; // south
 	}
 
+	sxp = -0.4f;
+	syp = -0.5f;
 	return mSoldierTexture[p->getSide()->isFirst() ? 0 : 1][dir];
 }
 
@@ -332,8 +388,11 @@ void Driver::drawEntities()
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, 10.0f);
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
-		sprites.push_back(Sprite(s, SpriteType::Soldier, 2.0f, soldierTexture(s), mSoldierShadowTexture, -0.4f, 0.0f,
-					-0.4f, -0.5f));
+		boost::shared_ptr<Texture> t;
+		float sxp, syp;
+		t = soldierTexture(s, sxp, syp);
+		sprites.push_back(Sprite(s, SpriteType::Soldier, 2.0f, t, mSoldierShadowTexture, -0.4f, 0.0f,
+					sxp, syp));
 	}
 
 	auto trees = mWorld->getTreesAt(mCamera, 10.0f);
@@ -345,7 +404,7 @@ void Driver::drawEntities()
 	auto bullets = mWorld->getBulletsAt(mCamera, 10.0f);
 	for(auto b : bullets) {
 		sprites.push_back(Sprite(b, SpriteType::Bullet, 1.0f, boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
-					0.0f, -0.5f,
+					0.0f, 0.5f,
 					-0.8f, -1.0f));
 	}
 

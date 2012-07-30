@@ -58,7 +58,7 @@ class Driver {
 		void finishFrame();
 		void drawTerrain();
 		void drawTexts();
-		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p);
+		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p, float& sxp, float& syp);
 		void drawEntities();
 		void setFocusSoldier();
 
@@ -74,6 +74,7 @@ class Driver {
 		Common::Vector3 mCameraVelocity;
 		Common::Vector3 mPlayerControlVelocity;
 		boost::shared_ptr<Common::Texture> mSoldierTexture[NUM_SIDES][4];
+		boost::shared_ptr<Common::Texture> mFallenSoldierTexture[NUM_SIDES];
 		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
 		boost::shared_ptr<Common::Texture> mGrassTexture;
 		boost::shared_ptr<Common::Texture> mTreeTexture;

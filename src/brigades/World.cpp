@@ -1,3 +1,5 @@
+#include <stdexcept>
+
 #include "World.h"
 
 #include "common/Random.h"
@@ -178,7 +180,9 @@ SoldierPtr Bullet::getShooter() const
 World::World()
 	: mWidth(100.0f),
 	mHeight(100.0f),
-	mVisibility(150.0f)
+	mVisibility(25.0f),
+	mTeamWon(-1),
+	mWinTimer(1.0f)
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
 		mSides[i] = SidePtr(new Side(i == 0));
@@ -276,12 +280,28 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p) const
 	return ret;
 }
 
+int World::teamWon() const
+{
+	return mTeamWon;
+}
+
+int World::soldiersAlive(int t) const
+{
+	if(t >= NUM_SIDES || t < 0) {
+		throw std::runtime_error("World::soldiersAlive: invalid parameter");
+	}
+	return mSoldiersAlive[t];
+}
+
+
 // modifiers
 void World::update(float time)
 {
 	for(auto s : mSoldiers) {
 		if(!s.second->isDead())
 			s.second->update(time);
+
+		checkSoldierPosition(s.second);
 	}
 
 	auto bit = mBullets.begin();
@@ -298,7 +318,7 @@ void World::update(float time)
 			if(Math::segmentCircleIntersect((*bit)->getPosition(),
 						(*bit)->getPosition() + (*bit)->getVelocity() * time,
 						s->getPosition(), s->getRadius())) {
-				s->die();
+				killSoldier(s);
 				erase = true;
 				break;
 			}
@@ -317,6 +337,10 @@ void World::update(float time)
 			++bit;
 		}
 	}
+
+	if(mWinTimer.check(time)) {
+		checkForWin();
+	}
 }
 
 void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
@@ -331,7 +355,8 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
-		addSoldier(i == 0);
+		for(int j = 0; j < 10; j++)
+			addSoldier(i == 0);
 	}
 }
 
@@ -341,6 +366,7 @@ void World::addSoldier(bool first)
 	s->setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this(), s)));
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
+	mSoldiersAlive[first ? 0 : 1]++;
 
 	float x = mWidth * 0.3f;
 	float y = mHeight * 0.3f;
@@ -383,15 +409,57 @@ void World::addTrees()
 
 void World::addWalls()
 {
-	Vector3 a(-mWidth * 0.5f + 5.0f, -mHeight * 0.5f + 5.0f, 0.0f);
-	Vector3 b( mWidth * 0.5f - 5.0f, -mHeight * 0.5f + 5.0f, 0.0f);
-	Vector3 c(-mWidth * 0.5f + 5.0f,  mHeight * 0.5f - 5.0f, 0.0f);
-	Vector3 d( mWidth * 0.5f - 5.0f,  mHeight * 0.5f - 5.0f, 0.0f);
+	const float wallDistance = 0.1f;
+	Vector3 a(-mWidth * 0.5f + wallDistance, -mHeight * 0.5f + wallDistance, 0.0f);
+	Vector3 b( mWidth * 0.5f - wallDistance, -mHeight * 0.5f + wallDistance, 0.0f);
+	Vector3 c(-mWidth * 0.5f + wallDistance,  mHeight * 0.5f - wallDistance, 0.0f);
+	Vector3 d( mWidth * 0.5f - wallDistance,  mHeight * 0.5f - wallDistance, 0.0f);
 
 	mWalls.push_back(WallPtr(new Wall(a, b)));
 	mWalls.push_back(WallPtr(new Wall(a, c)));
 	mWalls.push_back(WallPtr(new Wall(b, d)));
 	mWalls.push_back(WallPtr(new Wall(c, d)));
+}
+
+void World::checkSoldierPosition(SoldierPtr s)
+{
+	if(fabs(s->getPosition().x) > mWidth * 0.5f || fabs(s->getPosition().y) > mHeight * 0.5f) {
+		// stepped out of the world and fell
+		killSoldier(s);
+	}
+}
+
+void World::checkForWin()
+{
+	int winningTeam = -1;
+	for(int i = 0; i < NUM_SIDES; i++) {
+		if(mSoldiersAlive[i] != 0) {
+			if(winningTeam == -1) {
+				winningTeam = i;
+			}
+			else {
+				return;
+			}
+		}
+	}
+
+	if(winningTeam == -1) {
+		mTeamWon = -2;
+	}
+	else {
+		mTeamWon = winningTeam;
+	}
+}
+
+void World::killSoldier(SoldierPtr s)
+{
+	if(s->isDead())
+		return;
+
+	s->die();
+	assert(s->getSideNum() < NUM_SIDES);
+	assert(mSoldiersAlive[s->getSideNum()] > 0);
+	mSoldiersAlive[s->getSideNum()]--;
 }
 
 }
