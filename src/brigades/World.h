@@ -66,11 +66,14 @@ class Soldier;
 
 class SoldierController {
 	public:
-		SoldierController(boost::shared_ptr<World> w, boost::shared_ptr<Soldier> s);
+		SoldierController(boost::shared_ptr<Soldier> s);
 		virtual ~SoldierController() { }
 		virtual void act(float time) = 0;
 
 	protected:
+		Common::Vector3 defaultMovement(float time);
+		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
+
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
 		Common::Steering mSteering;
@@ -78,9 +81,12 @@ class SoldierController {
 
 typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;
 
-class Soldier : public Common::Vehicle {
+class SensorySystem;
+
+class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<Soldier> {
 	public:
 		Soldier(boost::shared_ptr<World> w, bool firstside);
+		void init();
 		SidePtr getSide() const;
 		int getID() const;
 		int getSideNum() const;
@@ -90,6 +96,9 @@ class Soldier : public Common::Vehicle {
 		void die();
 		bool isDead() const;
 		WeaponPtr getWeapon();
+		const WorldPtr getWorld() const;
+		WorldPtr getWorld();
+		boost::shared_ptr<SensorySystem> getSensorySystem();
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -99,6 +108,7 @@ class Soldier : public Common::Vehicle {
 		SoldierControllerPtr mController;
 		bool mAlive;
 		WeaponPtr mWeapon;
+		boost::shared_ptr<SensorySystem> mSensorySystem;
 
 		static int getNextID();
 };

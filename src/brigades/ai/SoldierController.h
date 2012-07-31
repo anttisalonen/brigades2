@@ -11,11 +11,10 @@ namespace AI {
 
 class SoldierController : public Brigades::SoldierController {
 	public:
-		SoldierController(WorldPtr w, SoldierPtr p);
+		SoldierController(SoldierPtr p);
 		void act(float time);
 
 	protected:
-		Common::SteadyTimer mVisionUpdater;
 		SoldierPtr mTargetSoldier;
 
 	private:

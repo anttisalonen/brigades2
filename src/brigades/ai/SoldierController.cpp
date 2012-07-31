@@ -1,5 +1,7 @@
 #include <cfloat>
 
+#include "brigades/SensorySystem.h"
+
 #include "brigades/ai/SoldierController.h"
 
 using namespace Common;
@@ -8,15 +10,14 @@ namespace Brigades {
 
 namespace AI {
 
-SoldierController::SoldierController(WorldPtr w, SoldierPtr p)
-	: Brigades::SoldierController(w, p),
-	mVisionUpdater(0.25f)
+SoldierController::SoldierController(SoldierPtr p)
+	: Brigades::SoldierController(p)
 {
 }
 
 void SoldierController::act(float time)
 {
-	if(mVisionUpdater.check(time)) {
+	if(mSoldier->getSensorySystem()->update(time)) {
 		updateTargetSoldier();
 	}
 
@@ -26,20 +27,8 @@ void SoldierController::act(float time)
 
 void SoldierController::move(float time)
 {
-	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
-	std::vector<Obstacle*> obstacles(trees.size());
-	for(unsigned int i = 0; i < trees.size(); i++)
-		obstacles[i] = trees[i].get();
-
-	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
-	std::vector<Wall*> walls(wallptrs.size());
-	for(unsigned int i = 0; i < wallptrs.size(); i++)
-		walls[i] = wallptrs[i].get();
-
-	Vector3 obs = mSteering.obstacleAvoidance(obstacles);
-	Vector3 wal = mSteering.wallAvoidance(walls);
-
 	Vector3 vel;
+
 	if(mTargetSoldier) {
 		vel = mSteering.pursuit(*mTargetSoldier);
 	} else {
@@ -48,20 +37,15 @@ void SoldierController::move(float time)
 	}
 	vel.truncate(10.0f);
 
-	Vector3 tot;
-	mSteering.accumulate(tot, wal);
-	mSteering.accumulate(tot, obs);
+	Vector3 tot = defaultMovement(time);
 	mSteering.accumulate(tot, vel);
 
-	mSoldier->setAcceleration(tot * (10.0f / time));
-	mSoldier->Vehicle::update(time);
-	if(mSoldier->getVelocity().length() > 0.3f)
-		mSoldier->setAutomaticHeading();
+	moveTo(tot, time, true);
 }
 
 void SoldierController::updateTargetSoldier()
 {
-	auto soldiers = mWorld->getSoldiersInFOV(mSoldier);
+	auto soldiers = mSoldier->getSensorySystem()->getSoldiers();
 	float distToNearest = FLT_MAX;
 	SoldierPtr nearest;
 	for(auto s : soldiers) {

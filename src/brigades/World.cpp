@@ -1,6 +1,7 @@
 #include <stdexcept>
 
 #include "World.h"
+#include "SensorySystem.h"
 
 #include "common/Random.h"
 
@@ -73,11 +74,41 @@ int Side::getSideNum() const
 	return mFirst ? 0 : 1;
 }
 
-SoldierController::SoldierController(boost::shared_ptr<World> w, boost::shared_ptr<Soldier> s)
-	: mWorld(w),
+SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
+	: mWorld(s->getWorld()),
 	mSoldier(s),
 	mSteering(*s)
 {
+}
+
+Vector3 SoldierController::defaultMovement(float time)
+{
+	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
+	std::vector<Obstacle*> obstacles(trees.size());
+	for(unsigned int i = 0; i < trees.size(); i++)
+		obstacles[i] = trees[i].get();
+
+	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
+	std::vector<Wall*> walls(wallptrs.size());
+	for(unsigned int i = 0; i < wallptrs.size(); i++)
+		walls[i] = wallptrs[i].get();
+
+	Vector3 obs = mSteering.obstacleAvoidance(obstacles);
+	Vector3 wal = mSteering.wallAvoidance(walls);
+
+	Vector3 tot;
+	mSteering.accumulate(tot, wal);
+	mSteering.accumulate(tot, obs);
+
+	return tot;
+}
+
+void SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
+{
+	mSoldier->setAcceleration(dir * (10.0f / time));
+	mSoldier->Vehicle::update(time);
+	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
+		mSoldier->setAutomaticHeading();
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
@@ -89,6 +120,12 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
 	mAlive(true),
 	mWeapon(WeaponPtr(new AssaultRifle()))
 {
+}
+
+void Soldier::init()
+{
+	setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this())));
+	mSensorySystem = SensorySystemPtr(new SensorySystem(shared_from_this()));
 }
 
 SidePtr Soldier::getSide() const
@@ -146,6 +183,21 @@ bool Soldier::isDead() const
 WeaponPtr Soldier::getWeapon()
 {
 	return mWeapon;
+}
+
+const WorldPtr Soldier::getWorld() const
+{
+	return mWorld;
+}
+
+WorldPtr Soldier::getWorld()
+{
+	return mWorld;
+}
+
+SensorySystemPtr Soldier::getSensorySystem()
+{
+	return mSensorySystem;
 }
 
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
@@ -363,7 +415,7 @@ void World::setupSides()
 void World::addSoldier(bool first)
 {
 	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first));
-	s->setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this(), s)));
+	s->init();
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
 	mSoldiersAlive[first ? 0 : 1]++;
