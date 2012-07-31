@@ -1,4 +1,5 @@
 #include "Driver.h"
+#include "SensorySystem.h"
 
 #include "common/Rectangle.h"
 #include "common/SDL_utils.h"
@@ -24,13 +25,16 @@ bool Sprite::operator<(const Sprite& s1) const
 	return false;
 }
 
-Driver::Driver(WorldPtr w)
+Driver::Driver(WorldPtr w, bool observer)
 	: mWorld(w),
 	mPaused(false),
 	mScaleLevel(11.5f),
 	mScaleLevelVelocity(0.0f),
 	mFreeCamera(false),
-	mSoldierVisible(false)
+	mSoldierVisible(false),
+	mObserver(observer),
+	mShooting(false),
+	mRestarting(false)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -59,11 +63,35 @@ void Driver::run()
 		if(handleInput(frameTime))
 			break;
 
+		if(!mObserver && mSoldier->isDead()) {
+			if(mRestarting) {
+				mRestarting = false;
+				setFocusSoldier();
+			}
+		}
+
 		startFrame();
 		drawTerrain();
 		drawEntities();
 		drawTexts();
 		finishFrame();
+	}
+}
+
+void Driver::act(float time)
+{
+	mSoldier->getSensorySystem()->update(time);
+	Vector3 tot = defaultMovement(time);
+	mSteering->accumulate(tot, mPlayerControlVelocity);
+	moveTo(tot, time, false);
+
+	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
+	mSoldier->setXYRotation(atan2(mousedir.y, mousedir.x));
+
+	if(mShooting) {
+		if(mSoldier->getWeapon()->canShoot()) {
+			mSoldier->getWeapon()->shoot(mWorld, mSoldier, mousedir);
+		}
 	}
 }
 
@@ -225,12 +253,28 @@ bool Driver::handleInput(float frameTime)
 				}
 				break;
 
+			case SDL_MOUSEBUTTONDOWN:
+				switch(event.button.button) {
+					case SDL_BUTTON_LEFT:
+						if(mSoldier->isDead())
+							mRestarting = true;
+						else
+							mShooting = true;
+						break;
+				}
+				break;
+
 			case SDL_MOUSEBUTTONUP:
 				switch(event.button.button) {
 					case SDL_BUTTON_WHEELUP:
 						mScaleLevel += 4.0f; break;
 					case SDL_BUTTON_WHEELDOWN:
 						mScaleLevel -= 4.0f; break;
+
+					case SDL_BUTTON_LEFT:
+						mShooting = false;
+						break;
+
 					default:
 						break;
 				}
@@ -252,8 +296,8 @@ void Driver::handleInputState(float frameTime)
 	if(mFreeCamera) {
 		mCamera -= mCameraVelocity * frameTime * 10.0f;
 	}
-	else if(mFocusSoldier) {
-		mCamera = mFocusSoldier->getPosition();
+	else if(mSoldier) {
+		mCamera = mSoldier->getPosition();
 	}
 	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
 	mScaleLevel = clamp(10.0f, mScaleLevel, 20.0f);
@@ -305,19 +349,6 @@ void Driver::drawTexts()
 				screenWidth / 2, screenHeight / 2, FontConfig("Paused", Color(255, 255, 255), 2.0f),
 				true, true);
 	}
-	if(mFocusSoldier) {
-		char posbuf[128];
-		sprintf(posbuf, "%3.1f %3.1f", mFocusSoldier->getPosition().x, mFocusSoldier->getPosition().y);
-		SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-				40.0f, 40.0f, FontConfig(posbuf, Color(255, 255, 255), 1.5f),
-				true, false);
-		mSoldierVisible = !mWorld->getSoldiersInFOV(mFocusSoldier).empty();
-		if(mSoldierVisible) {
-			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-					40.0f, screenHeight - 40.0f, FontConfig("Soldier Visible", Color(255, 255, 255), 1.5f),
-					true, false);
-		}
-	}
 
 	{
 		for(int i = 0; i < NUM_SIDES; i++) {
@@ -334,6 +365,16 @@ void Driver::drawTexts()
 	switch(mWorld->teamWon()) {
 		case -1:
 		default:
+			{
+				if(!mObserver) {
+					if(mSoldier->isDead()) {
+						SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+								screenWidth * 0.5f, screenHeight * 0.5f - 40.0f,
+							       	FontConfig("You're dead", Color::Red, 3.0f),
+								true, true);
+					}
+				}
+			}
 			break;
 
 		case 0:
@@ -385,7 +426,10 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, floa
 void Driver::drawEntities()
 {
 	static const float treeScale = 3.0f;
-	const auto soldiers = mWorld->getSoldiersAt(mCamera, 10.0f);
+	const auto soldiers = mObserver || mSoldier->isDead() ?
+		mWorld->getSoldiersAt(mCamera, 10.0f) :
+		mSoldier->getSensorySystem()->getSoldiers();
+
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
 		boost::shared_ptr<Texture> t;
@@ -449,8 +493,28 @@ void Driver::drawEntities()
 void Driver::setFocusSoldier()
 {
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, 1000.0f);
-	if(!soldiers.empty())
-		mFocusSoldier = soldiers[0];
+	for(auto s : soldiers) {
+		if(s->getSideNum() == 0 && !s->isDead()) {
+			mSoldier = s;
+			if(!mObserver) {
+				setSoldier(mSoldier);
+				return;
+			}
+		}
+	}
+}
+
+Vector3 Driver::getMousePositionOnField() const
+{
+	int xp, yp;
+	float x, y;
+	SDL_GetMouseState(&xp, &yp);
+	yp = screenHeight - yp;
+
+	x = float(xp) / mScaleLevel + mCamera.x - (screenWidth / (2.0f * mScaleLevel));
+	y = float(yp) / mScaleLevel + mCamera.y - (screenHeight / (2.0f * mScaleLevel));
+
+	return Vector3(x, y, 0);
 }
 
 }

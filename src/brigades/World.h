@@ -64,9 +64,11 @@ typedef boost::shared_ptr<Side> SidePtr;
 
 class Soldier;
 
-class SoldierController {
+class SoldierController : public boost::enable_shared_from_this<SoldierController> {
 	public:
+		SoldierController();
 		SoldierController(boost::shared_ptr<Soldier> s);
+		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual ~SoldierController() { }
 		virtual void act(float time) = 0;
 
@@ -76,7 +78,7 @@ class SoldierController {
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
-		Common::Steering mSteering;
+		boost::shared_ptr<Common::Steering> mSteering;
 };
 
 typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;

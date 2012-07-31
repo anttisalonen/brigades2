@@ -30,15 +30,15 @@ void SoldierController::move(float time)
 	Vector3 vel;
 
 	if(mTargetSoldier) {
-		vel = mSteering.pursuit(*mTargetSoldier);
+		vel = mSteering->pursuit(*mTargetSoldier);
 	} else {
 		if(mWorld->teamWon() < 0)
-			vel = mSteering.wander();
+			vel = mSteering->wander();
 	}
 	vel.truncate(10.0f);
 
 	Vector3 tot = defaultMovement(time);
-	mSteering.accumulate(tot, vel);
+	mSteering->accumulate(tot, vel);
 
 	moveTo(tot, time, true);
 }

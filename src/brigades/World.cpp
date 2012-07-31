@@ -74,11 +74,23 @@ int Side::getSideNum() const
 	return mFirst ? 0 : 1;
 }
 
+SoldierController::SoldierController()
+{
+}
+
 SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	: mWorld(s->getWorld()),
 	mSoldier(s),
-	mSteering(*s)
+	mSteering(boost::shared_ptr<Steering>(new Steering(*s)))
 {
+}
+
+void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
+{
+	mSoldier = s;
+	mWorld = mSoldier->getWorld();
+	mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier));
+	mSoldier->setController(shared_from_this());
 }
 
 Vector3 SoldierController::defaultMovement(float time)
@@ -93,18 +105,22 @@ Vector3 SoldierController::defaultMovement(float time)
 	for(unsigned int i = 0; i < wallptrs.size(); i++)
 		walls[i] = wallptrs[i].get();
 
-	Vector3 obs = mSteering.obstacleAvoidance(obstacles);
-	Vector3 wal = mSteering.wallAvoidance(walls);
+	Vector3 obs = mSteering->obstacleAvoidance(obstacles);
+	Vector3 wal = mSteering->wallAvoidance(walls);
 
 	Vector3 tot;
-	mSteering.accumulate(tot, wal);
-	mSteering.accumulate(tot, obs);
+	mSteering->accumulate(tot, wal);
+	mSteering->accumulate(tot, obs);
 
 	return tot;
 }
 
 void SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
+	if(dir.null() && !mSoldier->getVelocity().null()) {
+		mSoldier->setAcceleration(mSoldier->getVelocity() * -1.0f);
+		return;
+	}
 	mSoldier->setAcceleration(dir * (10.0f / time));
 	mSoldier->Vehicle::update(time);
 	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
@@ -301,8 +317,10 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p) const
 	std::vector<SoldierPtr> ret;
 
 	for(auto s : nearbysoldiers) {
-		if(s.get() == p.get())
+		if(s.get() == p.get()) {
+			ret.push_back(s);
 			continue;
+		}
 
 		float distToMe = Entity::distanceBetween(*p, *s);
 		if(distToMe > mVisibility) {

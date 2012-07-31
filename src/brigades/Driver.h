@@ -41,11 +41,12 @@ struct Sprite {
 	bool operator<(const Sprite& s1) const;
 };
 
-class Driver {
+class Driver : public SoldierController {
 	public:
-		Driver(WorldPtr w);
+		Driver(WorldPtr w, bool observer);
 		void init();
 		void run();
+		void act(float time) override;
 
 	private:
 		void loadTextures();
@@ -61,6 +62,7 @@ class Driver {
 		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p, float& sxp, float& syp);
 		void drawEntities();
 		void setFocusSoldier();
+		Common::Vector3 getMousePositionOnField() const;
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
@@ -80,8 +82,11 @@ class Driver {
 		boost::shared_ptr<Common::Texture> mTreeTexture;
 		boost::shared_ptr<Common::Texture> mTreeShadowTexture;
 		Common::TextMap mTextMap;
-		SoldierPtr mFocusSoldier;
+		SoldierPtr mSoldier;
 		bool mSoldierVisible;
+		bool mObserver;
+		bool mShooting;
+		bool mRestarting;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;
