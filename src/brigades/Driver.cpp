@@ -341,7 +341,7 @@ void Driver::drawTexts()
 			{
 				char buf[128];
 				Color c = mWorld->teamWon() == 0 ? Color::Red : Color::Blue;
-				sprintf(buf, "%s team won", mWorld->teamWon() == 0 ? "Red" : "Blue");
+				sprintf(buf, "%s team wins", mWorld->teamWon() == 0 ? "Red" : "Blue");
 				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
 						screenWidth * 0.5f, screenHeight * 0.5f - 40.0f, FontConfig(buf, c, 3.0f),
 						true, true);
