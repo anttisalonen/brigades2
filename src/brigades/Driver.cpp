@@ -86,7 +86,7 @@ void Driver::act(float time)
 	moveTo(tot, time, false);
 
 	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
-	mSoldier->setXYRotation(atan2(mousedir.y, mousedir.x));
+	turnTo(mousedir);
 
 	if(mShooting) {
 		if(mSoldier->getWeapon()->canShoot()) {

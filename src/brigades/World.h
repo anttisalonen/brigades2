@@ -75,6 +75,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 	protected:
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
+		void turnTo(const Common::Vector3& dir);
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;

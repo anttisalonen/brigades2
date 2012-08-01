@@ -21,6 +21,8 @@ void SoldierController::act(float time)
 		updateTargetSoldier();
 	}
 
+	updateShootTarget();
+
 	move(time);
 	tryToShoot();
 }
@@ -40,7 +42,10 @@ void SoldierController::move(float time)
 	Vector3 tot = defaultMovement(time);
 	mSteering->accumulate(tot, vel);
 
-	moveTo(tot, time, true);
+	moveTo(tot, time, mShootTargetPosition.null());
+	if(!mShootTargetPosition.null()) {
+		turnTo(mShootTargetPosition);
+	}
 }
 
 void SoldierController::updateTargetSoldier()
@@ -72,12 +77,40 @@ void SoldierController::tryToShoot()
 		return;
 	}
 
-	float dist = Entity::distanceBetween(*mTargetSoldier, *mSoldier);
+	float dist = mShootTargetPosition.length();
 	if(dist < mSoldier->getWeapon()->getRange()) {
 		if(mSoldier->getWeapon()->canShoot()) {
-			mSoldier->getWeapon()->shoot(mWorld, mSoldier, mTargetSoldier->getPosition() - mSoldier->getPosition());
+			mSoldier->getWeapon()->shoot(mWorld, mSoldier, mShootTargetPosition);
 		}
 	}
+}
+
+void SoldierController::updateShootTarget()
+{
+	if(!mTargetSoldier) {
+		mShootTargetPosition = Vector3();
+		return;
+	}
+
+	Vector3 pos = mTargetSoldier->getPosition();
+	Vector3 vel = mTargetSoldier->getVelocity();
+
+	float time1, time2;
+
+	Vector3 topos = pos - mSoldier->getPosition();
+
+	if(!Math::tps(topos, vel, mSoldier->getWeapon()->getVelocity(), time1, time2)) {
+		mShootTargetPosition = topos;
+		return;
+	}
+
+	float corrtime = time1 > 0.0f && time1 < time2 ? time1 : time2;
+	if(corrtime <= 0.0f) {
+		mShootTargetPosition = topos;
+		return;
+	}
+
+	mShootTargetPosition = topos + vel * corrtime;
 }
 
 }

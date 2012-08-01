@@ -16,11 +16,13 @@ class SoldierController : public Brigades::SoldierController {
 
 	protected:
 		SoldierPtr mTargetSoldier;
+		Common::Vector3 mShootTargetPosition;
 
 	private:
 		void move(float time);
 		void updateTargetSoldier();
 		void tryToShoot();
+		void updateShootTarget();
 };
 
 }

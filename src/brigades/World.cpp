@@ -54,6 +54,8 @@ void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
 	mLoadTime.rewind();
 }
 
+/* NOTE: increasing bullet speed is an excellent way to
+ * make the game harder. */
 AssaultRifle::AssaultRifle()
 	: Weapon(25.0f, 20.0f, 0.1f)
 {
@@ -125,6 +127,11 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 	mSoldier->Vehicle::update(time);
 	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
 		mSoldier->setAutomaticHeading();
+}
+
+void SoldierController::turnTo(const Common::Vector3& dir)
+{
+	mSoldier->setXYRotation(atan2(dir.y, dir.x));
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
