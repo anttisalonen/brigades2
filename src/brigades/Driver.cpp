@@ -297,6 +297,12 @@ void Driver::handleInputState(float frameTime)
 		mCamera -= mCameraVelocity * frameTime * 10.0f;
 	}
 	else if(mSoldier) {
+		if(mObserver && mSoldier->isDead()) {
+			setFocusSoldier();
+			if(mSoldier->isDead()) {
+				mFreeCamera = true;
+			}
+		}
 		mCamera = mSoldier->getPosition();
 	}
 	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
