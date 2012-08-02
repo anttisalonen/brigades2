@@ -31,16 +31,35 @@ void SoldierController::move(float time)
 {
 	Vector3 vel;
 
+	Vector3 tot = defaultMovement(time);
+
 	if(mTargetSoldier) {
 		vel = mSteering->pursuit(*mTargetSoldier);
 	} else {
-		if(mWorld->teamWon() < 0)
+		if(mWorld->teamWon() < 0) {
 			vel = mSteering->wander();
+		}
 	}
 	vel.truncate(10.0f);
 
-	Vector3 tot = defaultMovement(time);
 	mSteering->accumulate(tot, vel);
+
+	if(!mTargetSoldier && mWorld->teamWon() < 0) {
+		std::vector<Entity*> neighbours;
+		for(auto n : mSoldier->getSensorySystem()->getSoldiers()) {
+			if(n->getSideNum() == mSoldier->getSideNum()) {
+				neighbours.push_back(n.get());
+			}
+		}
+
+		Vector3 sep = mSteering->separation(neighbours);
+		sep.truncate(10.0f);
+		if(mSteering->accumulate(tot, sep)) {
+			Vector3 coh = mSteering->cohesion(neighbours);
+			coh.truncate(1.5f);
+			mSteering->accumulate(tot, coh);
+		}
+	}
 
 	moveTo(tot, time, mShootTargetPosition.null());
 	if(!mShootTargetPosition.null()) {
