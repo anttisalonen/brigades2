@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdexcept>
 
 #include "World.h"
@@ -285,6 +286,8 @@ World::World()
 	mTeamWon(-1),
 	mWinTimer(1.0f)
 {
+	memset(mSoldiersAlive, 0, sizeof(mSoldiersAlive));
+
 	for(int i = 0; i < NUM_SIDES; i++) {
 		mSides[i] = SidePtr(new Side(i == 0));
 	}
