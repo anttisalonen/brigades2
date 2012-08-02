@@ -1,3 +1,5 @@
+#include <string.h>
+
 #include "Driver.h"
 #include "SensorySystem.h"
 
@@ -80,6 +82,7 @@ void Driver::run()
 
 void Driver::act(float time)
 {
+	handleEvents();
 	mSoldier->getSensorySystem()->update(time);
 	Vector3 tot = defaultMovement(time);
 	mSteering->accumulate(tot, mPlayerControlVelocity);
@@ -156,6 +159,7 @@ bool Driver::handleInput(float frameTime)
 {
 	bool quitting = false;
 	SDL_Event event;
+	memset(&event, 0, sizeof(event));
 	while(SDL_PollEvent(&event)) {
 		switch(event.type) {
 			case SDL_KEYDOWN:
@@ -359,9 +363,11 @@ void Driver::drawTexts()
 	{
 		for(int i = 0; i < NUM_SIDES; i++) {
 			char alivebuf[128];
+			memset(alivebuf, 0, sizeof(alivebuf));
 			Color c = i == 0 ? Color::Red : Color::Blue;
 			int alive = mWorld->soldiersAlive(i);
-			sprintf(alivebuf, "%d soldier%s", alive, alive == 1 ? "" : "s");
+			snprintf(alivebuf, 127, "%d soldier%s", alive, alive == 1 ? "" : "s");
+			alivebuf[127] = 0;
 			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
 					40.0f, screenHeight - 40.0f - 15.0f * (i + 2), FontConfig(alivebuf, c, 1.0f),
 					true, false);
@@ -388,7 +394,9 @@ void Driver::drawTexts()
 			{
 				char buf[128];
 				Color c = mWorld->teamWon() == 0 ? Color::Red : Color::Blue;
-				sprintf(buf, "%s team wins", mWorld->teamWon() == 0 ? "Red" : "Blue");
+				memset(buf, 0, sizeof(buf));
+				snprintf(buf, 127, "%s team wins", mWorld->teamWon() == 0 ? "Red" : "Blue");
+				buf[127] = 0;
 				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
 						screenWidth * 0.5f, screenHeight * 0.5f - 40.0f, FontConfig(buf, c, 3.0f),
 						true, true);

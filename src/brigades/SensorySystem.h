@@ -16,6 +16,7 @@ class SensorySystem {
 		SensorySystem(SoldierPtr s);
 		bool update(float time);
 		const std::vector<SoldierPtr> getSoldiers() const;
+		void addSound(SoldierPtr s);
 
 	private:
 		void updateFOV();

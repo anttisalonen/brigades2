@@ -134,6 +134,22 @@ void SoldierController::turnTo(const Common::Vector3& dir)
 	mSoldier->setXYRotation(atan2(dir.y, dir.x));
 }
 
+bool SoldierController::handleEvents()
+{
+	bool ret = !mSoldier->getEvents().empty();
+
+	for(auto e : mSoldier->getEvents()) {
+		switch(e->getType()) {
+			case EventType::Sound:
+				mSoldier->getSensorySystem()->addSound(static_cast<Soldier*>(e->getData())->shared_from_this());
+				break;
+		}
+	}
+	mSoldier->getEvents().clear();
+
+	return ret;
+}
+
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),
 	mWorld(w),
@@ -223,6 +239,16 @@ SensorySystemPtr Soldier::getSensorySystem()
 	return mSensorySystem;
 }
 
+void Soldier::addEvent(EventPtr e)
+{
+	mEvents.push_back(e);
+}
+
+std::vector<EventPtr>& Soldier::getEvents()
+{
+	return mEvents;
+}
+
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
 	: mShooter(shooter),
 	mTimer(timeleft)
@@ -290,7 +316,7 @@ std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius) con
 	return ret;
 }
 
-std::vector<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius) const
+std::list<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius) const
 {
 	/* TODO */
 	return mBullets;
@@ -418,6 +444,8 @@ void World::update(float time)
 	if(mWinTimer.check(time)) {
 		checkForWin();
 	}
+
+	updateTriggerSystem(time);
 }
 
 void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
@@ -427,6 +455,7 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 				s->getPosition(),
 				dir.normalized() * w->getVelocity(),
 				time)));
+	mTriggerSystem.add(SoundTriggerPtr(new SoundTrigger(s, 50.0f)));
 }
 
 void World::setupSides()
@@ -537,6 +566,15 @@ void World::killSoldier(SoldierPtr s)
 	assert(s->getSideNum() < NUM_SIDES);
 	assert(mSoldiersAlive[s->getSideNum()] > 0);
 	mSoldiersAlive[s->getSideNum()]--;
+}
+
+void World::updateTriggerSystem(float time)
+{
+	std::vector<SoldierPtr> soldiers;
+	for(auto s : mSoldiers) {
+		soldiers.push_back(s.second);
+	}
+	mTriggerSystem.update(soldiers, time);
 }
 
 }

@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <map>
+#include <list>
 
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
@@ -10,6 +11,9 @@
 #include "common/Clock.h"
 #include "common/Vehicle.h"
 #include "common/Steering.h"
+
+#include "Event.h"
+#include "Trigger.h"
 
 #define NUM_SIDES 2
 
@@ -76,6 +80,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
 		void turnTo(const Common::Vector3& dir);
+		bool handleEvents();
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
@@ -102,6 +107,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		const WorldPtr getWorld() const;
 		WorldPtr getWorld();
 		boost::shared_ptr<SensorySystem> getSensorySystem();
+		void addEvent(EventPtr e);
+		std::vector<EventPtr>& getEvents();
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -112,6 +119,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool mAlive;
 		WeaponPtr mWeapon;
 		boost::shared_ptr<SensorySystem> mSensorySystem;
+		std::vector<EventPtr> mEvents;
 
 		static int getNextID();
 };
@@ -153,7 +161,7 @@ class World : public boost::enable_shared_from_this<World> {
 		// accessors
 		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius) const;
-		std::vector<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
+		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
@@ -175,6 +183,7 @@ class World : public boost::enable_shared_from_this<World> {
 		void checkSoldierPosition(SoldierPtr s);
 		void checkForWin();
 		void killSoldier(SoldierPtr s);
+		void updateTriggerSystem(float time);
 
 		float mWidth;
 		float mHeight;
@@ -183,10 +192,11 @@ class World : public boost::enable_shared_from_this<World> {
 		std::vector<TreePtr> mTrees;
 		std::vector<WallPtr> mWalls;
 		float mVisibility;
-		std::vector<BulletPtr> mBullets;
+		std::list<BulletPtr> mBullets;
 		int mTeamWon;
 		int mSoldiersAlive[NUM_SIDES];
 		Common::SteadyTimer mWinTimer;
+		TriggerSystem mTriggerSystem;
 };
 
 };

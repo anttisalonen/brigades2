@@ -27,6 +27,10 @@ void SensorySystem::updateFOV()
 	mSoldiers = mSoldier->getWorld()->getSoldiersInFOV(mSoldier);
 }
 
+void SensorySystem::addSound(SoldierPtr s)
+{
+	mSoldiers.push_back(s);
+}
 
 }
 

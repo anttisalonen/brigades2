@@ -17,7 +17,7 @@ SoldierController::SoldierController(SoldierPtr p)
 
 void SoldierController::act(float time)
 {
-	if(mSoldier->getSensorySystem()->update(time)) {
+	if(handleEvents() || mSoldier->getSensorySystem()->update(time)) {
 		updateTargetSoldier();
 	}
 
