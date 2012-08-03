@@ -11,7 +11,8 @@ namespace Brigades {
 namespace AI {
 
 SoldierController::SoldierController(SoldierPtr p)
-	: Brigades::SoldierController(p)
+	: Brigades::SoldierController(p),
+	mCommandTimer(1.0f)
 {
 }
 
@@ -19,6 +20,10 @@ void SoldierController::act(float time)
 {
 	if(handleEvents() || mSoldier->getSensorySystem()->update(time)) {
 		updateTargetSoldier();
+	}
+
+	if(!mSoldier->getCommandees().empty() && mCommandTimer.check(time)) {
+		updateCommandeeOrders();
 	}
 
 	updateShootTarget();
@@ -37,27 +42,47 @@ void SoldierController::move(float time)
 		vel = mSteering->pursuit(*mTargetSoldier);
 	} else {
 		if(mWorld->teamWon() < 0) {
-			vel = mSteering->wander();
+			vel = mSteering->wander(2.0f, 10.0f, 3.0f);
 		}
 	}
-	vel.truncate(10.0f);
+	if(mSoldier->getCommandees().empty())
+		vel.truncate(10.0f);
+	else
+		vel.truncate(0.02f);
 
 	mSteering->accumulate(tot, vel);
 
-	if(!mTargetSoldier && mWorld->teamWon() < 0) {
+	if(mWorld->teamWon() < 0) {
 		std::vector<Entity*> neighbours;
+		auto leader = mSoldier->getLeader();
+		if(leader && leader->isDead()) {
+			leader = SoldierPtr();
+			mSoldier->setLeader(leader);
+		}
+		bool leaderVisible = false;
+		bool beingLead = false;
+
 		for(auto n : mSoldier->getSensorySystem()->getSoldiers()) {
 			if(n->getSideNum() == mSoldier->getSideNum()) {
 				neighbours.push_back(n.get());
+				if(leader && !leaderVisible && n == leader)
+					leaderVisible = true;
 			}
 		}
 
-		Vector3 sep = mSteering->separation(neighbours);
-		sep.truncate(10.0f);
-		if(mSteering->accumulate(tot, sep)) {
-			Vector3 coh = mSteering->cohesion(neighbours);
-			coh.truncate(1.5f);
-			mSteering->accumulate(tot, coh);
+		beingLead = leader && !mSoldier->getFormationOffset().null() && leaderVisible;
+
+		if(beingLead) {
+			Vector3 sep = mSteering->separation(neighbours);
+			sep.truncate(10.0f);
+			if(mSteering->accumulate(tot, sep)) {
+				Vector3 coh = mSteering->cohesion(neighbours);
+				coh.truncate(1.5f);
+				mSteering->accumulate(tot, coh);
+			}
+
+			Vector3 offset = mSteering->offsetPursuit(*leader, mSoldier->getFormationOffset());
+			mSteering->accumulate(tot, offset);
 		}
 	}
 
@@ -130,6 +155,12 @@ void SoldierController::updateShootTarget()
 	}
 
 	mShootTargetPosition = topos + vel * corrtime;
+}
+
+void SoldierController::updateCommandeeOrders()
+{
+	mSoldier->pruneCommandees();
+	mSoldier->setLineFormation(10.0f);
 }
 
 }

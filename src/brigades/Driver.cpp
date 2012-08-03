@@ -212,6 +212,20 @@ bool Driver::handleInput(float frameTime)
 						mFreeCamera = !mFreeCamera;
 						break;
 
+					case SDLK_x:
+						if(!mObserver && mSoldier) {
+							mSoldier->pruneCommandees();
+							mSoldier->setLineFormation(10.0f);
+						}
+						break;
+
+					case SDLK_c:
+						if(!mObserver && mSoldier) {
+							mSoldier->pruneCommandees();
+							mSoldier->setColumnFormation(10.0f);
+						}
+						break;
+
 					case SDLK_p:
 					case SDLK_PAUSE:
 						mPaused = !mPaused;

@@ -151,14 +151,15 @@ bool SoldierController::handleEvents()
 	return ret;
 }
 
-Soldier::Soldier(boost::shared_ptr<World> w, bool firstside)
+Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),
 	mWorld(w),
 	mSide(w->getSide(firstside)),
 	mID(getNextID()),
 	mFOV(PI),
 	mAlive(true),
-	mWeapon(WeaponPtr(new AssaultRifle()))
+	mWeapon(WeaponPtr(new AssaultRifle())),
+	mRank(rank)
 {
 }
 
@@ -250,6 +251,78 @@ std::vector<EventPtr>& Soldier::getEvents()
 	return mEvents;
 }
 
+SoldierRank Soldier::getRank() const
+{
+	return mRank;
+}
+
+void Soldier::addCommandee(SoldierPtr s)
+{
+	if(!s->isDead()) {
+		mCommandees.push_back(s);
+		s->setLeader(shared_from_this());
+	}
+}
+
+std::list<SoldierPtr>& Soldier::getCommandees()
+{
+	return mCommandees;
+}
+
+void Soldier::setLeader(SoldierPtr s)
+{
+	mLeader = s;
+}
+
+SoldierPtr Soldier::getLeader()
+{
+	return mLeader;
+}
+
+void Soldier::setFormationOffset(const Vector3& v)
+{
+	mFormationOffset = v;
+}
+
+const Vector3& Soldier::getFormationOffset() const
+{
+	return mFormationOffset;
+}
+
+void Soldier::setColumnFormation(float dist)
+{
+	int i = 1;
+	for(auto c : mCommandees) {
+		float pos = i * -dist;
+		c->setFormationOffset(Vector3(pos, 0.0f, 0.0f));
+		i++;
+	}
+}
+
+void Soldier::setLineFormation(float dist)
+{
+	int i = 2;
+	for(auto c : mCommandees) {
+		float pos = (i / 2) * dist * (i & 1 ? 1.0f : -1.0f);
+		c->setFormationOffset(Vector3(0.0f, pos, 0.0f));
+		i++;
+	}
+}
+
+void Soldier::pruneCommandees()
+{
+	auto sit = mCommandees.begin();
+	while(sit != mCommandees.end()) {
+		if((*sit)->isDead()) {
+			sit = mCommandees.erase(sit);
+		}
+		else {
+			++sit;
+		}
+	}
+
+}
+
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
 	: mShooter(shooter),
 	mTimer(timeleft)
@@ -280,9 +353,9 @@ SoldierPtr Bullet::getShooter() const
 }
 
 World::World()
-	: mWidth(100.0f),
-	mHeight(100.0f),
-	mVisibility(25.0f),
+	: mWidth(200.0f),
+	mHeight(200.0f),
+	mVisibility(40.0f),
 	mTeamWon(-1),
 	mWinTimer(1.0f)
 {
@@ -359,6 +432,19 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p) const
 		}
 
 		float distToMe = Entity::distanceBetween(*p, *s);
+
+		if(distToMe < 2.0f) {
+			// "see" anyone just behind my back
+			ret.push_back(s);
+			continue;
+		}
+
+		if(distToMe < mVisibility && s->getSideNum() == p->getSideNum()) {
+			// "see" any nearby friendly soldiers
+			ret.push_back(s);
+			continue;
+		}
+
 		if(distToMe > mVisibility) {
 			continue;
 		}
@@ -415,7 +501,7 @@ void World::update(float time)
 		bool erase = false;
 		auto soldiers = getSoldiersAt((*bit)->getPosition(), (*bit)->getVelocity().length());
 		for(auto s : soldiers) {
-			if(s == (*bit)->getShooter())
+			if(s->getSideNum() == (*bit)->getShooter()->getSideNum())
 				continue;
 
 			if(s->isDead())
@@ -464,14 +550,22 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
-		for(int j = 0; j < 10; j++)
-			addSoldier(i == 0);
+		SoldierPtr leader;
+		for(int j = 0; j < 8; j++) {
+			auto s = addSoldier(i == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private);
+			if(j == 0) {
+				leader = s;
+			}
+			else {
+				leader->addCommandee(s);
+			}
+		}
 	}
 }
 
-void World::addSoldier(bool first)
+SoldierPtr World::addSoldier(bool first, SoldierRank rank)
 {
-	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first));
+	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank));
 	s->init();
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
@@ -484,6 +578,7 @@ void World::addSoldier(bool first)
 		y = -y;
 	}
 	s->setPosition(Vector3(x, y, 0.0f));
+	return s;
 }
 
 void World::addTrees()

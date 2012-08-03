@@ -91,9 +91,15 @@ typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;
 
 class SensorySystem;
 
+enum class SoldierRank {
+	Private,
+	Corporal,
+	Sergeant,
+};
+
 class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<Soldier> {
 	public:
-		Soldier(boost::shared_ptr<World> w, bool firstside);
+		Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank);
 		void init();
 		SidePtr getSide() const;
 		int getID() const;
@@ -109,6 +115,16 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		boost::shared_ptr<SensorySystem> getSensorySystem();
 		void addEvent(EventPtr e);
 		std::vector<EventPtr>& getEvents();
+		SoldierRank getRank() const;
+		void addCommandee(SoldierPtr s);
+		std::list<SoldierPtr>& getCommandees();
+		void setLeader(SoldierPtr s);
+		SoldierPtr getLeader();
+		void setFormationOffset(const Common::Vector3& v);
+		const Common::Vector3& getFormationOffset() const;
+		void setLineFormation(float dist);
+		void setColumnFormation(float dist);
+		void pruneCommandees();
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -120,6 +136,10 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		WeaponPtr mWeapon;
 		boost::shared_ptr<SensorySystem> mSensorySystem;
 		std::vector<EventPtr> mEvents;
+		SoldierRank mRank;
+		std::list<SoldierPtr> mCommandees;
+		SoldierPtr mLeader;
+		Common::Vector3 mFormationOffset;
 
 		static int getNextID();
 };
@@ -177,7 +197,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 	private:
 		void setupSides();
-		void addSoldier(bool first);
+		SoldierPtr addSoldier(bool first, SoldierRank rank);
 		void addTrees();
 		void addWalls();
 		void checkSoldierPosition(SoldierPtr s);
