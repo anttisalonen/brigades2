@@ -52,6 +52,11 @@ class AssaultRifle : public Weapon {
 		AssaultRifle();
 };
 
+class MachineGun : public Weapon {
+	public:
+		MachineGun();
+};
+
 typedef boost::shared_ptr<Weapon> WeaponPtr;
 
 class Side {
@@ -109,6 +114,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void setController(SoldierControllerPtr p);
 		void die();
 		bool isDead() const;
+		void setWeapon(WeaponPtr w);
 		WeaponPtr getWeapon();
 		const WorldPtr getWorld() const;
 		WorldPtr getWorld();

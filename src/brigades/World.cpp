@@ -62,6 +62,11 @@ AssaultRifle::AssaultRifle()
 {
 }
 
+MachineGun::MachineGun()
+	: Weapon(35.0f, 20.0f, 0.04f)
+{
+}
+
 Side::Side(bool first)
 	: mFirst(first)
 {
@@ -219,6 +224,11 @@ void Soldier::die()
 bool Soldier::isDead() const
 {
 	return !mAlive;
+}
+
+void Soldier::setWeapon(WeaponPtr w)
+{
+	mWeapon = w;
 }
 
 WeaponPtr Soldier::getWeapon()
@@ -557,6 +567,9 @@ void World::setupSides()
 				leader = s;
 			}
 			else {
+				if(j == 2) {
+					s->setWeapon(WeaponPtr(new MachineGun()));
+				}
 				leader->addCommandee(s);
 			}
 		}
