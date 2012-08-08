@@ -18,6 +18,7 @@ class SoldierController : public Brigades::SoldierController {
 		SoldierPtr mTargetSoldier;
 		Common::Vector3 mShootTargetPosition;
 		Common::SteadyTimer mCommandTimer;
+		bool mRetreat;
 
 	private:
 		void move(float time);

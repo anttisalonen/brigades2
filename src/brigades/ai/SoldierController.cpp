@@ -1,4 +1,5 @@
 #include <cfloat>
+#include <climits>
 
 #include "brigades/SensorySystem.h"
 
@@ -12,7 +13,8 @@ namespace AI {
 
 SoldierController::SoldierController(SoldierPtr p)
 	: Brigades::SoldierController(p),
-	mCommandTimer(1.0f)
+	mCommandTimer(1.0f),
+	mRetreat(false)
 {
 }
 
@@ -39,7 +41,11 @@ void SoldierController::move(float time)
 	Vector3 tot = defaultMovement(time);
 
 	if(mTargetSoldier) {
-		vel = mSteering->pursuit(*mTargetSoldier);
+		if(!mRetreat) {
+			vel = mSteering->pursuit(*mTargetSoldier);
+		} else {
+			vel = mSteering->evade(*mTargetSoldier);
+		}
 	} else {
 		if(mWorld->teamWon() < 0) {
 			vel = mSteering->wander(2.0f, 10.0f, 3.0f);
@@ -97,17 +103,44 @@ void SoldierController::updateTargetSoldier()
 	auto soldiers = mSoldier->getSensorySystem()->getSoldiers();
 	float distToNearest = FLT_MAX;
 	SoldierPtr nearest;
+	unsigned int weapontouse = INT_MAX;
+
 	for(auto s : soldiers) {
 		if(!s->isDead() && s->getSideNum() != mSoldier->getSideNum()) {
 			float thisdist = Entity::distanceBetween(*mSoldier, *s);
 			if(thisdist < distToNearest) {
-				distToNearest = thisdist;
-				nearest = s;
+				unsigned int i = 0;
+				unsigned int bestweapon = INT_MAX;
+				float bestscore = 0.0f;
+				float rangeToTgt = Entity::distanceBetween(*mSoldier, *s);
+				for(auto w : mSoldier->getWeapons()) {
+					if(w->getRange() < rangeToTgt && bestscore > 0.0f)
+						continue;
+
+					float thisscore = s->damageFactorFromWeapon(w) * w->getVelocity() / std::max(0.01f, w->getLoadTime());
+					if(thisscore > bestscore) {
+						bestweapon = i;
+						bestscore = thisscore;
+					}
+					i++;
+				}
+				if(distToNearest == FLT_MAX || bestscore > 0.0f) {
+					distToNearest = thisdist;
+					nearest = s;
+					weapontouse = bestweapon;
+				}
 			}
 		}
 	}
 
 	if(nearest) {
+		if(weapontouse == INT_MAX) {
+			mRetreat = true;
+		}
+		else {
+			mRetreat = false;
+			mSoldier->switchWeapon(weapontouse);
+		}
 		mTargetSoldier = nearest;
 	}
 	else {
@@ -117,21 +150,21 @@ void SoldierController::updateTargetSoldier()
 
 void SoldierController::tryToShoot()
 {
-	if(!mTargetSoldier) {
+	if(!mTargetSoldier || mRetreat || !mSoldier->getCurrentWeapon()) {
 		return;
 	}
 
 	float dist = mShootTargetPosition.length();
-	if(dist < mSoldier->getWeapon()->getRange()) {
-		if(mSoldier->getWeapon()->canShoot()) {
-			mSoldier->getWeapon()->shoot(mWorld, mSoldier, mShootTargetPosition);
+	if(dist < mSoldier->getCurrentWeapon()->getRange()) {
+		if(mSoldier->getCurrentWeapon()->canShoot()) {
+			mSoldier->getCurrentWeapon()->shoot(mWorld, mSoldier, mShootTargetPosition);
 		}
 	}
 }
 
 void SoldierController::updateShootTarget()
 {
-	if(!mTargetSoldier) {
+	if(!mTargetSoldier || !mSoldier->getCurrentWeapon()) {
 		mShootTargetPosition = Vector3();
 		return;
 	}
@@ -143,7 +176,7 @@ void SoldierController::updateShootTarget()
 
 	Vector3 topos = pos - mSoldier->getPosition();
 
-	if(!Math::tps(topos, vel, mSoldier->getWeapon()->getVelocity(), time1, time2)) {
+	if(!Math::tps(topos, vel, mSoldier->getCurrentWeapon()->getVelocity(), time1, time2)) {
 		mShootTargetPosition = topos;
 		return;
 	}

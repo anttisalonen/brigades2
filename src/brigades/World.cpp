@@ -18,10 +18,16 @@ Tree::Tree(const Vector3& pos, float radius)
 	mPosition = pos;
 }
 
-Weapon::Weapon(float range, float velocity, float loadtime)
+Weapon::Weapon(float range, float velocity, float loadtime,
+		float softd,
+		float lightd,
+		float heavyd)
 	: mRange(range),
 	mVelocity(velocity),
-	mLoadTime(loadtime)
+	mLoadTime(loadtime),
+	mSoftDamage(softd),
+	mLightArmorDamage(lightd),
+	mHeavyArmorDamage(heavyd)
 {
 }
 
@@ -46,6 +52,11 @@ float Weapon::getVelocity() const
 	return mVelocity;
 }
 
+float Weapon::getLoadTime() const
+{
+	return mLoadTime.getMaxTime();
+}
+
 void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
 {
 	if(!canShoot())
@@ -55,6 +66,21 @@ void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
 	mLoadTime.rewind();
 }
 
+float Weapon::getDamageAgainstSoftTargets() const
+{
+	return mSoftDamage;
+}
+
+float Weapon::getDamageAgainstLightArmor() const
+{
+	return mLightArmorDamage;
+}
+
+float Weapon::getDamageAgainstHeavyArmor() const
+{
+	return mHeavyArmorDamage;
+}
+
 /* NOTE: increasing bullet speed is an excellent way to
  * make the game harder. */
 AssaultRifle::AssaultRifle()
@@ -62,9 +88,39 @@ AssaultRifle::AssaultRifle()
 {
 }
 
+const char* AssaultRifle::getName() const
+{
+	return "Assault Rifle";
+}
+
 MachineGun::MachineGun()
 	: Weapon(35.0f, 20.0f, 0.04f)
 {
+}
+
+const char* MachineGun::getName() const
+{
+	return "Machine Gun";
+}
+
+AutomaticCannon::AutomaticCannon()
+	: Weapon(40.0f, 20.0f, 0.4f, 1.0f, 0.3f, 0.0f)
+{
+}
+
+const char* AutomaticCannon::getName() const
+{
+	return "Automatic Cannon";
+}
+
+Bazooka::Bazooka()
+	: Weapon(20.0f, 15.0f, 4.0f, 1.0f, 0.3f, 0.0f)
+{
+}
+
+const char* Bazooka::getName() const
+{
+	return "Bazooka";
 }
 
 Side::Side(bool first)
@@ -113,8 +169,8 @@ Vector3 SoldierController::defaultMovement(float time)
 	for(unsigned int i = 0; i < wallptrs.size(); i++)
 		walls[i] = wallptrs[i].get();
 
-	Vector3 obs = mSteering->obstacleAvoidance(obstacles);
-	Vector3 wal = mSteering->wallAvoidance(walls);
+	Vector3 obs = mSteering->obstacleAvoidance(obstacles) * 100.0f;
+	Vector3 wal = mSteering->wallAvoidance(walls) * 100.0f;
 
 	Vector3 tot;
 	mSteering->accumulate(tot, wal);
@@ -126,10 +182,11 @@ Vector3 SoldierController::defaultMovement(float time)
 void SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
 	if(dir.null() && !mSoldier->getVelocity().null()) {
-		mSoldier->setAcceleration(mSoldier->getVelocity() * -1.0f);
-		return;
+		mSoldier->setAcceleration(mSoldier->getVelocity() * -10.0f);
 	}
-	mSoldier->setAcceleration(dir * (10.0f / time));
+	else {
+		mSoldier->setAcceleration(dir * (10.0f / time));
+	}
 	mSoldier->Vehicle::update(time);
 	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
 		mSoldier->setAutomaticHeading();
@@ -138,6 +195,16 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 void SoldierController::turnTo(const Common::Vector3& dir)
 {
 	mSoldier->setXYRotation(atan2(dir.y, dir.x));
+}
+
+void SoldierController::turnBy(float rad)
+{
+	mSoldier->addXYRotation(rad);
+}
+
+void SoldierController::setVelocityToHeading()
+{
+	mSoldier->setVelocityToHeading();
 }
 
 bool SoldierController::handleEvents()
@@ -156,16 +223,28 @@ bool SoldierController::handleEvents()
 	return ret;
 }
 
-Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank)
+Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),
 	mWorld(w),
 	mSide(w->getSide(firstside)),
 	mID(getNextID()),
 	mFOV(PI),
 	mAlive(true),
-	mWeapon(WeaponPtr(new AssaultRifle())),
-	mRank(rank)
+	mCurrentWeaponIndex(0),
+	mRank(rank),
+	mWarriorType(wt),
+	mHealth(1.0f)
 {
+	if(wt == WarriorType::Vehicle) {
+		mRadius = 3.5f;
+		mMaxSpeed = 30.0f;
+		mMaxAcceleration = 10.0f;
+		addWeapon(WeaponPtr(new AutomaticCannon()));
+		addWeapon(WeaponPtr(new MachineGun()));
+		mFOV = TWO_PI;
+	} else {
+		addWeapon(WeaponPtr(new AssaultRifle()));
+	}
 }
 
 void Soldier::init()
@@ -200,7 +279,8 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
-	mWeapon->update(time);
+	if(mCurrentWeaponIndex < mWeapons.size())
+		mWeapons[mCurrentWeaponIndex]->update(time);
 	if(mController) {
 		mController->act(time);
 	}
@@ -226,14 +306,32 @@ bool Soldier::isDead() const
 	return !mAlive;
 }
 
-void Soldier::setWeapon(WeaponPtr w)
+void Soldier::clearWeapons()
 {
-	mWeapon = w;
+	mWeapons.clear();
 }
 
-WeaponPtr Soldier::getWeapon()
+void Soldier::addWeapon(WeaponPtr w)
 {
-	return mWeapon;
+	mWeapons.push_back(w);
+}
+
+WeaponPtr Soldier::getCurrentWeapon()
+{
+	if(mCurrentWeaponIndex < mWeapons.size())
+		return mWeapons[mCurrentWeaponIndex];
+	else
+		return WeaponPtr();
+}
+
+void Soldier::switchWeapon(unsigned int index)
+{
+	mCurrentWeaponIndex = index;
+}
+
+const std::vector<WeaponPtr>& Soldier::getWeapons() const
+{
+	return mWeapons;
 }
 
 const WorldPtr Soldier::getWorld() const
@@ -333,13 +431,39 @@ void Soldier::pruneCommandees()
 
 }
 
+WarriorType Soldier::getWarriorType() const
+{
+	return mWarriorType;
+}
+
+void Soldier::reduceHealth(float n)
+{
+	mHealth -= n;
+}
+
+float Soldier::getHealth() const
+{
+	return mHealth;
+}
+
+float Soldier::damageFactorFromWeapon(const WeaponPtr w) const
+{
+	if(getWarriorType() == WarriorType::Soldier) {
+		return w->getDamageAgainstSoftTargets();
+	} else {
+		return w->getDamageAgainstLightArmor();
+	}
+}
+
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
 	: mShooter(shooter),
 	mTimer(timeleft)
 {
 	mTimer.rewind();
 	mPosition = pos;
-	mVelocity = vel;
+	mVelocity = vel + shooter->getVelocity();
+	mWeapon = shooter->getCurrentWeapon();
+	assert(mWeapon);
 }
 
 void Bullet::update(float time)
@@ -360,6 +484,11 @@ bool Bullet::isAlive() const
 SoldierPtr Bullet::getShooter() const
 {
 	return mShooter;
+}
+
+const WeaponPtr Bullet::getWeapon() const
+{
+	return mWeapon;
 }
 
 World::World()
@@ -520,7 +649,10 @@ void World::update(float time)
 			if(Math::segmentCircleIntersect((*bit)->getPosition(),
 						(*bit)->getPosition() + (*bit)->getVelocity() * time,
 						s->getPosition(), s->getRadius())) {
-				killSoldier(s);
+				s->reduceHealth(s->damageFactorFromWeapon((*bit)->getWeapon()));
+				if(s->getHealth() <= 0.0f) {
+					killSoldier(s);
+				}
 				erase = true;
 				break;
 			}
@@ -561,14 +693,22 @@ void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
 		SoldierPtr leader;
-		for(int j = 0; j < 8; j++) {
-			auto s = addSoldier(i == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private);
+		for(int j = 0; j < 9; j++) {
+			WarriorType wt = WarriorType::Soldier;
+			if(j == 8)
+				wt = WarriorType::Vehicle;
+
+			auto s = addSoldier(i == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt);
 			if(j == 0) {
 				leader = s;
 			}
 			else {
 				if(j == 2) {
-					s->setWeapon(WeaponPtr(new MachineGun()));
+					s->clearWeapons();
+					s->addWeapon(WeaponPtr(new MachineGun()));
+				}
+				else if(j == 3 || j == 4 || j == 5) {
+					s->addWeapon(WeaponPtr(new Bazooka()));
 				}
 				leader->addCommandee(s);
 			}
@@ -576,9 +716,9 @@ void World::setupSides()
 	}
 }
 
-SoldierPtr World::addSoldier(bool first, SoldierRank rank)
+SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt)
 {
-	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank));
+	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank, wt));
 	s->init();
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
@@ -640,9 +780,41 @@ void World::addWalls()
 
 void World::checkSoldierPosition(SoldierPtr s)
 {
-	if(fabs(s->getPosition().x) > mWidth * 0.5f || fabs(s->getPosition().y) > mHeight * 0.5f) {
-		// stepped out of the world and fell
-		killSoldier(s);
+	for(auto t : getTreesAt(s->getPosition(), s->getRadius())) {
+		Vector3 diff = s->getPosition() - t->getPosition();
+		float dist2 = diff.length2();
+		float mindist = t->getRadius() + s->getRadius();
+		if(dist2 < mindist * mindist) {
+			if(dist2 == 0.0f)
+				diff = Vector3(1, 0, 0);
+			Vector3 shouldpos = t->getPosition() + diff.normalized() * mindist;
+			s->setPosition(shouldpos);
+			s->setVelocity(diff * 0.3f);
+		}
+	}
+
+	if(fabs(s->getPosition().x) > mWidth * 0.5f) {
+		float nx = mWidth * 0.5f - 1.0f;
+		Vector3 p = s->getPosition();
+		if(s->getPosition().x < 0.0f) {
+			p.x = -nx;
+		} else {
+			p.x = nx;
+		}
+		s->setPosition(p);
+		s->setVelocity(Vector3());
+	}
+
+	if(fabs(s->getPosition().y) > mHeight * 0.5f) {
+		float ny = mHeight * 0.5f - 1.0f;
+		Vector3 p = s->getPosition();
+		if(s->getPosition().y < 0.0f) {
+			p.y = -ny;
+		} else {
+			p.y = ny;
+		}
+		s->setPosition(p);
+		s->setVelocity(Vector3());
 	}
 }
 

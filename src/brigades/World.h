@@ -33,28 +33,53 @@ typedef boost::shared_ptr<World> WorldPtr;
 
 class Weapon : public boost::enable_shared_from_this<Weapon> {
 	public:
-		Weapon(float range, float velocity, float loadtime);
+		Weapon(float range, float velocity, float loadtime,
+				float softd = 1.0f,
+				float lightd = 0.0f,
+				float heavyd = 0.0f);
 		virtual ~Weapon() { }
 		void update(float time);
 		bool canShoot() const;
 		float getRange() const;
 		float getVelocity() const;
+		float getLoadTime() const;
 		void shoot(WorldPtr w, const SoldierPtr s, const Common::Vector3& dir);
+		float getDamageAgainstSoftTargets() const;
+		float getDamageAgainstLightArmor() const;
+		float getDamageAgainstHeavyArmor() const;
+		virtual const char* getName() const = 0;
 
 	protected:
 		float mRange;
 		float mVelocity;
 		Common::Countdown mLoadTime;
+		float mSoftDamage;
+		float mLightArmorDamage;
+		float mHeavyArmorDamage;
 };
 
 class AssaultRifle : public Weapon {
 	public:
 		AssaultRifle();
+		const char* getName() const;
 };
 
 class MachineGun : public Weapon {
 	public:
 		MachineGun();
+		const char* getName() const;
+};
+
+class Bazooka : public Weapon {
+	public:
+		Bazooka();
+		const char* getName() const;
+};
+
+class AutomaticCannon : public Weapon {
+	public:
+		AutomaticCannon();
+		const char* getName() const;
 };
 
 typedef boost::shared_ptr<Weapon> WeaponPtr;
@@ -85,6 +110,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
 		void turnTo(const Common::Vector3& dir);
+		void turnBy(float rad);
+		void setVelocityToHeading();
 		bool handleEvents();
 
 		boost::shared_ptr<World> mWorld;
@@ -102,9 +129,14 @@ enum class SoldierRank {
 	Sergeant,
 };
 
+enum class WarriorType {
+	Soldier,
+	Vehicle
+};
+
 class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<Soldier> {
 	public:
-		Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank);
+		Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt = WarriorType::Soldier);
 		void init();
 		SidePtr getSide() const;
 		int getID() const;
@@ -114,8 +146,11 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void setController(SoldierControllerPtr p);
 		void die();
 		bool isDead() const;
-		void setWeapon(WeaponPtr w);
-		WeaponPtr getWeapon();
+		void clearWeapons();
+		void addWeapon(WeaponPtr w);
+		WeaponPtr getCurrentWeapon();
+		void switchWeapon(unsigned int index);
+		const std::vector<WeaponPtr>& getWeapons() const;
 		const WorldPtr getWorld() const;
 		WorldPtr getWorld();
 		boost::shared_ptr<SensorySystem> getSensorySystem();
@@ -131,6 +166,10 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void setLineFormation(float dist);
 		void setColumnFormation(float dist);
 		void pruneCommandees();
+		WarriorType getWarriorType() const;
+		void reduceHealth(float n);
+		float getHealth() const;
+		float damageFactorFromWeapon(const WeaponPtr w) const;
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -139,13 +178,16 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		float mFOV;
 		SoldierControllerPtr mController;
 		bool mAlive;
-		WeaponPtr mWeapon;
+		std::vector<WeaponPtr> mWeapons;
+		unsigned int mCurrentWeaponIndex;
 		boost::shared_ptr<SensorySystem> mSensorySystem;
 		std::vector<EventPtr> mEvents;
 		SoldierRank mRank;
 		std::list<SoldierPtr> mCommandees;
 		SoldierPtr mLeader;
 		Common::Vector3 mFormationOffset;
+		WarriorType mWarriorType;
+		float mHealth;
 
 		static int getNextID();
 };
@@ -170,10 +212,12 @@ class Bullet : public Common::Entity {
 		void update(float time) override;
 		bool isAlive() const;
 		SoldierPtr getShooter() const;
+		const WeaponPtr getWeapon() const;
 
 	private:
 		SoldierPtr mShooter;
 		Common::Countdown mTimer;
+		WeaponPtr mWeapon;
 };
 
 typedef boost::shared_ptr<Bullet> BulletPtr;
@@ -203,7 +247,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 	private:
 		void setupSides();
-		SoldierPtr addSoldier(bool first, SoldierRank rank);
+		SoldierPtr addSoldier(bool first, SoldierRank rank, WarriorType wt);
 		void addTrees();
 		void addWalls();
 		void checkSoldierPosition(SoldierPtr s);

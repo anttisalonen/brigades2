@@ -52,6 +52,8 @@ class Driver : public SoldierController {
 		void loadTextures();
 		void loadFont();
 		Common::Color mapSideColor(bool first, const Common::Color& c);
+		Common::Color mapTankColor(bool first, const Common::Color& c);
+		Common::Color mapDestroyedTankColor(bool first, const Common::Color& c);
 		bool handleInput(float frameTime);
 		void handleInputState(float frameTime);
 		float restrictCameraCoordinate(float t, float w, float res);
@@ -59,7 +61,8 @@ class Driver : public SoldierController {
 		void finishFrame();
 		void drawTerrain();
 		void drawTexts();
-		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p, float& sxp, float& syp);
+		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p,
+				float& xp, float& yp, float& sxp, float& syp, float& scale);
 		void drawEntities();
 		void setFocusSoldier();
 		Common::Vector3 getMousePositionOnField() const;
@@ -75,6 +78,8 @@ class Driver : public SoldierController {
 		Common::Vector3 mCamera;
 		Common::Vector3 mCameraVelocity;
 		Common::Vector3 mPlayerControlVelocity;
+		boost::shared_ptr<Common::Texture> mTankTexture[NUM_SIDES][4];
+		boost::shared_ptr<Common::Texture> mDestroyedTankTexture[NUM_SIDES][4];
 		boost::shared_ptr<Common::Texture> mSoldierTexture[NUM_SIDES][4];
 		boost::shared_ptr<Common::Texture> mFallenSoldierTexture[NUM_SIDES];
 		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
@@ -87,6 +92,7 @@ class Driver : public SoldierController {
 		bool mObserver;
 		bool mShooting;
 		bool mRestarting;
+		bool mDriving;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

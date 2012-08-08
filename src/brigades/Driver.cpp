@@ -36,7 +36,8 @@ Driver::Driver(WorldPtr w, bool observer)
 	mSoldierVisible(false),
 	mObserver(observer),
 	mShooting(false),
-	mRestarting(false)
+	mRestarting(false),
+	mDriving(false)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -84,16 +85,30 @@ void Driver::act(float time)
 {
 	handleEvents();
 	mSoldier->getSensorySystem()->update(time);
-	Vector3 tot = defaultMovement(time);
-	mSteering->accumulate(tot, mPlayerControlVelocity);
+	Vector3 tot;
+	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
+
+	if(!mDriving) {
+		tot = defaultMovement(time);
+		mSteering->accumulate(tot, mPlayerControlVelocity);
+		turnTo(mousedir);
+	} else {
+		if(mPlayerControlVelocity.y) {
+			Vector3 vec = mSoldier->getHeadingVector() * mPlayerControlVelocity.y;
+			mSteering->accumulate(tot, vec);
+		}
+		if(mPlayerControlVelocity.x) {
+			float rot(mPlayerControlVelocity.x);
+			rot *= -0.05f;
+			turnBy(rot);
+			setVelocityToHeading();
+		}
+	}
 	moveTo(tot, time, false);
 
-	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
-	turnTo(mousedir);
-
 	if(mShooting) {
-		if(mSoldier->getWeapon()->canShoot()) {
-			mSoldier->getWeapon()->shoot(mWorld, mSoldier, mousedir);
+		if(mSoldier->getCurrentWeapon() && mSoldier->getCurrentWeapon()->canShoot()) {
+			mSoldier->getCurrentWeapon()->shoot(mWorld, mSoldier, mousedir);
 		}
 	}
 }
@@ -106,17 +121,33 @@ void Driver::loadTextures()
 		SDLSurface("share/soldier1-e.png"),
 		};
 
-	int i = 0;
-	for(auto& s : surfs) {
-		for(int j = 0; j < NUM_SIDES; j++) {
-			SDLSurface surf(s);
-			surf.mapPixelColor( [&] (const Color& c) { return mapSideColor(j == 0, c); } );
-			mSoldierTexture[j][i] = boost::shared_ptr<Texture>(new Texture(surf, 0, 32));
-		}
-		i++;
-	}
+	SDLSurface tanksurfs[] = { SDLSurface("share/tank-n.png"),
+		SDLSurface("share/tank-w.png"),
+		SDLSurface("share/tank-s.png"),
+		SDLSurface("share/tank-e.png"),
+	};
 
 	for(int j = 0; j < NUM_SIDES; j++) {
+		for(int k = 0; k < 4; k++) {
+			{
+				SDLSurface surf(surfs[k]);
+				surf.mapPixelColor( [&] (const Color& c) { return mapSideColor(j == 0, c); } );
+				mSoldierTexture[j][k] = boost::shared_ptr<Texture>(new Texture(surf, 0, 32));
+			}
+
+			{
+				SDLSurface surf(tanksurfs[k]);
+				surf.mapPixelColor( [&] (const Color& c) { return mapTankColor(j == 0, c); } );
+				mTankTexture[j][k] = boost::shared_ptr<Texture>(new Texture(surf, 0, 0));
+			}
+
+			{
+				SDLSurface surf(tanksurfs[k]);
+				surf.mapPixelColor( [&] (const Color& c) { return mapDestroyedTankColor(j == 0, c); } );
+				mDestroyedTankTexture[j][k] = boost::shared_ptr<Texture>(new Texture(surf, 0, 0));
+			}
+		}
+
 		SDLSurface surf("share/soldier1-fallen.png");
 		surf.mapPixelColor( [&] (const Color& c) { return mapSideColor(j == 0, c); } );
 		mFallenSoldierTexture[j] = boost::shared_ptr<Texture>(new Texture(surf, 0, 32));
@@ -153,6 +184,42 @@ Common::Color Driver::mapSideColor(bool first, const Common::Color& c)
 	}
 
 	return c;
+}
+
+Common::Color Driver::mapTankColor(bool first, const Common::Color& c)
+{
+	if((c.r + c.b) / 4 > c.g) {
+		if(first) {
+			Color r(c);
+			r.b = r.g;
+			return r;
+		}
+		else {
+			Color r(c);
+			r.r = r.g;
+			return r;
+		}
+	}
+
+	return c;
+}
+
+Common::Color Driver::mapDestroyedTankColor(bool first, const Common::Color& c)
+{
+	if((c.r + c.b) / 4 > c.g) {
+		if(first) {
+			Color r(c);
+			r.b = r.g;
+			return r;
+		}
+		else {
+			Color r(c);
+			r.r = r.g;
+			return r;
+		}
+	}
+
+	return Color::Black;
 }
 
 bool Driver::handleInput(float frameTime)
@@ -229,6 +296,20 @@ bool Driver::handleInput(float frameTime)
 					case SDLK_p:
 					case SDLK_PAUSE:
 						mPaused = !mPaused;
+						break;
+
+					case SDLK_1:
+					case SDLK_2:
+					case SDLK_3:
+					case SDLK_4:
+					case SDLK_5:
+					case SDLK_6:
+					case SDLK_7:
+					case SDLK_8:
+						if(!mObserver) {
+							int k = event.key.keysym.sym - SDLK_1;
+							mSoldier->switchWeapon(k);
+						}
 						break;
 
 					default:
@@ -375,6 +456,23 @@ void Driver::drawTexts()
 	}
 
 	{
+		int i = 0;
+		for(auto w : mSoldier->getWeapons()) {
+			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+					40.0f, screenHeight - 100.0f - 15.0f * i,
+					FontConfig(w->getName(), Color(255, 255, 255), 1.0f),
+					true, false);
+			if(w == mSoldier->getCurrentWeapon()) {
+				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+						30.0f, screenHeight - 100.0f - 15.0f * i,
+						FontConfig("*", Color(255, 255, 255), 1.0f),
+						true, false);
+			}
+			i++;
+		}
+	}
+
+	{
 		for(int i = 0; i < NUM_SIDES; i++) {
 			char alivebuf[128];
 			memset(alivebuf, 0, sizeof(alivebuf));
@@ -426,12 +524,31 @@ void Driver::drawTexts()
 	}
 }
 
-const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, float& sxp, float& syp)
+const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, float& sxp, float& syp,
+		float& xp, float& yp, float& scale)
 {
-	if(p->isDead()) {
+	int sideIndex = p->getSide()->isFirst() ? 0 : 1;
+	bool dead = p->isDead();
+	bool soldier = p->getWarriorType() == WarriorType::Soldier;
+
+	if(soldier) {
+		scale = 2.0f;
+		xp = -0.4f;
+		yp = 0.0f;
+		sxp = -0.4f;
+		syp = -0.5f;
+	} else {
+		scale = 8.0f;
+		xp = -0.5f;
+		yp = -0.5f;
+		sxp = -0.5f;
+		syp = -0.7f;
+	}
+
+	if(dead && soldier) {
 		sxp = -0.4f;
 		syp = -0.1f;
-		return mFallenSoldierTexture[p->getSide()->isFirst() ? 0 : 1];
+		return mFallenSoldierTexture[sideIndex];
 	}
 
 	float r = p->getXYRotation();
@@ -446,9 +563,15 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, floa
 		dir = 2; // south
 	}
 
-	sxp = -0.4f;
-	syp = -0.5f;
-	return mSoldierTexture[p->getSide()->isFirst() ? 0 : 1][dir];
+	if(soldier) {
+		return mSoldierTexture[sideIndex][dir];
+	} else {
+		if(dead) {
+			return mDestroyedTankTexture[sideIndex][dir];
+		} else {
+			return mTankTexture[sideIndex][dir];
+		}
+	}
 }
 
 void Driver::drawEntities()
@@ -460,10 +583,10 @@ void Driver::drawEntities()
 
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
-		boost::shared_ptr<Texture> t;
-		float sxp, syp;
-		t = soldierTexture(s, sxp, syp);
-		sprites.push_back(Sprite(s, SpriteType::Soldier, 2.0f, t, mSoldierShadowTexture, -0.4f, 0.0f,
+		float xp, yp, sxp, syp;
+		float scale;
+		boost::shared_ptr<Texture> t = soldierTexture(s, sxp, syp, xp, yp, scale);
+		sprites.push_back(Sprite(s, SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
 					sxp, syp));
 	}
 
@@ -475,9 +598,12 @@ void Driver::drawEntities()
 
 	auto bullets = mWorld->getBulletsAt(mCamera, 10.0f);
 	for(auto b : bullets) {
-		sprites.push_back(Sprite(b, SpriteType::Bullet, 1.0f, boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
-					0.0f, 0.5f,
-					-0.8f, -1.0f));
+		float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
+		sprites.push_back(Sprite(b, SpriteType::Bullet,
+					scale,
+					boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
+					0.0f, 0.5f / scale,
+					-0.8f / scale, -1.0f / scale));
 	}
 
 	for(auto s : sprites) {
@@ -491,7 +617,7 @@ void Driver::drawEntities()
 					r,
 					Rectangle(1, 1, -1, -1), 0.0f);
 		} else {
-			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), 1.0f, Color::Black);
+			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), s.mScale, Color::Black);
 		}
 	}
 
@@ -507,7 +633,7 @@ void Driver::drawEntities()
 			SDL_utils::drawSprite(*s.mTexture, r,
 					Rectangle(1, 1, -1, -1), 0.0f);
 		} else {
-			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), 1.0f, Color::White);
+			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), s.mScale, Color::White);
 		}
 
 #if 0
@@ -525,6 +651,7 @@ void Driver::setFocusSoldier()
 		if(s->getSideNum() == 0 && !s->isDead()) {
 			mSoldier = s;
 			if(!mObserver) {
+				mDriving = s->getWarriorType() == WarriorType::Vehicle;
 				setSoldier(mSoldier);
 				return;
 			}
