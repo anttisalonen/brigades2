@@ -176,7 +176,7 @@ void SoldierController::updateShootTarget()
 
 	Vector3 topos = pos - mSoldier->getPosition();
 
-	if(!Math::tps(topos, vel, mSoldier->getCurrentWeapon()->getVelocity(), time1, time2)) {
+	if(!Math::tps(topos, vel - mSoldier->getVelocity(), mSoldier->getCurrentWeapon()->getVelocity(), time1, time2)) {
 		mShootTargetPosition = topos;
 		return;
 	}
