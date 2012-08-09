@@ -397,7 +397,7 @@ bool Driver::handleInput(float frameTime)
 void Driver::handleInputState(float frameTime)
 {
 	if(mFreeCamera) {
-		mCamera -= mCameraVelocity * frameTime * 10.0f;
+		mCamera -= mCameraVelocity * frameTime * 50.0f;
 	}
 	else if(mSoldier) {
 		if(mObserver && mSoldier->isDead()) {
@@ -409,7 +409,8 @@ void Driver::handleInputState(float frameTime)
 		mCamera = mSoldier->getPosition();
 	}
 	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
-	mScaleLevel = clamp(10.0f, mScaleLevel, 20.0f);
+	float maxScale = mObserver ? 5.0f : mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
+	mScaleLevel = clamp(clamp(5.0f, maxScale, 20.0f), mScaleLevel, 20.0f);
 }
 
 float Driver::restrictCameraCoordinate(float t, float w, float res)
