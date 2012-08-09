@@ -20,16 +20,17 @@ enum class SpriteType {
 	Soldier,
 	Tree,
 	Bullet,
+	WeaponPickup
 };
 
 struct Sprite {
-	Sprite(boost::shared_ptr<Common::Entity> e, SpriteType t, float scale,
+	Sprite(const Common::Vector3& pos, SpriteType t, float scale,
 			boost::shared_ptr<Common::Texture> texture,
 			boost::shared_ptr<Common::Texture> shadow, float xp, float yp,
 			float sxp, float syp)
-		: mEntity(e), mSpriteType(t), mScale(scale), mTexture(texture), mShadowTexture(shadow),
+		: mPosition(pos), mSpriteType(t), mScale(scale), mTexture(texture), mShadowTexture(shadow),
 		mXP(xp), mYP(yp), mSXP(sxp), mSYP(syp) { }
-	boost::shared_ptr<Common::Entity> mEntity;
+	Common::Vector3 mPosition;
 	SpriteType mSpriteType;
 	float mScale;
 	boost::shared_ptr<Common::Texture> mTexture;
@@ -39,6 +40,14 @@ struct Sprite {
 	float mSXP;
 	float mSYP;
 	bool operator<(const Sprite& s1) const;
+};
+
+enum class WeaponPickupTexture {
+	Unknown,
+	AssaultRifle,
+	MachineGun,
+	Bazooka,
+	END,
 };
 
 class Driver : public SoldierController {
@@ -86,6 +95,7 @@ class Driver : public SoldierController {
 		boost::shared_ptr<Common::Texture> mGrassTexture;
 		boost::shared_ptr<Common::Texture> mTreeTexture;
 		boost::shared_ptr<Common::Texture> mTreeShadowTexture;
+		boost::shared_ptr<Common::Texture> mWeaponPickupTextures[int(WeaponPickupTexture::END)];
 		Common::TextMap mTextMap;
 		SoldierPtr mSoldier;
 		bool mSoldierVisible;

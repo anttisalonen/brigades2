@@ -104,7 +104,7 @@ const char* MachineGun::getName() const
 }
 
 AutomaticCannon::AutomaticCannon()
-	: Weapon(40.0f, 20.0f, 0.4f, 1.0f, 0.3f, 0.0f)
+	: Weapon(40.0f, 20.0f, 0.4f, 1.0f, 1.0f, 0.0f)
 {
 }
 
@@ -114,7 +114,7 @@ const char* AutomaticCannon::getName() const
 }
 
 Bazooka::Bazooka()
-	: Weapon(20.0f, 15.0f, 4.0f, 1.0f, 0.3f, 0.0f)
+	: Weapon(30.0f, 16.0f, 4.0f, 1.0f, 1.0f, 0.0f)
 {
 }
 
@@ -212,12 +212,9 @@ bool SoldierController::handleEvents()
 	bool ret = !mSoldier->getEvents().empty();
 
 	for(auto e : mSoldier->getEvents()) {
-		switch(e->getType()) {
-			case EventType::Sound:
-				mSoldier->getSensorySystem()->addSound(static_cast<Soldier*>(e->getData())->shared_from_this());
-				break;
-		}
+		e->handleEvent(mSoldier);
 	}
+
 	mSoldier->getEvents().clear();
 
 	return ret;
@@ -453,6 +450,15 @@ float Soldier::damageFactorFromWeapon(const WeaponPtr w) const
 	} else {
 		return w->getDamageAgainstLightArmor();
 	}
+}
+
+bool Soldier::hasWeaponType(const char* wname) const
+{
+	for(auto w : mWeapons) {
+		if(!strcmp(wname, w->getName()))
+			return true;
+	}
+	return false;
 }
 
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
@@ -846,6 +852,13 @@ void World::killSoldier(SoldierPtr s)
 		return;
 
 	s->die();
+	if(s->getWarriorType() == WarriorType::Soldier) {
+		for(auto w : s->getWeapons()) {
+			Vector3 offset = Vector3(1.0f * Random::clamped(), 1.0f * Random::clamped(), 0.0f);
+			mTriggerSystem.add(WeaponPickupTriggerPtr(new WeaponPickupTrigger(w, s->getPosition() + offset)));
+		}
+	}
+
 	assert(s->getSideNum() < NUM_SIDES);
 	assert(mSoldiersAlive[s->getSideNum()] > 0);
 	mSoldiersAlive[s->getSideNum()]--;
@@ -858,6 +871,11 @@ void World::updateTriggerSystem(float time)
 		soldiers.push_back(s.second);
 	}
 	mTriggerSystem.update(soldiers, time);
+}
+
+const TriggerSystem& World::getTriggerSystem() const
+{
+	return mTriggerSystem;
 }
 
 }

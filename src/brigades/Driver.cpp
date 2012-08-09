@@ -16,13 +16,13 @@ static int screenHeight = 600;
 bool Sprite::operator<(const Sprite& s1) const
 {
 	/* Important to define strict weak ordering or face segmentation fault. */
-	auto e1 = mEntity;
-	auto e2 = s1.mEntity;
-	if(e1->getPosition().z < e2->getPosition().z)
+	auto e1 = mPosition;
+	auto e2 = s1.mPosition;
+	if(e1.z < e2.z)
 		return true;
-	if(e1->getPosition().z > e2->getPosition().z)
+	if(e1.z > e2.z)
 		return false;
-	if(e1->getPosition().y > e2->getPosition().y)
+	if(e1.y > e2.y)
 		return true;
 	return false;
 }
@@ -157,6 +157,10 @@ void Driver::loadTextures()
 	mSoldierShadowTexture = boost::shared_ptr<Texture>(new Texture("share/soldier1shadow.png", 0, 32));
 	mTreeTexture = boost::shared_ptr<Texture>(new Texture("share/tree.png", 0, 0));
 	mTreeShadowTexture = mSoldierShadowTexture;
+	mWeaponPickupTextures[int(WeaponPickupTexture::Unknown)]      = boost::shared_ptr<Texture>(new Texture("share/question.png", 0, 0));
+	mWeaponPickupTextures[int(WeaponPickupTexture::AssaultRifle)] = boost::shared_ptr<Texture>(new Texture("share/assaultrifle.png", 0, 0));
+	mWeaponPickupTextures[int(WeaponPickupTexture::MachineGun)]   = boost::shared_ptr<Texture>(new Texture("share/machinegun.png", 0, 0));
+	mWeaponPickupTextures[int(WeaponPickupTexture::Bazooka)]      = boost::shared_ptr<Texture>(new Texture("share/bazooka.png", 0, 0));
 }
 
 void Driver::loadFont()
@@ -586,28 +590,56 @@ void Driver::drawEntities()
 		float xp, yp, sxp, syp;
 		float scale;
 		boost::shared_ptr<Texture> t = soldierTexture(s, sxp, syp, xp, yp, scale);
-		sprites.push_back(Sprite(s, SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
+		sprites.push_back(Sprite(s->getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
 					sxp, syp));
 	}
 
 	auto trees = mWorld->getTreesAt(mCamera, 10.0f);
 	for(auto t : trees) {
-		sprites.push_back(Sprite(t, SpriteType::Tree, t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
+		sprites.push_back(Sprite(t->getPosition(), SpriteType::Tree,
+					t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
 					-0.5f, -0.8f));
 	}
 
 	auto bullets = mWorld->getBulletsAt(mCamera, 10.0f);
 	for(auto b : bullets) {
 		float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
-		sprites.push_back(Sprite(b, SpriteType::Bullet,
+		sprites.push_back(Sprite(b->getPosition(), SpriteType::Bullet,
 					scale,
 					boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
 					0.0f, 0.5f / scale,
 					-0.8f / scale, -1.0f / scale));
 	}
 
+
+	auto triggers = mWorld->getTriggerSystem().getTriggers();
+	for(auto t : triggers) {
+		const char* tn = t->getName();
+		WeaponPickupTexture tex = WeaponPickupTexture::Unknown;
+		if(!strncmp(tn, "WeaponPickup", sizeof("WeaponPickup") - 1)) {
+			tn += sizeof("WeaponPickup") - 1;
+			if(!strcmp(tn, "Assault Rifle")) {
+				tex = WeaponPickupTexture::AssaultRifle;
+			}
+			else if(!strcmp(tn, "Machine Gun")) {
+				tex = WeaponPickupTexture::MachineGun;
+			}
+			else if(!strcmp(tn, "Bazooka")) {
+				tex = WeaponPickupTexture::Bazooka;
+			}
+			sprites.push_back(Sprite(t->getPosition(), SpriteType::WeaponPickup,
+						2.0f,
+						mWeaponPickupTextures[int(tex)], boost::shared_ptr<Texture>(),
+						-0.5f, -0.5f,
+						0.0f, 0.0f));
+		}
+	}
+
 	for(auto s : sprites) {
-		const Vector3& v(s.mEntity->getPosition());
+		if(!s.mShadowTexture && s.mSpriteType != SpriteType::Bullet)
+			continue;
+
+		const Vector3& v(s.mPosition);
 		Rectangle r = Rectangle((-mCamera.x + v.x + s.mSXP * s.mScale + v.z * 0.15f * s.mScale) * mScaleLevel + screenWidth * 0.5f,
 				(-mCamera.y + v.y + s.mSYP * s.mScale - v.z * 0.20f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
 				mScaleLevel * s.mScale, mScaleLevel * s.mScale);
@@ -624,7 +656,10 @@ void Driver::drawEntities()
 	std::sort(sprites.begin(), sprites.end());
 
 	for(auto s : sprites) {
-		const Vector3& v(s.mEntity->getPosition());
+		if(!s.mTexture && s.mSpriteType != SpriteType::Bullet)
+			continue;
+
+		const Vector3& v(s.mPosition);
 		Rectangle r = Rectangle((-mCamera.x + v.x + s.mXP * s.mScale) * mScaleLevel + screenWidth * 0.5f,
 				(-mCamera.y + v.y + s.mYP * s.mScale + v.z * 0.3f * s.mScale) * mScaleLevel + screenHeight * 0.5f,
 				mScaleLevel * s.mScale, mScaleLevel * s.mScale);

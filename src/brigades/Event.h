@@ -7,17 +7,41 @@ namespace Brigades {
 
 enum class EventType {
 	Sound,
+	WeaponPickup,
 };
+
+class Soldier;
+class Weapon;
+typedef boost::shared_ptr<Soldier> SoldierPtr;
+typedef boost::shared_ptr<Weapon> WeaponPtr;
 
 class Event {
 	public:
-		Event(EventType t, void* data);
+		Event(EventType t);
+		virtual ~Event() { }
 		EventType getType() const;
-		void* getData();
+		virtual void handleEvent(SoldierPtr p) = 0;
 
 	private:
 		EventType mType;
-		void* mData;
+};
+
+class SoundEvent : public Event {
+	public:
+		SoundEvent(SoldierPtr soundmaker);
+		void handleEvent(SoldierPtr p);
+
+	private:
+		SoldierPtr mSoundMaker;
+};
+
+class WeaponPickupEvent : public Event {
+	public:
+		WeaponPickupEvent(WeaponPtr w);
+		void handleEvent(SoldierPtr p);
+
+	private:
+		WeaponPtr mWeapon;
 };
 
 typedef boost::shared_ptr<Event> EventPtr;

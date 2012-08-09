@@ -170,6 +170,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void reduceHealth(float n);
 		float getHealth() const;
 		float damageFactorFromWeapon(const WeaponPtr w) const;
+		bool hasWeaponType(const char* wname) const;
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -239,6 +240,7 @@ class World : public boost::enable_shared_from_this<World> {
 		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p) const;
 		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
 		int soldiersAlive(int t) const;
+		const TriggerSystem& getTriggerSystem() const;
 
 		// modifiers
 		void update(float time);

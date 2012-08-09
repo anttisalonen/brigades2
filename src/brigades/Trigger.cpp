@@ -17,6 +17,27 @@ bool CircleTriggerRegion::isIn(const Common::Vector3& v)
 	return dist <= mRadius * mRadius;
 }
 
+const Vector3& CircleTriggerRegion::getCenter() const
+{
+	return mCenter;
+}
+
+bool OnetimeTrigger::update(float time)
+{
+	return false;
+}
+
+TimedTrigger::TimedTrigger(float time)
+	: mTimer(time)
+{
+}
+
+bool TimedTrigger::update(float time)
+{
+	mTimer.doCountdown(time);
+	return mTimer.check();
+}
+
 SoundTrigger::SoundTrigger(const boost::shared_ptr<Soldier> soundmaker, float range)
 	: mSoundMaker(soundmaker),
 	mRegion(soundmaker->getPosition(), range)
@@ -26,14 +47,54 @@ SoundTrigger::SoundTrigger(const boost::shared_ptr<Soldier> soundmaker, float ra
 void SoundTrigger::tryTrigger(boost::shared_ptr<Soldier> s)
 {
 	if(mRegion.isIn(s->getPosition())) {
-		EventPtr e(new Event(EventType::Sound, mSoundMaker.get()));
-		s->addEvent(e);
+		s->addEvent(boost::shared_ptr<SoundEvent>(new SoundEvent(mSoundMaker)));
 	}
 }
 
-bool SoundTrigger::update(float time)
+const char* SoundTrigger::getName()
 {
-	return false;
+	return "Sound";
+}
+
+Vector3 SoundTrigger::getPosition()
+{
+	return mRegion.getCenter();
+}
+
+WeaponPickupTrigger::WeaponPickupTrigger(WeaponPtr w, const Vector3& pos)
+	: TimedTrigger(60.0f),
+	mWeapon(w),
+	mRegion(pos, 1.0f),
+	mPickedUp(false)
+{
+	mName = std::string("WeaponPickup") + std::string(mWeapon->getName());
+}
+
+void WeaponPickupTrigger::tryTrigger(SoldierPtr s)
+{
+	if(!s->isDead() &&
+			s->getWarriorType() == WarriorType::Soldier &&
+			mRegion.isIn(s->getPosition()) &&
+			!s->hasWeaponType(mWeapon->getName()) &&
+			!mPickedUp) {
+		s->addEvent(boost::shared_ptr<WeaponPickupEvent>(new WeaponPickupEvent(mWeapon)));
+		mPickedUp = true;
+	}
+}
+
+bool WeaponPickupTrigger::update(float time)
+{
+	return !mPickedUp && !TimedTrigger::update(time);
+}
+
+const char* WeaponPickupTrigger::getName()
+{
+	return mName.c_str();
+}
+
+Vector3 WeaponPickupTrigger::getPosition()
+{
+	return mRegion.getCenter();
 }
 
 TriggerSystem::TriggerSystem()
@@ -62,6 +123,10 @@ void TriggerSystem::update(std::vector<SoldierPtr> soldiers, float time)
 
 }
 
+const std::list<TriggerPtr> TriggerSystem::getTriggers() const
+{
+	return mTriggers;
+}
 
 }
 
