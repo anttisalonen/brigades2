@@ -498,8 +498,8 @@ const WeaponPtr Bullet::getWeapon() const
 }
 
 World::World()
-	: mWidth(200.0f),
-	mHeight(200.0f),
+	: mWidth(256.0f),
+	mHeight(256.0f),
 	mVisibility(40.0f),
 	mTeamWon(-1),
 	mWinTimer(1.0f)
@@ -742,30 +742,44 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt)
 
 void World::addTrees()
 {
-	for(int i = 0; i < mWidth * mHeight * 0.01f; i++) {
-		float x = Random::clamped();
-		float y = Random::clamped();
-		float r = Random::uniform();
+	int squareSide = 64;
+	int numXSquares = mWidth / squareSide;
+	int numYSquares = mHeight / squareSide;
 
-		x *= mWidth;
-		y *= mHeight;
-		r = Common::clamp(3.0f, r * 8.0f, 8.0f);
+	for(int k = -numYSquares / 2; k < numYSquares / 2; k++) {
+		for(int j = -numXSquares / 2; j < numXSquares / 2; j++) {
+			if((k == -numYSquares / 2 && j == -numXSquares / 2) ||
+				       (k == numYSquares / 2 - 1 && j == numXSquares / 2 -1))
+				continue;
 
-		bool tooclose = false;
-		for(auto t : mTrees) {
-			float maxdist = r + t->getRadius();
-			if(Vector3(x, y, 0.0f).distance2(t->getPosition()) <
-					maxdist * maxdist) {
-				tooclose = true;
-				break;
+			for(int i = 0; i < 10; i++) {
+				float x = Random::uniform();
+				float y = Random::uniform();
+				float r = Random::uniform();
+
+				x *= squareSide;
+				y *= squareSide;
+				x += j * squareSide;
+				y += k * squareSide;
+				r = Common::clamp(3.0f, r * 8.0f, 8.0f);
+
+				bool tooclose = false;
+				for(auto t : mTrees) {
+					float maxdist = r + t->getRadius();
+					if(Vector3(x, y, 0.0f).distance2(t->getPosition()) <
+							maxdist * maxdist) {
+						tooclose = true;
+						break;
+					}
+				}
+				if(tooclose) {
+					continue;
+				}
+
+				TreePtr tree(new Tree(Vector3(x, y, 0), r));
+				mTrees.push_back(tree);
 			}
 		}
-		if(tooclose) {
-			continue;
-		}
-
-		TreePtr tree(new Tree(Vector3(x, y, 0), r));
-		mTrees.push_back(tree);
 	}
 	std::cout << "Added " << mTrees.size() << " trees.\n";
 }
