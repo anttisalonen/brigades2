@@ -684,7 +684,7 @@ void Driver::setFocusSoldier()
 {
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, 1000.0f);
 	for(auto s : soldiers) {
-		if(s->getSideNum() == 0 && !s->isDead()) {
+		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator()) {
 			mSoldier = s;
 			if(!mObserver) {
 				mDriving = s->getWarriorType() == WarriorType::Vehicle;

@@ -123,6 +123,16 @@ const char* Bazooka::getName() const
 	return "Bazooka";
 }
 
+Pistol::Pistol()
+	: Weapon(15.0f, 18.0f, 0.5f)
+{
+}
+
+const char* Pistol::getName() const
+{
+	return "Pistol";
+}
+
 Side::Side(bool first)
 	: mFirst(first)
 {
@@ -461,6 +471,20 @@ bool Soldier::hasWeaponType(const char* wname) const
 	return false;
 }
 
+void Soldier::setDictator(bool d)
+{
+	mDictator = d;
+	if(mDictator) {
+		mMaxSpeed = 0.0f;
+		mMaxAcceleration = 0.0f;
+	}
+}
+
+bool Soldier::isDictator() const
+{
+	return mDictator;
+}
+
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
 	: mShooter(shooter),
 	mTimer(timeleft)
@@ -630,6 +654,11 @@ int World::soldiersAlive(int t) const
 	return mSoldiersAlive[t];
 }
 
+const TriggerSystem& World::getTriggerSystem() const
+{
+	return mTriggerSystem;
+}
+
 
 // modifiers
 void World::update(float time)
@@ -658,6 +687,9 @@ void World::update(float time)
 				s->reduceHealth(s->damageFactorFromWeapon((*bit)->getWeapon()));
 				if(s->getHealth() <= 0.0f) {
 					killSoldier(s);
+					if(s->isDictator() && mTeamWon == -1) {
+						mTeamWon = (*bit)->getShooter()->getSideNum();
+					}
 				}
 				erase = true;
 				break;
@@ -704,7 +736,7 @@ void World::setupSides()
 			if(j == 8)
 				wt = WarriorType::Vehicle;
 
-			auto s = addSoldier(i == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt);
+			auto s = addSoldier(i == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt, false);
 			if(j == 0) {
 				leader = s;
 			}
@@ -719,16 +751,28 @@ void World::setupSides()
 				leader->addCommandee(s);
 			}
 		}
+
+		{
+			auto s = addSoldier(i == 0, SoldierRank::Private, WarriorType::Soldier, true);
+		}
 	}
 }
 
-SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt)
+SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator)
 {
 	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank, wt));
 	s->init();
 	int id = s->getID();
 	mSoldiers.insert(std::make_pair(id, s));
-	mSoldiersAlive[first ? 0 : 1]++;
+
+	if(dictator) {
+		s->setDictator(true);
+		s->clearWeapons();
+		s->addWeapon(WeaponPtr(new Pistol()));
+	}
+	else {
+		mSoldiersAlive[first ? 0 : 1]++;
+	}
 
 	float x = mWidth * 0.3f;
 	float y = mHeight * 0.3f;
@@ -885,11 +929,6 @@ void World::updateTriggerSystem(float time)
 		soldiers.push_back(s.second);
 	}
 	mTriggerSystem.update(soldiers, time);
-}
-
-const TriggerSystem& World::getTriggerSystem() const
-{
-	return mTriggerSystem;
 }
 
 }

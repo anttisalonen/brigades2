@@ -76,6 +76,12 @@ class Bazooka : public Weapon {
 		const char* getName() const;
 };
 
+class Pistol : public Weapon {
+	public:
+		Pistol();
+		const char* getName() const;
+};
+
 class AutomaticCannon : public Weapon {
 	public:
 		AutomaticCannon();
@@ -171,6 +177,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		float getHealth() const;
 		float damageFactorFromWeapon(const WeaponPtr w) const;
 		bool hasWeaponType(const char* wname) const;
+		void setDictator(bool d);
+		bool isDictator() const;
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -189,6 +197,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		Common::Vector3 mFormationOffset;
 		WarriorType mWarriorType;
 		float mHealth;
+		bool mDictator;
 
 		static int getNextID();
 };
@@ -249,7 +258,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 	private:
 		void setupSides();
-		SoldierPtr addSoldier(bool first, SoldierRank rank, WarriorType wt);
+		SoldierPtr addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator);
 		void addTrees();
 		void addWalls();
 		void checkSoldierPosition(SoldierPtr s);
