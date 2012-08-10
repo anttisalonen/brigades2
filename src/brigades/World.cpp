@@ -744,31 +744,8 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
-		SoldierPtr leader;
-		for(int j = 0; j < 9; j++) {
-			WarriorType wt = WarriorType::Soldier;
-			if(j == 8)
-				wt = WarriorType::Vehicle;
-
-			auto s = addSoldier(i == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt, false);
-			if(j == 0) {
-				leader = s;
-			}
-			else {
-				if(j == 2) {
-					s->clearWeapons();
-					s->addWeapon(WeaponPtr(new MachineGun()));
-				}
-				else if(j == 3 || j == 4 || j == 5) {
-					s->addWeapon(WeaponPtr(new Bazooka()));
-				}
-				leader->addCommandee(s);
-			}
-		}
-
-		{
-			auto s = addSoldier(i == 0, SoldierRank::Private, WarriorType::Soldier, true);
-		}
+		addPlatoon(i);
+		addDictator(i);
 	}
 }
 
@@ -948,5 +925,43 @@ void World::updateTriggerSystem(float time)
 	mTriggerSystem.update(soldiers, time);
 }
 
+void World::addPlatoon(int side)
+{
+	for(int k = 0; k < 4; k++) {
+		addSquad(side);
+	}
 }
+
+void World::addSquad(int side)
+{
+	SoldierPtr squadleader;
+	for(int j = 0; j < 9; j++) {
+		WarriorType wt = WarriorType::Soldier;
+		if(j == 8)
+			wt = WarriorType::Vehicle;
+
+		auto s = addSoldier(side == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt, false);
+		if(j == 0) {
+			squadleader = s;
+		}
+		else {
+			if(j == 2) {
+				s->clearWeapons();
+				s->addWeapon(WeaponPtr(new MachineGun()));
+			}
+			else if(j == 3 || j == 4 || j == 5) {
+				s->addWeapon(WeaponPtr(new Bazooka()));
+			}
+			squadleader->addCommandee(s);
+		}
+	}
+}
+
+void World::addDictator(int side)
+{
+	addSoldier(side == 0, SoldierRank::Private, WarriorType::Soldier, true);
+}
+
+}
+
 

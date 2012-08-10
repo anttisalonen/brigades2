@@ -266,6 +266,9 @@ class World : public boost::enable_shared_from_this<World> {
 		void checkForWin();
 		void killSoldier(SoldierPtr s);
 		void updateTriggerSystem(float time);
+		void addPlatoon(int side);
+		void addSquad(int side);
+		void addDictator(int side);
 
 		float mWidth;
 		float mHeight;
