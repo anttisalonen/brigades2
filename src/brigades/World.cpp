@@ -675,6 +675,9 @@ void World::update(float time)
 		bool erase = false;
 		auto soldiers = getSoldiersAt((*bit)->getPosition(), (*bit)->getVelocity().length());
 		for(auto s : soldiers) {
+			if(mTeamWon != -1)
+				continue;
+
 			if(s->getSideNum() == (*bit)->getShooter()->getSideNum())
 				continue;
 
@@ -687,7 +690,7 @@ void World::update(float time)
 				s->reduceHealth(s->damageFactorFromWeapon((*bit)->getWeapon()));
 				if(s->getHealth() <= 0.0f) {
 					killSoldier(s);
-					if(s->isDictator() && mTeamWon == -1) {
+					if(s->isDictator()) {
 						mTeamWon = (*bit)->getShooter()->getSideNum();
 					}
 				}
@@ -884,6 +887,9 @@ void World::checkSoldierPosition(SoldierPtr s)
 
 void World::checkForWin()
 {
+	if(mTeamWon != -1)
+		return;
+
 	int winningTeam = -1;
 	for(int i = 0; i < NUM_SIDES; i++) {
 		if(mSoldiersAlive[i] != 0) {
