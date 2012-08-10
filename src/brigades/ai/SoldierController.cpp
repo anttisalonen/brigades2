@@ -1,5 +1,7 @@
+#include <cassert>
 #include <cfloat>
 #include <climits>
+#include <stdexcept>
 
 #include "brigades/SensorySystem.h"
 
@@ -11,16 +13,48 @@ namespace Brigades {
 
 namespace AI {
 
-SoldierController::SoldierController(SoldierPtr p)
-	: Brigades::SoldierController(p),
+Goal::Goal(SoldierPtr s)
+	: mSoldier(s),
+	mWorld(s->getWorld())
+{
+}
+
+AtomicGoal::AtomicGoal(SoldierPtr s)
+	: Goal(s)
+{
+}
+
+void AtomicGoal::addSubGoal(GoalPtr g)
+{
+	assert(0);
+	throw std::runtime_error("AtomicGoal::addSubGoal: illegal");
+}
+
+CompositeGoal::CompositeGoal(SoldierPtr s)
+	: Goal(s)
+{
+}
+
+void CompositeGoal::addSubGoal(GoalPtr g)
+{
+	mSubGoals.push_front(g);
+}
+
+SeekAndDestroyGoal::SeekAndDestroyGoal(SoldierPtr s)
+	: AtomicGoal(s),
+	mTargetUpdateTimer(0.25f),
 	mCommandTimer(1.0f),
 	mRetreat(false)
 {
 }
 
-void SoldierController::act(float time)
+void SeekAndDestroyGoal::activate()
 {
-	if(handleEvents() || mSoldier->getSensorySystem()->update(time)) {
+}
+
+bool SeekAndDestroyGoal::process(float time)
+{
+	if(mTargetUpdateTimer.check(time)) {
 		updateTargetSoldier();
 	}
 
@@ -32,23 +66,65 @@ void SoldierController::act(float time)
 
 	move(time);
 	tryToShoot();
+
+	return true;
 }
 
-void SoldierController::move(float time)
+void SeekAndDestroyGoal::deactivate()
+{
+}
+
+void SeekAndDestroyGoal::updateCommandeeOrders()
+{
+	mSoldier->pruneCommandees();
+	mSoldier->setLineFormation(10.0f);
+}
+
+void SeekAndDestroyGoal::updateShootTarget()
+{
+	if(!mTargetSoldier || !mSoldier->getCurrentWeapon()) {
+		mShootTargetPosition = Vector3();
+		return;
+	}
+
+	Vector3 pos = mTargetSoldier->getPosition();
+	Vector3 vel = mTargetSoldier->getVelocity();
+
+	float time1, time2;
+
+	Vector3 topos = pos - mSoldier->getPosition();
+
+	if(!Math::tps(topos, vel - mSoldier->getVelocity(), mSoldier->getCurrentWeapon()->getVelocity(), time1, time2)) {
+		mShootTargetPosition = topos;
+		return;
+	}
+
+	float corrtime = time1 > 0.0f && time1 < time2 ? time1 : time2;
+	if(corrtime <= 0.0f) {
+		mShootTargetPosition = topos;
+		return;
+	}
+
+	mShootTargetPosition = topos + vel * corrtime;
+}
+
+void SeekAndDestroyGoal::move(float time)
 {
 	Vector3 vel;
 
-	Vector3 tot = defaultMovement(time);
+	auto controller = mSoldier->getController();
+	auto steering = controller->getSteering();
+	Vector3 tot = controller->defaultMovement(time);
 
 	if(mTargetSoldier) {
 		if(!mRetreat) {
-			vel = mSteering->pursuit(*mTargetSoldier);
+			vel = steering->pursuit(*mTargetSoldier);
 		} else {
-			vel = mSteering->evade(*mTargetSoldier);
+			vel = steering->evade(*mTargetSoldier);
 		}
 	} else {
 		if(mWorld->teamWon() < 0) {
-			vel = mSteering->wander(2.0f, 10.0f, 3.0f);
+			vel = steering->wander(2.0f, 10.0f, 3.0f);
 		}
 	}
 	if(mSoldier->getCommandees().empty())
@@ -56,7 +132,7 @@ void SoldierController::move(float time)
 	else
 		vel.truncate(0.02f);
 
-	mSteering->accumulate(tot, vel);
+	steering->accumulate(tot, vel);
 
 	if(mWorld->teamWon() < 0) {
 		std::vector<Entity*> neighbours;
@@ -79,26 +155,26 @@ void SoldierController::move(float time)
 		beingLead = leader && !mSoldier->getFormationOffset().null() && leaderVisible;
 
 		if(beingLead) {
-			Vector3 sep = mSteering->separation(neighbours);
+			Vector3 sep = steering->separation(neighbours);
 			sep.truncate(10.0f);
-			if(mSteering->accumulate(tot, sep)) {
-				Vector3 coh = mSteering->cohesion(neighbours);
+			if(steering->accumulate(tot, sep)) {
+				Vector3 coh = steering->cohesion(neighbours);
 				coh.truncate(1.5f);
-				mSteering->accumulate(tot, coh);
+				steering->accumulate(tot, coh);
 			}
 
-			Vector3 offset = mSteering->offsetPursuit(*leader, mSoldier->getFormationOffset());
-			mSteering->accumulate(tot, offset);
+			Vector3 offset = steering->offsetPursuit(*leader, mSoldier->getFormationOffset());
+			steering->accumulate(tot, offset);
 		}
 	}
 
-	moveTo(tot, time, mShootTargetPosition.null());
+	controller->moveTo(tot, time, mShootTargetPosition.null());
 	if(!mShootTargetPosition.null()) {
-		turnTo(mShootTargetPosition);
+		controller->turnTo(mShootTargetPosition);
 	}
 }
 
-void SoldierController::updateTargetSoldier()
+void SeekAndDestroyGoal::updateTargetSoldier()
 {
 	auto soldiers = mSoldier->getSensorySystem()->getSoldiers();
 	float distToNearest = FLT_MAX;
@@ -148,7 +224,7 @@ void SoldierController::updateTargetSoldier()
 	}
 }
 
-void SoldierController::tryToShoot()
+void SeekAndDestroyGoal::tryToShoot()
 {
 	if(!mTargetSoldier || mRetreat || !mSoldier->getCurrentWeapon()) {
 		return;
@@ -162,38 +238,15 @@ void SoldierController::tryToShoot()
 	}
 }
 
-void SoldierController::updateShootTarget()
+SoldierController::SoldierController(SoldierPtr p)
+	: Brigades::SoldierController(p),
+	mCurrentGoal(GoalPtr(new SeekAndDestroyGoal(p)))
 {
-	if(!mTargetSoldier || !mSoldier->getCurrentWeapon()) {
-		mShootTargetPosition = Vector3();
-		return;
-	}
-
-	Vector3 pos = mTargetSoldier->getPosition();
-	Vector3 vel = mTargetSoldier->getVelocity();
-
-	float time1, time2;
-
-	Vector3 topos = pos - mSoldier->getPosition();
-
-	if(!Math::tps(topos, vel - mSoldier->getVelocity(), mSoldier->getCurrentWeapon()->getVelocity(), time1, time2)) {
-		mShootTargetPosition = topos;
-		return;
-	}
-
-	float corrtime = time1 > 0.0f && time1 < time2 ? time1 : time2;
-	if(corrtime <= 0.0f) {
-		mShootTargetPosition = topos;
-		return;
-	}
-
-	mShootTargetPosition = topos + vel * corrtime;
 }
 
-void SoldierController::updateCommandeeOrders()
+void SoldierController::act(float time)
 {
-	mSoldier->pruneCommandees();
-	mSoldier->setLineFormation(10.0f);
+	mCurrentGoal->process(time);
 }
 
 }

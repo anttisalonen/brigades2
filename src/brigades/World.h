@@ -108,17 +108,16 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 	public:
 		SoldierController();
 		SoldierController(boost::shared_ptr<Soldier> s);
-		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual ~SoldierController() { }
+		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual void act(float time) = 0;
 
-	protected:
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
 		void turnTo(const Common::Vector3& dir);
 		void turnBy(float rad);
 		void setVelocityToHeading();
-		bool handleEvents();
+		boost::shared_ptr<Common::Steering> getSteering();
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
@@ -150,6 +149,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void update(float time) override;
 		float getFOV() const; // total FOV in radians
 		void setController(SoldierControllerPtr p);
+		SoldierControllerPtr getController();
 		void die();
 		bool isDead() const;
 		void clearWeapons();
@@ -162,6 +162,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		boost::shared_ptr<SensorySystem> getSensorySystem();
 		void addEvent(EventPtr e);
 		std::vector<EventPtr>& getEvents();
+		bool handleEvents();
 		SoldierRank getRank() const;
 		void addCommandee(SoldierPtr s);
 		std::list<SoldierPtr>& getCommandees();

@@ -217,17 +217,9 @@ void SoldierController::setVelocityToHeading()
 	mSoldier->setVelocityToHeading();
 }
 
-bool SoldierController::handleEvents()
+boost::shared_ptr<Common::Steering> SoldierController::getSteering()
 {
-	bool ret = !mSoldier->getEvents().empty();
-
-	for(auto e : mSoldier->getEvents()) {
-		e->handleEvent(mSoldier);
-	}
-
-	mSoldier->getEvents().clear();
-
-	return ret;
+	return mSteering;
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt)
@@ -286,6 +278,7 @@ void Soldier::update(float time)
 	if(!time)
 		return;
 
+	mSensorySystem->update(time);
 	if(mCurrentWeaponIndex < mWeapons.size())
 		mWeapons[mCurrentWeaponIndex]->update(time);
 	if(mController) {
@@ -301,6 +294,11 @@ float Soldier::getFOV() const
 void Soldier::setController(SoldierControllerPtr p)
 {
 	mController = p;
+}
+
+SoldierControllerPtr Soldier::getController()
+{
+	return mController;
 }
 
 void Soldier::die()
@@ -364,6 +362,19 @@ void Soldier::addEvent(EventPtr e)
 std::vector<EventPtr>& Soldier::getEvents()
 {
 	return mEvents;
+}
+
+bool Soldier::handleEvents()
+{
+	bool ret = !mEvents.empty();
+
+	for(auto e : mEvents) {
+		e->handleEvent(shared_from_this());
+	}
+
+	mEvents.clear();
+
+	return ret;
 }
 
 SoldierRank Soldier::getRank() const

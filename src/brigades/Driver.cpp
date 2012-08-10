@@ -83,8 +83,7 @@ void Driver::run()
 
 void Driver::act(float time)
 {
-	handleEvents();
-	mSoldier->getSensorySystem()->update(time);
+	mSoldier->handleEvents();
 	Vector3 tot;
 	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
 
