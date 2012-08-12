@@ -13,6 +13,7 @@
 #include "common/Rectangle.h"
 
 #include "World.h"
+#include "DebugOutput.h"
 
 
 namespace Brigades {
@@ -51,13 +52,41 @@ enum class WeaponPickupTexture {
 	END,
 };
 
-class Driver : public SoldierController {
+struct DebugSymbolCollection {
+	struct Area {
+		Area(const Common::Color& c_, const Common::Rectangle& r_, bool onlyframes_)
+			: c(c_), r(r_), onlyframes(onlyframes_) { }
+		Common::Color c;
+		Common::Rectangle r;
+		bool onlyframes;
+	};
+
+	struct Arrow {
+		Arrow(const Common::Color& c_, const Common::Vector3& start_, const Common::Vector3& end_)
+			: c(c_), start(start_), end(end_) { }
+		Common::Color c;
+		Common::Vector3 start;
+		Common::Vector3 end;
+	};
+
+	std::vector<Area> areas;
+	std::vector<Arrow> arrows;
+
+	void clear() {
+		areas.clear();
+		arrows.clear();
+	}
+};
+
+class Driver : public SoldierController, public DebugOutput {
 	public:
 		Driver(WorldPtr w, bool observer);
 		void init();
 		void run();
 		void act(float time) override;
 		bool handleAttackOrder(const Common::Rectangle& r) override;
+		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
+		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
 
 	private:
 		void loadTextures();
@@ -72,6 +101,10 @@ class Driver : public SoldierController {
 		void finishFrame();
 		void drawTerrain();
 		void drawTexts();
+		void drawOverlays();
+		void drawRectangle(const Common::Rectangle& r,
+				const Common::Color& c, float alpha, bool onlyframes);
+		void drawLine(const Common::Vector3& p1, const Common::Vector3& p2, const Common::Color& c);
 		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p,
 				float& xp, float& yp, float& sxp, float& syp, float& scale);
 		void drawEntities();
@@ -105,6 +138,7 @@ class Driver : public SoldierController {
 		bool mShooting;
 		bool mRestarting;
 		bool mDriving;
+		DebugSymbolCollection mDebugSymbols;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

@@ -6,6 +6,7 @@
 #include <set>
 
 #include "brigades/SensorySystem.h"
+#include "brigades/DebugOutput.h"
 
 #include "brigades/ai/SoldierController.h"
 
@@ -247,6 +248,8 @@ void PlatoonLeaderGoal::giveOrders()
 			if(s->defending()) {
 				Vector3 attackpos;
 				if(calculateAttackPosition(s, attackpos)) {
+					DebugOutput::getInstance()->markArea(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
+							getSector(attackpos), false);
 					s->giveAttackOrder(getSector(attackpos));
 					reduceHome(s->getPosition());
 					markCombat(attackpos);
@@ -508,6 +511,8 @@ void SeekAndDestroyGoal::move(float time)
 	}
 
 	controller->moveTo(tot, time, mShootTargetPosition.null());
+	DebugOutput::getInstance()->addArrow(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
+			mSoldier->getPosition(), tot + mSoldier->getPosition());
 	if(!mShootTargetPosition.null()) {
 		controller->turnTo(mShootTargetPosition);
 	}

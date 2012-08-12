@@ -5,6 +5,7 @@
 
 #include "World.h"
 #include "Driver.h"
+#include "DebugOutput.h"
 
 using namespace Brigades;
 
@@ -20,6 +21,8 @@ int main(int argc, char** argv)
 	}
 	WorldPtr world(new World());
 	DriverPtr driver(new Driver(world, observer));
+	if(observer)
+		DebugOutput::setInstance(driver);
 
 	int seed = time(NULL);
 	srand(seed);

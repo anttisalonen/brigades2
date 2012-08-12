@@ -77,6 +77,7 @@ void Driver::run()
 		drawTerrain();
 		drawEntities();
 		drawTexts();
+		drawOverlays();
 		finishFrame();
 	}
 }
@@ -116,6 +117,16 @@ bool Driver::handleAttackOrder(const Rectangle& r)
 {
 	std::cout << "You should attack the area at " << r << "\n";
 	return true;
+}
+
+void Driver::markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes)
+{
+	mDebugSymbols.areas.push_back(DebugSymbolCollection::Area(c, r, onlyframes));
+}
+
+void Driver::addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& end)
+{
+	mDebugSymbols.arrows.push_back(DebugSymbolCollection::Arrow(c, start, end));
 }
 
 void Driver::loadTextures()
@@ -552,15 +563,55 @@ void Driver::drawTexts()
 			break;
 
 	}
+}
 
+void Driver::drawOverlays()
+{
 	{
 		if(mSoldier->getAttackArea().w) {
-			SDL_utils::drawRectangle((-mCamera.x + mSoldier->getAttackArea().x) * mScaleLevel + screenWidth * 0.5f,
-					(-mCamera.y + mSoldier->getAttackArea().y) * mScaleLevel + screenHeight * 0.5f,
-					(-mCamera.x + mSoldier->getAttackArea().x + mSoldier->getAttackArea().w) * mScaleLevel + screenWidth * 0.5f,
-					(-mCamera.y + mSoldier->getAttackArea().y + mSoldier->getAttackArea().h) * mScaleLevel + screenHeight * 0.5f);
+			drawRectangle(mSoldier->getAttackArea(), Common::Color::White, 1.0f, true);
 		}
 	}
+
+	for(auto a : mDebugSymbols.areas) {
+		drawRectangle(a.r, a.c, 0.2f, a.onlyframes);
+	}
+
+	for(auto a : mDebugSymbols.arrows) {
+		Vector3 arrow = a.end - a.start;
+		Vector3 v1 = Math::rotate2D(arrow, QUARTER_PI);
+		Vector3 v2 = Math::rotate2D(arrow, -QUARTER_PI);
+		v1 *= -0.3f;
+		v2 *= -0.3f;
+		v1 += a.end;
+		v2 += a.end;
+		drawLine(a.start, a.end, a.c);
+		drawLine(a.end, v1, a.c);
+		drawLine(a.end, v2, a.c);
+	}
+
+	mDebugSymbols.clear();
+}
+
+void Driver::drawRectangle(const Common::Rectangle& r,
+		const Common::Color& c, float alpha, bool onlyframes)
+{
+	SDL_utils::drawRectangle((-mCamera.x + r.x) * mScaleLevel + screenWidth * 0.5f,
+			(-mCamera.y + r.y) * mScaleLevel + screenHeight * 0.5f,
+			(-mCamera.x + r.x + r.w) * mScaleLevel + screenWidth * 0.5f,
+			(-mCamera.y + r.y + r.h) * mScaleLevel + screenHeight * 0.5f,
+			c, alpha, onlyframes);
+}
+
+void Driver::drawLine(const Common::Vector3& p1, const Common::Vector3& p2, const Common::Color& c)
+{
+	Vector3 v1((-mCamera.x + p1.x) * mScaleLevel + screenWidth * 0.5f,
+			(-mCamera.y + p1.y) * mScaleLevel + screenHeight * 0.5f,
+			0.0f);
+	Vector3 v2((-mCamera.x + p2.x) * mScaleLevel + screenWidth * 0.5f,
+			(-mCamera.y + p2.y) * mScaleLevel + screenHeight * 0.5f,
+			0.0f);
+	SDL_utils::drawLine(v1, v2, c, 1.0f);
 }
 
 const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, float& sxp, float& syp,
