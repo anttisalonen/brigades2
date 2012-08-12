@@ -246,6 +246,7 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mDictator(false),
 	mAttacking(false)
 {
+	mName = generateName();
 	if(wt == WarriorType::Vehicle) {
 		mRadius = 3.5f;
 		mMaxSpeed = 30.0f;
@@ -283,6 +284,20 @@ int Soldier::getNextID()
 {
 	static int id = 0;
 	return ++id;
+}
+
+std::string Soldier::generateName()
+{
+	static char n = 'A';
+
+	std::string s(1, n);
+	if(n == 'Z') {
+		n = 'A';
+	} else {
+		n++;
+	}
+
+	return s;
 }
 
 void Soldier::update(float time)
@@ -530,6 +545,25 @@ bool Soldier::hasEnemyContact() const
 		}
 	}
 	return false;
+}
+
+const std::string& Soldier::getName() const
+{
+	return mName;
+}
+
+const char* Soldier::rankToString(SoldierRank r)
+{
+	switch(r) {
+		case SoldierRank::Private:
+			return "Private";
+		case SoldierRank::Corporal:
+			return "Corporal";
+		case SoldierRank::Sergeant:
+			return "Sergeant";
+		case SoldierRank::Lieutenant:
+			return "Lieutenant";
+	}
 }
 
 bool Soldier::defending() const

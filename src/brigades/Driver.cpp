@@ -497,6 +497,7 @@ void Driver::drawTexts()
 	}
 
 	{
+		// weapons
 		int i = 0;
 		for(auto w : mSoldier->getWeapons()) {
 			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
@@ -514,6 +515,14 @@ void Driver::drawTexts()
 	}
 
 	{
+		// rank
+		SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+				40.0f, screenHeight - 145.0f, FontConfig(Soldier::rankToString(mSoldier->getRank()), Color::White, 1.0f),
+				true, false);
+	}
+
+	{
+		// "n soldiers"
 		for(int i = 0; i < NUM_SIDES; i++) {
 			char alivebuf[128];
 			memset(alivebuf, 0, sizeof(alivebuf));
@@ -524,6 +533,59 @@ void Driver::drawTexts()
 			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
 					40.0f, screenHeight - 40.0f - 15.0f * (i + 2), FontConfig(alivebuf, c, 1.0f),
 					true, false);
+		}
+	}
+
+	{
+		// soldier names
+		if(mObserver) {
+			for(auto s : mWorld->getSoldiersAt(mCamera, 10.0f)) {
+				Color c;
+				switch(s->getRank()) {
+					case SoldierRank::Private:
+					case SoldierRank::Corporal:
+						c = Color(255, 255, 255);
+						break;
+
+					case SoldierRank::Sergeant:
+						c = Color(200, 200, 200);
+						break;
+
+					case SoldierRank::Lieutenant:
+						c = Color(255, 240, 0);
+						break;
+				}
+				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+						s->getPosition().x, s->getPosition().y + 2.0f, FontConfig(s->getName().c_str(), c, 0.08f),
+						false, true);
+			}
+		} else {
+			auto allseen = mSoldier->getSensorySystem()->getSoldiers();
+			// self
+			drawSoldierName(mSoldier, Color(192, 192, 192));
+
+			if(mSoldier->getLeader()) {
+				if(std::find(allseen.begin(), allseen.end(), mSoldier->getLeader()) != allseen.end()) {
+					// leader
+					drawSoldierName(mSoldier->getLeader(), Color(255, 215, 0));
+				}
+
+				for(auto s : mSoldier->getLeader()->getCommandees()) {
+					if(s != mSoldier) {
+						if(std::find(allseen.begin(), allseen.end(), s) != allseen.end()) {
+							// peers
+							drawSoldierName(s, Color(192, 192, 192));
+						}
+					}
+				}
+			}
+
+			for(auto s : mSoldier->getCommandees()) {
+				if(std::find(allseen.begin(), allseen.end(), s) != allseen.end()) {
+					// commandees
+					drawSoldierName(s, Color(207, 127, 50));
+				}
+			}
 		}
 	}
 
@@ -791,6 +853,15 @@ Vector3 Driver::getMousePositionOnField() const
 	y = float(yp) / mScaleLevel + mCamera.y - (screenHeight / (2.0f * mScaleLevel));
 
 	return Vector3(x, y, 0);
+}
+
+void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
+{
+	SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+			s->getPosition().x,
+			s->getPosition().y + 2.0f,
+			FontConfig(s->getName().c_str(), c, 0.08f),
+			false, true);
 }
 
 }

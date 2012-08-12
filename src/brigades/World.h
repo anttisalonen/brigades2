@@ -190,6 +190,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool canCommunicateWith(const SoldierPtr p) const;
 		bool hasRadio() const;
 		bool hasEnemyContact() const;
+		const std::string& getName() const;
+		static const char* rankToString(SoldierRank r);
 
 		// orders for the group leader
 		bool defending() const;
@@ -220,8 +222,10 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool mDictator;
 		bool mAttacking;
 		Common::Rectangle mAttackArea;
+		std::string mName;
 
 		static int getNextID();
+		static std::string generateName();
 };
 
 class SoldierAction {
