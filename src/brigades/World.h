@@ -9,6 +9,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "common/Clock.h"
+#include "common/Rectangle.h"
 #include "common/Vehicle.h"
 #include "common/Steering.h"
 
@@ -111,6 +112,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		virtual ~SoldierController() { }
 		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual void act(float time) = 0;
+		virtual bool handleAttackOrder(const Common::Rectangle& r);
+		virtual bool handleAttackSuccess(const Common::Rectangle& r);
 
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
@@ -132,6 +135,7 @@ enum class SoldierRank {
 	Private,
 	Corporal,
 	Sergeant,
+	Lieutenant,
 };
 
 enum class WarriorType {
@@ -168,8 +172,11 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		std::list<SoldierPtr>& getCommandees();
 		void setLeader(SoldierPtr s);
 		SoldierPtr getLeader();
+
+		// orders for the crew
 		void setFormationOffset(const Common::Vector3& v);
 		const Common::Vector3& getFormationOffset() const;
+
 		void setLineFormation(float dist);
 		void setColumnFormation(float dist);
 		void pruneCommandees();
@@ -180,6 +187,18 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool hasWeaponType(const char* wname) const;
 		void setDictator(bool d);
 		bool isDictator() const;
+		bool canCommunicateWith(const SoldierPtr p) const;
+		bool hasRadio() const;
+		bool hasEnemyContact() const;
+
+		// orders for the group leader
+		bool defending() const;
+		void setDefending();
+		void giveAttackOrder(const Common::Rectangle& r);
+		const Common::Rectangle& getAttackArea() const;
+
+		// messages for the platoon leader
+		void reportSuccessfulAttack(const Common::Rectangle& r);
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -199,6 +218,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		WarriorType mWarriorType;
 		float mHealth;
 		bool mDictator;
+		bool mAttacking;
+		Common::Rectangle mAttackArea;
 
 		static int getNextID();
 };
@@ -251,6 +272,7 @@ class World : public boost::enable_shared_from_this<World> {
 		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
 		int soldiersAlive(int t) const;
 		const TriggerSystem& getTriggerSystem() const;
+		const Common::Vector3& getHomeBasePosition(bool first) const;
 
 		// modifiers
 		void update(float time);
@@ -267,8 +289,9 @@ class World : public boost::enable_shared_from_this<World> {
 		void killSoldier(SoldierPtr s);
 		void updateTriggerSystem(float time);
 		void addPlatoon(int side);
-		void addSquad(int side);
+		SoldierPtr addSquad(int side);
 		void addDictator(int side);
+		void setHomeBasePositions();
 
 		float mWidth;
 		float mHeight;
@@ -282,6 +305,8 @@ class World : public boost::enable_shared_from_this<World> {
 		int mSoldiersAlive[NUM_SIDES];
 		Common::SteadyTimer mWinTimer;
 		TriggerSystem mTriggerSystem;
+		Common::Vector3 mHomeBasePositions[NUM_SIDES];
+		int mSquareSide;
 };
 
 };

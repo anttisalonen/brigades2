@@ -10,6 +10,7 @@
 #include "common/Texture.h"
 #include "common/Color.h"
 #include "common/FontConfig.h"
+#include "common/Rectangle.h"
 
 #include "World.h"
 
@@ -56,6 +57,7 @@ class Driver : public SoldierController {
 		void init();
 		void run();
 		void act(float time) override;
+		bool handleAttackOrder(const Common::Rectangle& r) override;
 
 	private:
 		void loadTextures();

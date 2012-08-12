@@ -40,5 +40,6 @@ void WeaponPickupEvent::handleEvent(SoldierPtr p)
 	p->addWeapon(mWeapon);
 }
 
+
 }
 

@@ -112,6 +112,12 @@ void Driver::act(float time)
 	}
 }
 
+bool Driver::handleAttackOrder(const Rectangle& r)
+{
+	std::cout << "You should attack the area at " << r << "\n";
+	return true;
+}
+
 void Driver::loadTextures()
 {
 	SDLSurface surfs[] = { SDLSurface("share/soldier1-n.png"),
@@ -222,7 +228,12 @@ Common::Color Driver::mapDestroyedTankColor(bool first, const Common::Color& c)
 		}
 	}
 
-	return Color::Black;
+	Color r(c);
+	r.r /= 4;
+	r.g /= 4;
+	r.b /= 4;
+
+	return r;
 }
 
 bool Driver::handleInput(float frameTime)
@@ -299,6 +310,21 @@ bool Driver::handleInput(float frameTime)
 					case SDLK_p:
 					case SDLK_PAUSE:
 						mPaused = !mPaused;
+						break;
+
+					case SDLK_v:
+						if(!mObserver && mSoldier && !mSoldier->isDead() &&
+								mSoldier->getRank() == SoldierRank::Sergeant &&
+								mSoldier->getLeader() && mSoldier->getAttackArea().w &&
+								mSoldier->getAttackArea().pointWithin(mSoldier->getPosition().x,
+									mSoldier->getPosition().y)) {
+							if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
+								mSoldier->setDefending();
+								mSoldier->getLeader()->reportSuccessfulAttack(mSoldier->getAttackArea());
+							} else {
+								/* TODO */
+							}
+						}
 						break;
 
 					case SDLK_1:
@@ -526,6 +552,15 @@ void Driver::drawTexts()
 			break;
 
 	}
+
+	{
+		if(mSoldier->getAttackArea().w) {
+			SDL_utils::drawRectangle((-mCamera.x + mSoldier->getAttackArea().x) * mScaleLevel + screenWidth * 0.5f,
+					(-mCamera.y + mSoldier->getAttackArea().y) * mScaleLevel + screenHeight * 0.5f,
+					(-mCamera.x + mSoldier->getAttackArea().x + mSoldier->getAttackArea().w) * mScaleLevel + screenWidth * 0.5f,
+					(-mCamera.y + mSoldier->getAttackArea().y + mSoldier->getAttackArea().h) * mScaleLevel + screenHeight * 0.5f);
+		}
+	}
 }
 
 const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, float& sxp, float& syp,
@@ -683,7 +718,7 @@ void Driver::setFocusSoldier()
 {
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, 1000.0f);
 	for(auto s : soldiers) {
-		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator()) {
+		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator() && s->getRank() < SoldierRank::Lieutenant) {
 			mSoldier = s;
 			if(!mObserver) {
 				mDriving = s->getWarriorType() == WarriorType::Vehicle;

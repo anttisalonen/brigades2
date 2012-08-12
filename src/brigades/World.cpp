@@ -167,6 +167,16 @@ void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
 	mSoldier->setController(shared_from_this());
 }
 
+bool SoldierController::handleAttackOrder(const Common::Rectangle& r)
+{
+	return false;
+}
+
+bool SoldierController::handleAttackSuccess(const Common::Rectangle& r)
+{
+	return false;
+}
+
 Vector3 SoldierController::defaultMovement(float time)
 {
 	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
@@ -232,7 +242,9 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mCurrentWeaponIndex(0),
 	mRank(rank),
 	mWarriorType(wt),
-	mHealth(1.0f)
+	mHealth(1.0f),
+	mDictator(false),
+	mAttacking(false)
 {
 	if(wt == WarriorType::Vehicle) {
 		mRadius = 3.5f;
@@ -384,7 +396,7 @@ SoldierRank Soldier::getRank() const
 
 void Soldier::addCommandee(SoldierPtr s)
 {
-	if(!s->isDead()) {
+	if(!isDead() && !s->isDead()) {
 		mCommandees.push_back(s);
 		s->setLeader(shared_from_this());
 	}
@@ -496,6 +508,64 @@ bool Soldier::isDictator() const
 	return mDictator;
 }
 
+bool Soldier::canCommunicateWith(const SoldierPtr p) const
+{
+	return !isDead() && !p->isDead() && ((hasRadio() && p->hasRadio()) ||
+			(std::find(mSensorySystem->getSoldiers().begin(),
+				mSensorySystem->getSoldiers().end(),
+				p) != mSensorySystem->getSoldiers().end()));
+}
+
+bool Soldier::hasRadio() const
+{
+	/* TODO: items */
+	return true;
+}
+
+bool Soldier::hasEnemyContact() const
+{
+	for(auto s : mSensorySystem->getSoldiers()) {
+		if(s->getSideNum() != getSideNum()) {
+			return true;
+		}
+	}
+	return false;
+}
+
+bool Soldier::defending() const
+{
+	return !mAttacking;
+}
+
+void Soldier::setDefending()
+{
+	mAttacking = false;
+}
+
+void Soldier::giveAttackOrder(const Common::Rectangle& r)
+{
+	mAttackArea = r;
+	mAttacking = true;
+	if(!mController->handleAttackOrder(r)) {
+		assert(0);
+		std::cout << "Warning: controller couldn't handle attack order\n";
+	}
+}
+
+const Common::Rectangle& Soldier::getAttackArea() const
+{
+	return mAttackArea;
+}
+
+void Soldier::reportSuccessfulAttack(const Common::Rectangle& r)
+{
+	if(!mController->handleAttackSuccess(r)) {
+		assert(0);
+		std::cout << "Warning: controller couldn't handle successful attack\n";
+	}
+}
+
+
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
 	: mShooter(shooter),
 	mTimer(timeleft)
@@ -537,13 +607,16 @@ World::World()
 	mHeight(256.0f),
 	mVisibility(40.0f),
 	mTeamWon(-1),
-	mWinTimer(1.0f)
+	mWinTimer(1.0f),
+	mSquareSide(64)
 {
 	memset(mSoldiersAlive, 0, sizeof(mSoldiersAlive));
 
 	for(int i = 0; i < NUM_SIDES; i++) {
 		mSides[i] = SidePtr(new Side(i == 0));
 	}
+
+	setHomeBasePositions();
 }
 
 void World::create()
@@ -670,6 +743,10 @@ const TriggerSystem& World::getTriggerSystem() const
 	return mTriggerSystem;
 }
 
+const Vector3& World::getHomeBasePosition(bool first) const
+{
+	return mHomeBasePositions[first ? 0 : 1];
+}
 
 // modifiers
 void World::update(float time)
@@ -765,21 +842,14 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool 
 		mSoldiersAlive[first ? 0 : 1]++;
 	}
 
-	float x = mWidth * 0.3f;
-	float y = mHeight * 0.3f;
-	if(first) {
-		x = -x;
-		y = -y;
-	}
-	s->setPosition(Vector3(x, y, 0.0f));
+	s->setPosition(getHomeBasePosition(first));
 	return s;
 }
 
 void World::addTrees()
 {
-	int squareSide = 64;
-	int numXSquares = mWidth / squareSide;
-	int numYSquares = mHeight / squareSide;
+	int numXSquares = mWidth / mSquareSide;
+	int numYSquares = mHeight / mSquareSide;
 
 	for(int k = -numYSquares / 2; k < numYSquares / 2; k++) {
 		for(int j = -numXSquares / 2; j < numXSquares / 2; j++) {
@@ -792,10 +862,10 @@ void World::addTrees()
 				float y = Random::uniform();
 				float r = Random::uniform();
 
-				x *= squareSide;
-				y *= squareSide;
-				x += j * squareSide;
-				y += k * squareSide;
+				x *= mSquareSide;
+				y *= mSquareSide;
+				x += j * mSquareSide;
+				y += k * mSquareSide;
 				r = Common::clamp(3.0f, r * 8.0f, 8.0f);
 
 				bool tooclose = false;
@@ -911,9 +981,11 @@ void World::killSoldier(SoldierPtr s)
 		}
 	}
 
-	assert(s->getSideNum() < NUM_SIDES);
-	assert(mSoldiersAlive[s->getSideNum()] > 0);
-	mSoldiersAlive[s->getSideNum()]--;
+	if(!s->isDictator()) {
+		assert(s->getSideNum() < NUM_SIDES);
+		assert(mSoldiersAlive[s->getSideNum()] > 0);
+		mSoldiersAlive[s->getSideNum()]--;
+	}
 }
 
 void World::updateTriggerSystem(float time)
@@ -927,12 +999,15 @@ void World::updateTriggerSystem(float time)
 
 void World::addPlatoon(int side)
 {
+	SoldierPtr platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, WarriorType::Soldier, false);
 	for(int k = 0; k < 4; k++) {
-		addSquad(side);
+		auto s = addSquad(side);
+		assert(s);
+		platoonleader->addCommandee(s);
 	}
 }
 
-void World::addSquad(int side)
+SoldierPtr World::addSquad(int side)
 {
 	SoldierPtr squadleader;
 	for(int j = 0; j < 9; j++) {
@@ -955,11 +1030,20 @@ void World::addSquad(int side)
 			squadleader->addCommandee(s);
 		}
 	}
+	return squadleader;
 }
 
 void World::addDictator(int side)
 {
 	addSoldier(side == 0, SoldierRank::Private, WarriorType::Soldier, true);
+}
+
+void World::setHomeBasePositions()
+{
+	float x = mWidth * 0.5f - mSquareSide * 0.5f;
+	float y = mHeight * 0.5f - mSquareSide * 0.5f;
+	mHomeBasePositions[0] = Vector3(-x, -y, 0);
+	mHomeBasePositions[1] = Vector3(x, y, 0);
 }
 
 }
