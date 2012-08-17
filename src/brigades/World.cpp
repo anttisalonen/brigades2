@@ -201,10 +201,18 @@ Vector3 SoldierController::defaultMovement(float time)
 
 void SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
+	if(isnan(dir.x) || isnan(dir.y)) {
+		std::cout << "moveTo: warning: dir: " << dir << "\n";
+		return;
+	}
+
 	if(dir.null() && !mSoldier->getVelocity().null()) {
+		assert(!isnan(mSoldier->getVelocity().x));
+		assert(!isnan(mSoldier->getVelocity().y));
 		mSoldier->setAcceleration(mSoldier->getVelocity() * -10.0f);
 	}
 	else {
+		assert(time);
 		mSoldier->setAcceleration(dir * (10.0f / time));
 	}
 	mSoldier->Vehicle::update(time);
@@ -540,7 +548,7 @@ bool Soldier::hasRadio() const
 bool Soldier::hasEnemyContact() const
 {
 	for(auto s : mSensorySystem->getSoldiers()) {
-		if(s->getSideNum() != getSideNum()) {
+		if(!s->isDead() && s->getSideNum() != getSideNum()) {
 			return true;
 		}
 	}
@@ -639,6 +647,9 @@ const WeaponPtr Bullet::getWeapon() const
 World::World()
 	: mWidth(256.0f),
 	mHeight(256.0f),
+	mMaxSoldiers(1024),
+	mSoldierCSP(mWidth, mHeight, 16, 16, mMaxSoldiers),
+	mTrees(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
 	mVisibility(40.0f),
 	mTeamWon(-1),
 	mWinTimer(1.0f),
@@ -663,20 +674,19 @@ void World::create()
 // accessors
 std::vector<TreePtr> World::getTreesAt(const Vector3& v, float radius) const
 {
-	/* TODO */
-	return mTrees;
+	return mTrees.query(AABB(Point(v.x, v.y), Point(radius, radius)));
 }
 
-std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius) const
+std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius)
 {
-	/* TODO */
-	std::vector<SoldierPtr> ret;
-
-	for(auto s : mSoldiers) {
-		ret.push_back(s.second);
+	std::vector<SoldierPtr> res;
+	for(auto s = mSoldierCSP.queryBegin(Point(v.x, v.y), radius);
+			!mSoldierCSP.queryEnd();
+			s = mSoldierCSP.queryNext()) {
+		res.push_back(s);
 	}
 
-	return ret;
+	return res;
 }
 
 std::list<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius) const
@@ -706,7 +716,7 @@ std::vector<WallPtr> World::getWallsAt(const Common::Vector3& v, float radius) c
 	return mWalls;
 }
 
-std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p) const
+std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 {
 	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibility);
 	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibility);
@@ -782,14 +792,27 @@ const Vector3& World::getHomeBasePosition(bool first) const
 	return mHomeBasePositions[first ? 0 : 1];
 }
 
+float World::getMaxVisibility() const
+{
+	return mVisibility;
+}
+
+
 // modifiers
 void World::update(float time)
 {
-	for(auto s : mSoldiers) {
-		if(!s.second->isDead())
-			s.second->update(time);
+	for(auto sit : mSoldierMap) {
+		auto s = sit.second;
+		if(!s->isDead()) {
+			auto oldpos = s->getPosition();
+			assert(!isnan(s->getPosition().x));
+			s->update(time);
 
-		checkSoldierPosition(s.second);
+			assert(!isnan(s->getPosition().x));
+			checkSoldierPosition(s);
+			assert(!isnan(s->getPosition().x));
+			mSoldierCSP.update(s, Point(oldpos.x, oldpos.y), Point(s->getPosition().x, s->getPosition().y));
+		}
 	}
 
 	auto bit = mBullets.begin();
@@ -862,10 +885,13 @@ void World::setupSides()
 
 SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator)
 {
+	if(mSoldierMap.size() >= mMaxSoldiers) {
+		assert(0);
+		throw std::runtime_error("Too many soldiers in the world");
+	}
+
 	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank, wt));
 	s->init();
-	int id = s->getID();
-	mSoldiers.insert(std::make_pair(id, s));
 
 	if(dictator) {
 		s->setDictator(true);
@@ -877,6 +903,8 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool 
 	}
 
 	s->setPosition(getHomeBasePosition(first));
+	mSoldierCSP.add(s, Point(s->getPosition().x, s->getPosition().y));
+	mSoldierMap.insert(std::make_pair(s->getID(), s));
 	return s;
 }
 
@@ -896,14 +924,16 @@ void World::addTrees()
 				float y = Random::uniform();
 				float r = Random::uniform();
 
+				const float maxRadius = 8.0f;
+
 				x *= mSquareSide;
 				y *= mSquareSide;
 				x += j * mSquareSide;
 				y += k * mSquareSide;
-				r = Common::clamp(3.0f, r * 8.0f, 8.0f);
+				r = Common::clamp(3.0f, r * maxRadius, maxRadius);
 
 				bool tooclose = false;
-				for(auto t : mTrees) {
+				for(auto t : mTrees.query(AABB(Point(x, y), Point(maxRadius * 2.0f, maxRadius * 2.0f)))) {
 					float maxdist = r + t->getRadius();
 					if(Vector3(x, y, 0.0f).distance2(t->getPosition()) <
 							maxdist * maxdist) {
@@ -916,7 +946,11 @@ void World::addTrees()
 				}
 
 				TreePtr tree(new Tree(Vector3(x, y, 0), r));
-				mTrees.push_back(tree);
+				bool ret = mTrees.insert(tree, Point(x, y));
+				if(!ret) {
+					std::cout << "Error: couldn't add tree at " << x << ", " << y << "\n";
+					assert(0);
+				}
 			}
 		}
 	}
@@ -1025,7 +1059,7 @@ void World::killSoldier(SoldierPtr s)
 void World::updateTriggerSystem(float time)
 {
 	std::vector<SoldierPtr> soldiers;
-	for(auto s : mSoldiers) {
+	for(auto s : mSoldierMap) {
 		soldiers.push_back(s.second);
 	}
 	mTriggerSystem.update(soldiers, time);

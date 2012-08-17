@@ -1,4 +1,5 @@
 #include <string.h>
+#include <algorithm>
 
 #include "Driver.h"
 #include "SensorySystem.h"
@@ -58,6 +59,7 @@ void Driver::run()
 		double newTime = Clock::getTime();
 		double frameTime = newTime - prevTime;
 		prevTime = newTime;
+		frameTime = std::min(frameTime, 0.1);
 
 		if(!mPaused) {
 			mWorld->update(frameTime);
@@ -445,8 +447,9 @@ void Driver::handleInputState(float frameTime)
 		mCamera = mSoldier->getPosition();
 	}
 	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
-	float maxScale = mObserver ? 5.0f : mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
-	mScaleLevel = clamp(clamp(5.0f, maxScale, 20.0f), mScaleLevel, 20.0f);
+	static const float maxScale = 1.0f;
+	float thisMaxScale = mObserver ? 1.0f : mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
+	mScaleLevel = clamp(clamp(maxScale, thisMaxScale, 20.0f), mScaleLevel, 20.0f);
 }
 
 float Driver::restrictCameraCoordinate(float t, float w, float res)
@@ -539,7 +542,7 @@ void Driver::drawTexts()
 	{
 		// soldier names
 		if(mObserver) {
-			for(auto s : mWorld->getSoldiersAt(mCamera, 10.0f)) {
+			for(auto s : mWorld->getSoldiersAt(mCamera, screenWidth * 0.5f / mScaleLevel)) {
 				Color c;
 				switch(s->getRank()) {
 					case SoldierRank::Private:
@@ -730,7 +733,7 @@ void Driver::drawEntities()
 {
 	static const float treeScale = 3.0f;
 	const auto soldiers = mObserver || mSoldier->isDead() ?
-		mWorld->getSoldiersAt(mCamera, 10.0f) :
+		mWorld->getSoldiersAt(mCamera, screenWidth * 0.5f / mScaleLevel) :
 		mSoldier->getSensorySystem()->getSoldiers();
 
 	std::vector<Sprite> sprites;
@@ -742,14 +745,14 @@ void Driver::drawEntities()
 					sxp, syp));
 	}
 
-	auto trees = mWorld->getTreesAt(mCamera, 10.0f);
+	auto trees = mWorld->getTreesAt(mCamera, 10000.0f);
 	for(auto t : trees) {
 		sprites.push_back(Sprite(t->getPosition(), SpriteType::Tree,
 					t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
 					-0.5f, -0.8f));
 	}
 
-	auto bullets = mWorld->getBulletsAt(mCamera, 10.0f);
+	auto bullets = mWorld->getBulletsAt(mCamera, screenWidth * 0.5f / mScaleLevel);
 	for(auto b : bullets) {
 		float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
 		sprites.push_back(Sprite(b->getPosition(), SpriteType::Bullet,

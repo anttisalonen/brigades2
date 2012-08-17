@@ -12,6 +12,8 @@
 #include "common/Rectangle.h"
 #include "common/Vehicle.h"
 #include "common/Steering.h"
+#include "common/QuadTree.h"
+#include "common/CellSpacePartition.h"
 
 #include "Event.h"
 #include "Trigger.h"
@@ -266,17 +268,18 @@ class World : public boost::enable_shared_from_this<World> {
 
 		// accessors
 		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
-		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius) const;
+		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius);
 		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
 		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
-		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p) const;
+		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p);
 		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
 		int soldiersAlive(int t) const;
 		const TriggerSystem& getTriggerSystem() const;
 		const Common::Vector3& getHomeBasePosition(bool first) const;
+		float getMaxVisibility() const;
 
 		// modifiers
 		void update(float time);
@@ -299,9 +302,11 @@ class World : public boost::enable_shared_from_this<World> {
 
 		float mWidth;
 		float mHeight;
+		const unsigned int mMaxSoldiers;
 		SidePtr mSides[NUM_SIDES];
-		std::map<int, SoldierPtr> mSoldiers;
-		std::vector<TreePtr> mTrees;
+		Common::CellSpacePartition<SoldierPtr> mSoldierCSP;
+		std::map<int, SoldierPtr> mSoldierMap;
+		Common::QuadTree<TreePtr> mTrees;
 		std::vector<WallPtr> mWalls;
 		float mVisibility;
 		std::list<BulletPtr> mBullets;

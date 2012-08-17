@@ -14,14 +14,19 @@ int main(int argc, char** argv)
 	std::cout << "Brigades\n";
 
 	bool observer = false;
+	bool debug = false;
+
 	for(int i = 1; i < argc; i++) {
 		if(!strcmp(argv[i], "-o")) {
 			observer = true;
 		}
+		if(!strcmp(argv[i], "-d")) {
+			debug = true;
+		}
 	}
 	WorldPtr world(new World());
 	DriverPtr driver(new Driver(world, observer));
-	if(observer)
+	if(debug)
 		DebugOutput::setInstance(driver);
 
 	int seed = time(NULL);
