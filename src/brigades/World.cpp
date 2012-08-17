@@ -179,7 +179,8 @@ bool SoldierController::handleAttackSuccess(const Common::Rectangle& r)
 
 Vector3 SoldierController::defaultMovement(float time)
 {
-	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
+	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(),
+			mSoldier->getRadius() * 2.0f + mSoldier->getVelocity().length());
 	std::vector<Obstacle*> obstacles(trees.size());
 	for(unsigned int i = 0; i < trees.size(); i++)
 		obstacles[i] = trees[i].get();
@@ -973,7 +974,7 @@ void World::addWalls()
 
 void World::checkSoldierPosition(SoldierPtr s)
 {
-	for(auto t : getTreesAt(s->getPosition(), s->getRadius())) {
+	for(auto t : getTreesAt(s->getPosition(), s->getRadius() * 2.0f)) {
 		Vector3 diff = s->getPosition() - t->getPosition();
 		float dist2 = diff.length2();
 		float mindist = t->getRadius() + s->getRadius();
