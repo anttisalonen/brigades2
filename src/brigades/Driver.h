@@ -111,6 +111,7 @@ class Driver : public SoldierController, public DebugOutput {
 		void setFocusSoldier();
 		Common::Vector3 getMousePositionOnField() const;
 		void drawSoldierName(const SoldierPtr s, const Common::Color& c);
+		float getDrawRadius() const;
 
 		WorldPtr mWorld;
 		Common::Clock mClock;

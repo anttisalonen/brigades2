@@ -542,7 +542,7 @@ void Driver::drawTexts()
 	{
 		// soldier names
 		if(mObserver) {
-			for(auto s : mWorld->getSoldiersAt(mCamera, screenWidth * 0.5f / mScaleLevel)) {
+			for(auto s : mWorld->getSoldiersAt(mCamera, getDrawRadius())) {
 				Color c;
 				switch(s->getRank()) {
 					case SoldierRank::Private:
@@ -733,7 +733,7 @@ void Driver::drawEntities()
 {
 	static const float treeScale = 3.0f;
 	const auto soldiers = mObserver || mSoldier->isDead() ?
-		mWorld->getSoldiersAt(mCamera, screenWidth * 0.5f / mScaleLevel) :
+		mWorld->getSoldiersAt(mCamera, getDrawRadius()) :
 		mSoldier->getSensorySystem()->getSoldiers();
 
 	std::vector<Sprite> sprites;
@@ -745,14 +745,14 @@ void Driver::drawEntities()
 					sxp, syp));
 	}
 
-	auto trees = mWorld->getTreesAt(mCamera, 10000.0f);
+	auto trees = mWorld->getTreesAt(mCamera, getDrawRadius());
 	for(auto t : trees) {
 		sprites.push_back(Sprite(t->getPosition(), SpriteType::Tree,
 					t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
 					-0.5f, -0.8f));
 	}
 
-	auto bullets = mWorld->getBulletsAt(mCamera, screenWidth * 0.5f / mScaleLevel);
+	auto bullets = mWorld->getBulletsAt(mCamera, getDrawRadius());
 	for(auto b : bullets) {
 		float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
 		sprites.push_back(Sprite(b->getPosition(), SpriteType::Bullet,
@@ -832,7 +832,7 @@ void Driver::drawEntities()
 
 void Driver::setFocusSoldier()
 {
-	const auto soldiers = mWorld->getSoldiersAt(mCamera, 1000.0f);
+	const auto soldiers = mWorld->getSoldiersAt(mCamera, mWorld->getWidth());
 	for(auto s : soldiers) {
 		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator() && s->getRank() < SoldierRank::Lieutenant) {
 			mSoldier = s;
@@ -865,6 +865,11 @@ void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
 			s->getPosition().y + 2.0f,
 			FontConfig(s->getName().c_str(), c, 0.08f),
 			false, true);
+}
+
+float Driver::getDrawRadius() const
+{
+	return 10.0f + screenWidth * 0.5f / mScaleLevel;
 }
 
 }
