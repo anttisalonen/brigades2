@@ -280,6 +280,7 @@ class World : public boost::enable_shared_from_this<World> {
 		const TriggerSystem& getTriggerSystem() const;
 		const Common::Vector3& getHomeBasePosition(bool first) const;
 		float getMaxVisibility() const;
+		float getShootSoundHearingDistance() const;
 
 		// modifiers
 		void update(float time);

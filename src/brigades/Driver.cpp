@@ -863,6 +863,10 @@ void Driver::drawEntities()
 		mWorld->getSoldiersAt(mCamera, getDrawRadius()) :
 		mSoldier->getSensorySystem()->getSoldiers();
 
+	const Vector3& observerpos = mObserver ? mCamera : mSoldier->getPosition();
+	float observerdist = mObserver ? getDrawRadius() : mWorld->getShootSoundHearingDistance();
+	float observerdist2 = observerdist * observerdist;
+
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
 		float xp, yp, sxp, syp;
@@ -879,8 +883,11 @@ void Driver::drawEntities()
 					-0.5f, -0.8f));
 	}
 
-	auto bullets = mWorld->getBulletsAt(mCamera, getDrawRadius());
-	for(auto b : bullets) {
+	for(auto b : mWorld->getBulletsAt(observerpos, observerdist)) {
+		if(observerpos.distance2(b->getPosition()) >= observerdist2) {
+			continue;
+		}
+
 		float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
 		sprites.push_back(Sprite(b->getPosition(), SpriteType::Bullet,
 					scale,
@@ -889,9 +896,12 @@ void Driver::drawEntities()
 					-0.8f / scale, -1.0f / scale));
 	}
 
-
 	auto triggers = mWorld->getTriggerSystem().getTriggers();
 	for(auto t : triggers) {
+		if(observerpos.distance2(t->getPosition()) >= observerdist2) {
+			continue;
+		}
+
 		const char* tn = t->getName();
 		WeaponPickupTexture tex = WeaponPickupTexture::Unknown;
 		if(!strncmp(tn, "WeaponPickup", sizeof("WeaponPickup") - 1)) {

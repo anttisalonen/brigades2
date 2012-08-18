@@ -798,6 +798,11 @@ float World::getMaxVisibility() const
 	return mVisibility;
 }
 
+float World::getShootSoundHearingDistance() const
+{
+	return 50.0f;
+}
+
 
 // modifiers
 void World::update(float time)
@@ -873,7 +878,7 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 				s->getPosition(),
 				dir.normalized() * w->getVelocity(),
 				time)));
-	mTriggerSystem.add(SoundTriggerPtr(new SoundTrigger(s, 50.0f)));
+	mTriggerSystem.add(SoundTriggerPtr(new SoundTrigger(s, getShootSoundHearingDistance())));
 }
 
 void World::setupSides()
