@@ -535,15 +535,13 @@ bool Soldier::isDictator() const
 bool Soldier::canCommunicateWith(const SoldierPtr p) const
 {
 	return !isDead() && !p->isDead() && ((hasRadio() && p->hasRadio()) ||
-			(std::find(mSensorySystem->getSoldiers().begin(),
-				mSensorySystem->getSoldiers().end(),
-				p) != mSensorySystem->getSoldiers().end()));
+			(Entity::distanceBetween(*this, *p) < 10.0f));
 }
 
 bool Soldier::hasRadio() const
 {
 	/* TODO: items */
-	return true;
+	return mRank >= SoldierRank::Sergeant;
 }
 
 bool Soldier::hasEnemyContact() const

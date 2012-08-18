@@ -859,13 +859,73 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, floa
 void Driver::drawEntities()
 {
 	static const float treeScale = 3.0f;
-	const auto soldiers = mObserver || mSoldier->isDead() ?
+	const auto soldiervec = mObserver || mSoldier->isDead() ?
 		mWorld->getSoldiersAt(mCamera, getDrawRadius()) :
 		mSoldier->getSensorySystem()->getSoldiers();
 
-	const Vector3& observerpos = mObserver ? mCamera : mSoldier->getPosition();
-	float observerdist = mObserver ? getDrawRadius() : mWorld->getShootSoundHearingDistance();
-	float observerdist2 = observerdist * observerdist;
+	std::set<SoldierPtr> soldiers;
+
+	soldiers.insert(soldiervec.begin(), soldiervec.end());
+
+	if(!mObserver) {
+		for(auto s : mSoldier->getCommandees()) {
+			if(mSoldier->canCommunicateWith(s)) {
+				soldiers.insert(s);
+
+				for(auto p : s->getSensorySystem()->getSoldiers()) {
+					soldiers.insert(p);
+				}
+
+				for(auto c : s->getCommandees()) {
+					if(s->canCommunicateWith(c)) {
+						soldiers.insert(c);
+
+						for(auto p : c->getSensorySystem()->getSoldiers()) {
+							soldiers.insert(p);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	std::function<bool (const Vector3&)> observefunc;
+	std::set<SoldierPtr> comrades;
+
+	if(mObserver) {
+		const Vector3& observerpos = mCamera;
+		float observerdist = getDrawRadius();
+		float observerdist2 = observerdist * observerdist;
+		observefunc = [&](const Vector3& v) -> bool {
+			return observerpos.distance2(v) <= observerdist2;
+		};
+	} else {
+		float observerdist = mWorld->getShootSoundHearingDistance();
+		float observerdist2 = observerdist * observerdist;
+
+		comrades.insert(mSoldier);
+
+		for(auto s : mSoldier->getCommandees()) {
+			if(mSoldier->canCommunicateWith(s)) {
+				comrades.insert(s);
+
+				for(auto c : s->getCommandees()) {
+					if(s->canCommunicateWith(c)) {
+						comrades.insert(c);
+					}
+				}
+			}
+		}
+
+		observefunc = [&](const Vector3& v) -> bool {
+			for(auto s : comrades) {
+				if(s->getPosition().distance2(v) <= observerdist2)
+					return true;
+			}
+
+			return false;
+		};
+	}
 
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
@@ -883,8 +943,8 @@ void Driver::drawEntities()
 					-0.5f, -0.8f));
 	}
 
-	for(auto b : mWorld->getBulletsAt(observerpos, observerdist)) {
-		if(observerpos.distance2(b->getPosition()) >= observerdist2) {
+	for(auto b : mWorld->getBulletsAt(mCamera, getDrawRadius())) {
+		if(!observefunc(b->getPosition())) {
 			continue;
 		}
 
@@ -898,7 +958,7 @@ void Driver::drawEntities()
 
 	auto triggers = mWorld->getTriggerSystem().getTriggers();
 	for(auto t : triggers) {
-		if(observerpos.distance2(t->getPosition()) >= observerdist2) {
+		if(!observefunc(t->getPosition())) {
 			continue;
 		}
 
