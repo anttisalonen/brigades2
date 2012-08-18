@@ -112,6 +112,8 @@ class Driver : public SoldierController, public DebugOutput {
 		Common::Vector3 getMousePositionOnField() const;
 		void drawSoldierName(const SoldierPtr s, const Common::Color& c);
 		float getDrawRadius() const;
+		void drawOverlayText(const char* text, float size, const Common::Color& c,
+				float x, float y, bool centered, bool pixelcoords = false);
 
 		WorldPtr mWorld;
 		Common::Clock mClock;

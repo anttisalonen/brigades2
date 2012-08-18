@@ -495,24 +495,16 @@ void Driver::drawTerrain()
 void Driver::drawTexts()
 {
 	if(mPaused) {
-		SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-				screenWidth / 2, screenHeight / 2, FontConfig("Paused", Color(255, 255, 255), 2.0f),
-				true, true);
+		drawOverlayText("Paused", 2.0f, Common::Color::White, 0.5f, 0.5f, true);
 	}
 
 	{
 		// weapons
 		int i = 0;
 		for(auto w : mSoldier->getWeapons()) {
-			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-					40.0f, screenHeight - 100.0f - 15.0f * i,
-					FontConfig(w->getName(), Color(255, 255, 255), 1.0f),
-					true, false);
+			drawOverlayText(w->getName(), 1.0f, Common::Color::White, 40.0f, screenHeight - 100.0f - 15.0f * i, false, true);
 			if(w == mSoldier->getCurrentWeapon()) {
-				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-						30.0f, screenHeight - 100.0f - 15.0f * i,
-						FontConfig("*", Color(255, 255, 255), 1.0f),
-						true, false);
+				drawOverlayText("*", 1.0f, Common::Color::White, 30.0f, screenHeight - 100.0f - 15.0f * i, false, true);
 			}
 			i++;
 		}
@@ -520,9 +512,8 @@ void Driver::drawTexts()
 
 	{
 		// rank
-		SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-				40.0f, screenHeight - 145.0f, FontConfig(Soldier::rankToString(mSoldier->getRank()), Color::White, 1.0f),
-				true, false);
+		drawOverlayText(Soldier::rankToString(mSoldier->getRank()), 1.0f, Common::Color::White,
+				40.0f, screenHeight - 145.0f, false, true);
 	}
 
 	{
@@ -534,9 +525,8 @@ void Driver::drawTexts()
 			int alive = mWorld->soldiersAlive(i);
 			snprintf(alivebuf, 127, "%d soldier%s", alive, alive == 1 ? "" : "s");
 			alivebuf[127] = 0;
-			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-					40.0f, screenHeight - 40.0f - 15.0f * (i + 2), FontConfig(alivebuf, c, 1.0f),
-					true, false);
+			drawOverlayText(alivebuf, 1.0f, c,
+					40.0f, screenHeight - 40.0f - 15.0f * (i + 2), false, true);
 		}
 	}
 
@@ -559,9 +549,7 @@ void Driver::drawTexts()
 						c = Color(255, 240, 0);
 						break;
 				}
-				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-						s->getPosition().x, s->getPosition().y + 2.0f, FontConfig(s->getName().c_str(), c, 0.08f),
-						false, true);
+				drawSoldierName(s, c);
 			}
 		} else {
 			auto allseen = mSoldier->getSensorySystem()->getSoldiers();
@@ -599,10 +587,8 @@ void Driver::drawTexts()
 			{
 				if(!mObserver) {
 					if(mSoldier->isDead()) {
-						SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-								screenWidth * 0.5f, screenHeight * 0.5f - 40.0f,
-							       	FontConfig("You're dead", Color::Red, 3.0f),
-								true, true);
+						drawOverlayText("You're dead", 3.0f, Color::Red,
+								0.5f, 0.45f, true);
 					}
 				}
 			}
@@ -616,16 +602,12 @@ void Driver::drawTexts()
 				memset(buf, 0, sizeof(buf));
 				snprintf(buf, 127, "%s team wins", mWorld->teamWon() == 0 ? "Red" : "Blue");
 				buf[127] = 0;
-				SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-						screenWidth * 0.5f, screenHeight * 0.5f - 40.0f, FontConfig(buf, c, 3.0f),
-						true, true);
+				drawOverlayText(buf, 3.0f, c, 0.5f, 0.45f, true);
 			}
 			break;
 
 		case -2:
-			SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
-					screenWidth * 0.5f, screenHeight * 0.5f - 40.0f, FontConfig("Draw", Color::White, 3.0f),
-					true, true);
+			drawOverlayText("Draw", 3.0f, Color::White, 0.5f, 0.45f, true);
 			break;
 
 	}
@@ -872,6 +854,16 @@ void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
 float Driver::getDrawRadius() const
 {
 	return 10.0f + screenWidth * 0.5f / mScaleLevel;
+}
+
+void Driver::drawOverlayText(const char* text, float size, const Common::Color& c,
+		float x, float y, bool centered, bool pixelcoords)
+{
+	int xv = pixelcoords ? x : screenWidth * x;
+	int yv = pixelcoords ? y : screenHeight * y;
+	SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
+			xv, yv, FontConfig(text, c, size),
+			true, centered);
 }
 
 }
