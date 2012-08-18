@@ -28,7 +28,7 @@ bool Sprite::operator<(const Sprite& s1) const
 	return false;
 }
 
-Driver::Driver(WorldPtr w, bool observer)
+Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	: mWorld(w),
 	mPaused(false),
 	mScaleLevel(11.5f),
@@ -38,7 +38,8 @@ Driver::Driver(WorldPtr w, bool observer)
 	mObserver(observer),
 	mShooting(false),
 	mRestarting(false),
-	mDriving(false)
+	mDriving(false),
+	mSoldierRank(r)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -834,7 +835,8 @@ void Driver::setFocusSoldier()
 {
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, mWorld->getWidth());
 	for(auto s : soldiers) {
-		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator() && s->getRank() < SoldierRank::Lieutenant) {
+		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator() &&
+				(mObserver || (s->getRank() == mSoldierRank))) {
 			mSoldier = s;
 			if(!mObserver) {
 				mDriving = s->getWarriorType() == WarriorType::Vehicle;

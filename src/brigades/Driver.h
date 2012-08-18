@@ -80,7 +80,7 @@ struct DebugSymbolCollection {
 
 class Driver : public SoldierController, public DebugOutput {
 	public:
-		Driver(WorldPtr w, bool observer);
+		Driver(WorldPtr w, bool observer, SoldierRank r);
 		void init();
 		void run();
 		void act(float time) override;
@@ -141,6 +141,7 @@ class Driver : public SoldierController, public DebugOutput {
 		bool mRestarting;
 		bool mDriving;
 		DebugSymbolCollection mDebugSymbols;
+		SoldierRank mSoldierRank;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;
