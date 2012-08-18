@@ -590,8 +590,8 @@ void Soldier::giveAttackOrder(const Common::Rectangle& r)
 	mAttackArea = r;
 	mAttacking = true;
 	if(!mController->handleAttackOrder(r)) {
-		assert(0);
 		std::cout << "Warning: controller couldn't handle attack order\n";
+		assert(0);
 	}
 }
 
@@ -603,8 +603,8 @@ const Common::Rectangle& Soldier::getAttackArea() const
 void Soldier::reportSuccessfulAttack(const Common::Rectangle& r)
 {
 	if(!mController->handleAttackSuccess(r)) {
-		assert(0);
 		std::cout << "Warning: controller couldn't handle successful attack\n";
+		assert(0);
 	}
 }
 

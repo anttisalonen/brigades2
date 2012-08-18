@@ -114,8 +114,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		virtual ~SoldierController() { }
 		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual void act(float time) = 0;
-		virtual bool handleAttackOrder(const Common::Rectangle& r);
-		virtual bool handleAttackSuccess(const Common::Rectangle& r);
+		virtual bool handleAttackOrder(const Common::Rectangle& r) = 0;
+		virtual bool handleAttackSuccess(const Common::Rectangle& r) = 0;
 
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);

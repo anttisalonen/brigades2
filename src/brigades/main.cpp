@@ -12,7 +12,7 @@ using namespace Brigades;
 int main(int argc, char** argv)
 {
 	std::cout << "Brigades\n";
-	SoldierRank r = SoldierRank::Sergeant;
+	SoldierRank r = SoldierRank::Private;
 
 	bool observer = false;
 	bool debug = false;

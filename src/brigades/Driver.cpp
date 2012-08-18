@@ -39,7 +39,9 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mShooting(false),
 	mRestarting(false),
 	mDriving(false),
-	mSoldierRank(r)
+	mSoldierRank(r),
+	mCreatingRectangle(false),
+	mRectangleFinished(false)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -114,11 +116,26 @@ void Driver::act(float time)
 			mSoldier->getCurrentWeapon()->shoot(mWorld, mSoldier, mousedir);
 		}
 	}
+
+	if(mRectangleFinished) {
+		mRectangleFinished = false;
+		mCreatingRectangle = false;
+		if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
+				mSelectedGroupLeader && mSoldier->canCommunicateWith(mSelectedGroupLeader)) {
+			mSelectedGroupLeader->giveAttackOrder(mDrawnRectangle);
+		}
+	}
 }
 
 bool Driver::handleAttackOrder(const Rectangle& r)
 {
 	std::cout << "You should attack the area at " << r << "\n";
+	return true;
+}
+
+bool Driver::handleAttackSuccess(const Common::Rectangle& r)
+{
+	std::cout << "Attack to area " << r << " successful\n";
 	return true;
 }
 
@@ -355,6 +372,27 @@ bool Driver::handleInput(float frameTime)
 						}
 						break;
 
+					case SDLK_F1:
+					case SDLK_F2:
+					case SDLK_F3:
+					case SDLK_F4:
+					case SDLK_F5:
+					case SDLK_F6:
+					case SDLK_F7:
+					case SDLK_F8:
+						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant) {
+							int k = event.key.keysym.sym - SDLK_F1;
+							int i = 0;
+							for(auto c : mSoldier->getCommandees()) {
+								if(i == k) {
+									mSelectedGroupLeader = c;
+									break;
+								}
+								i++;
+							}
+						}
+						break;
+
 					default:
 						break;
 				}
@@ -403,6 +441,17 @@ bool Driver::handleInput(float frameTime)
 						else
 							mShooting = true;
 						break;
+
+					case SDL_BUTTON_RIGHT:
+						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant) {
+							mCreatingRectangle = true;
+							Common::Vector3 p = getMousePositionOnField();
+							mDrawnRectangle.x = p.x;
+							mDrawnRectangle.y = p.y;
+							mDrawnRectangle.w = 0.0f;
+							mDrawnRectangle.h = 0.0f;
+						}
+						break;
 				}
 				break;
 
@@ -417,8 +466,24 @@ bool Driver::handleInput(float frameTime)
 						mShooting = false;
 						break;
 
+					case SDL_BUTTON_RIGHT:
+						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
+								mSelectedGroupLeader &&
+								mSoldier->canCommunicateWith(mSelectedGroupLeader)) {
+							mRectangleFinished = true;
+						}
+						break;
+
 					default:
 						break;
+				}
+				break;
+
+			case SDL_MOUSEMOTION:
+				if(mCreatingRectangle) {
+					Common::Vector3 p = getMousePositionOnField();
+					mDrawnRectangle.w = p.x - mDrawnRectangle.x;
+					mDrawnRectangle.h = p.y - mDrawnRectangle.y;
 				}
 				break;
 
@@ -450,6 +515,24 @@ void Driver::handleInputState(float frameTime)
 	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
 	static const float maxScale = 1.0f;
 	float thisMaxScale = mObserver ? 1.0f : mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
+	if(mObserver) {
+		thisMaxScale = 1.0f;
+	} else {
+		thisMaxScale = mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
+		switch(mSoldier->getRank()) {
+			case SoldierRank::Private:
+			case SoldierRank::Corporal:
+				break;
+
+			case SoldierRank::Sergeant:
+				thisMaxScale *= 0.75f;
+				break;
+
+			case SoldierRank::Lieutenant:
+				thisMaxScale *= 0.25f;
+				break;
+		}
+	}
 	mScaleLevel = clamp(clamp(maxScale, thisMaxScale, 20.0f), mScaleLevel, 20.0f);
 }
 
@@ -611,34 +694,95 @@ void Driver::drawTexts()
 			break;
 
 	}
+
+	if(mSoldier->getRank() == SoldierRank::Sergeant) {
+		// group leader info
+		char buf[128];
+		buf[127] = 0;
+		int numprivates = 0;
+		auto vis = mSoldier->getSensorySystem()->getSoldiers();
+		for(auto s : mSoldier->getCommandees()) {
+			if(std::find(vis.begin(), vis.end(), s) != vis.end()) {
+				numprivates++;
+			}
+		}
+		snprintf(buf, 127, "%d privates", numprivates);
+		drawOverlayText(buf, 1.0f, Color::White, 0.9f, 0.8f, false);
+	} else if(mSoldier->getRank() == SoldierRank::Lieutenant) {
+		float yp = 0.8f;
+		for(auto s : mSoldier->getCommandees()) {
+			Color c;
+			if(!mSoldier->canCommunicateWith(s)) {
+				c = Color::Black;
+			} else if(s->hasEnemyContact()) {
+				c = Color::Red;
+			} else if(s->defending()) {
+				c = Color::White;
+			} else {
+				c = Color::Yellow;
+			}
+			char buf[128];
+			buf[127] = 0;
+			snprintf(buf, 127, "Sergeant %s", s->getName().c_str());
+			drawOverlayText(buf, 1.0f, c, 0.9f, yp, false);
+			if(mSelectedGroupLeader == s) {
+				drawOverlayText("*", 1.0f, c, 0.88f, yp, false);
+			}
+			yp -= 0.04f;
+		}
+	}
 }
 
 void Driver::drawOverlays()
 {
 	{
+		// group leader
 		if(mSoldier->getAttackArea().w) {
 			drawRectangle(mSoldier->getAttackArea(), Common::Color::White, 1.0f, true);
 		}
 	}
 
-	for(auto a : mDebugSymbols.areas) {
-		drawRectangle(a.r, a.c, 0.2f, a.onlyframes);
+	{
+		// platoon leader
+		if(mCreatingRectangle) {
+			drawRectangle(mDrawnRectangle, Common::Color::White, 1.0f, true);
+		}
+
+		Color c(255, 255, 255);
+		for(auto s : mSoldier->getCommandees()) {
+			c.r -= 40;
+			c.g -= 40;
+			c.b -= 40;
+
+			if(s == mSelectedGroupLeader) {
+				drawRectangle(s->getAttackArea(), Color::Yellow, 2.0f, true);
+			} else {
+				drawRectangle(s->getAttackArea(), c, 1.0f, true);
+			}
+		}
 	}
 
-	for(auto a : mDebugSymbols.arrows) {
-		Vector3 arrow = a.end - a.start;
-		Vector3 v1 = Math::rotate2D(arrow, QUARTER_PI);
-		Vector3 v2 = Math::rotate2D(arrow, -QUARTER_PI);
-		v1 *= -0.3f;
-		v2 *= -0.3f;
-		v1 += a.end;
-		v2 += a.end;
-		drawLine(a.start, a.end, a.c);
-		drawLine(a.end, v1, a.c);
-		drawLine(a.end, v2, a.c);
-	}
+	{
+		// debug symbols
+		for(auto a : mDebugSymbols.areas) {
+			drawRectangle(a.r, a.c, 0.2f, a.onlyframes);
+		}
 
-	mDebugSymbols.clear();
+		for(auto a : mDebugSymbols.arrows) {
+			Vector3 arrow = a.end - a.start;
+			Vector3 v1 = Math::rotate2D(arrow, QUARTER_PI);
+			Vector3 v2 = Math::rotate2D(arrow, -QUARTER_PI);
+			v1 *= -0.3f;
+			v2 *= -0.3f;
+			v1 += a.end;
+			v2 += a.end;
+			drawLine(a.start, a.end, a.c);
+			drawLine(a.end, v1, a.c);
+			drawLine(a.end, v2, a.c);
+		}
+
+		mDebugSymbols.clear();
+	}
 }
 
 void Driver::drawRectangle(const Common::Rectangle& r,
@@ -818,11 +962,14 @@ void Driver::setFocusSoldier()
 	const auto soldiers = mWorld->getSoldiersAt(mCamera, mWorld->getWidth());
 	for(auto s : soldiers) {
 		if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator() &&
-				(mObserver || (s->getRank() == mSoldierRank))) {
+				(s->getRank() == mSoldierRank)) {
 			mSoldier = s;
 			if(!mObserver) {
 				mDriving = s->getWarriorType() == WarriorType::Vehicle;
 				setSoldier(mSoldier);
+				if(mSoldier->getRank() == SoldierRank::Lieutenant && mSoldier->getCommandees().size() > 0) {
+					mSelectedGroupLeader = *mSoldier->getCommandees().begin();
+				}
 				return;
 			}
 		}
