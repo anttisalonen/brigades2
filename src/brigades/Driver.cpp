@@ -458,9 +458,9 @@ bool Driver::handleInput(float frameTime)
 			case SDL_MOUSEBUTTONUP:
 				switch(event.button.button) {
 					case SDL_BUTTON_WHEELUP:
-						mScaleLevel += 4.0f; break;
+						mScaleLevel += 1.0f; break;
 					case SDL_BUTTON_WHEELDOWN:
-						mScaleLevel -= 4.0f; break;
+						mScaleLevel -= 1.0f; break;
 
 					case SDL_BUTTON_LEFT:
 						mShooting = false;
