@@ -119,7 +119,6 @@ void Driver::act(float time)
 
 	if(mRectangleFinished) {
 		mRectangleFinished = false;
-		mCreatingRectangle = false;
 		if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
 				mSelectedGroupLeader && mSoldier->canCommunicateWith(mSelectedGroupLeader)) {
 			mSelectedGroupLeader->giveAttackOrder(mDrawnRectangle);
@@ -467,6 +466,7 @@ bool Driver::handleInput(float frameTime)
 						break;
 
 					case SDL_BUTTON_RIGHT:
+						mCreatingRectangle = false;
 						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
 								mSelectedGroupLeader &&
 								mSoldier->canCommunicateWith(mSelectedGroupLeader)) {
@@ -710,17 +710,11 @@ void Driver::drawTexts()
 		drawOverlayText(buf, 1.0f, Color::White, 0.9f, 0.8f, false);
 	} else if(mSoldier->getRank() == SoldierRank::Lieutenant) {
 		float yp = 0.8f;
+		float bright = 0.8f;
 		for(auto s : mSoldier->getCommandees()) {
-			Color c;
-			if(!mSoldier->canCommunicateWith(s)) {
-				c = Color::Black;
-			} else if(s->hasEnemyContact()) {
-				c = Color::Red;
-			} else if(s->defending()) {
-				c = Color::White;
-			} else {
-				c = Color::Yellow;
-			}
+			Color c = getGroupRectangleColor(s, bright);
+			bright -= 0.1f;
+
 			char buf[128];
 			buf[127] = 0;
 			snprintf(buf, 127, "Sergeant %s", s->getName().c_str());
@@ -748,17 +742,10 @@ void Driver::drawOverlays()
 			drawRectangle(mDrawnRectangle, Common::Color::White, 1.0f, true);
 		}
 
-		Color c(255, 255, 255);
+		float bright = 0.8f;
 		for(auto s : mSoldier->getCommandees()) {
-			c.r -= 40;
-			c.g -= 40;
-			c.b -= 40;
-
-			if(s == mSelectedGroupLeader) {
-				drawRectangle(s->getAttackArea(), Color::Yellow, 2.0f, true);
-			} else {
-				drawRectangle(s->getAttackArea(), c, 1.0f, true);
-			}
+			drawRectangle(s->getAttackArea(), getGroupRectangleColor(s, bright), 1.0f, true);
+			bright -= 0.1f;
 		}
 	}
 
@@ -1081,6 +1068,28 @@ void Driver::drawOverlayText(const char* text, float size, const Common::Color& 
 	SDL_utils::drawText(mTextMap, mFont, mCamera, mScaleLevel, screenWidth, screenHeight,
 			xv, yv, FontConfig(text, c, size),
 			true, centered);
+}
+
+Common::Color Driver::getGroupRectangleColor(const SoldierPtr commandee, float brightness)
+{
+	Color c;
+	if(!mSoldier->canCommunicateWith(commandee)) {
+		c = Color::Black;
+	} else if(commandee->hasEnemyContact()) {
+		c = Color::Red;
+	} else if(commandee->defending()) {
+		c = Color::White;
+	} else {
+		c = Color::Yellow;
+	}
+
+	if(commandee != mSelectedGroupLeader) {
+		c.r *= brightness;
+		c.g *= brightness;
+		c.b *= brightness;
+	}
+
+	return c;
 }
 
 }
