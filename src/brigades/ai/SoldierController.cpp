@@ -223,8 +223,8 @@ void PlatoonLeaderGoal::markHome(const Vector3& v)
 void PlatoonLeaderGoal::reduceHome(const Vector3& v)
 {
 	signed char& i = mSectorMap.at(coordinateToIndex(v));
-	assert(i > 0);
-	i--;
+	if(i > 0)
+		i--;
 }
 
 void PlatoonLeaderGoal::markEnemy(const Vector3& v)
@@ -477,23 +477,16 @@ void SeekAndDestroyGoal::move(float time)
 	if(mWorld->teamWon() < 0) {
 		std::vector<Entity*> neighbours;
 		auto leader = mSoldier->getLeader();
-		if(leader && leader->isDead()) {
-			leader = SoldierPtr();
-			mSoldier->setLeader(leader);
-		}
-		bool leaderVisible = false;
+		bool leaderVisible = leader && mSoldier->canCommunicateWith(leader);
 		bool beingLead = false;
 
 		for(auto n : mSoldier->getSensorySystem()->getSoldiers()) {
 			if(n->getSideNum() == mSoldier->getSideNum()) {
 				neighbours.push_back(n.get());
-				if(leader && !leaderVisible && n == leader)
-					leaderVisible = true;
 			}
 		}
 
 		beingLead = mSoldier->getRank() < SoldierRank::Sergeant &&
-			leader &&
 			!mSoldier->getFormationOffset().null() && leaderVisible;
 
 		if(beingLead) {
@@ -585,24 +578,32 @@ void SeekAndDestroyGoal::tryToShoot()
 SoldierController::SoldierController(SoldierPtr p)
 	: Brigades::SoldierController(p)
 {
-	switch(p->getRank()) {
+	resetRootGoal();
+}
+
+void SoldierController::resetRootGoal()
+{
+	switch(mSoldier->getRank()) {
 		case SoldierRank::Private:
 		case SoldierRank::Corporal:
-			mCurrentGoal = GoalPtr(new PrivateGoal(p));
+			mCurrentGoal = GoalPtr(new PrivateGoal(mSoldier));
 			break;
 
 		case SoldierRank::Sergeant:
-			mCurrentGoal = GoalPtr(new SquadLeaderGoal(p));
+			mCurrentGoal = GoalPtr(new SquadLeaderGoal(mSoldier));
 			break;
 
 		case SoldierRank::Lieutenant:
-			mCurrentGoal = GoalPtr(new PlatoonLeaderGoal(p));
+			mCurrentGoal = GoalPtr(new PlatoonLeaderGoal(mSoldier));
 			break;
 	}
 }
 
 void SoldierController::act(float time)
 {
+	if(handleLeaderCheck(time)) {
+		resetRootGoal();
+	}
 	mCurrentGoal->process(time);
 }
 

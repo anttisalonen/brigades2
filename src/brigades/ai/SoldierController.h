@@ -128,6 +128,9 @@ class SoldierController : public Brigades::SoldierController {
 		bool handleAttackSuccess(const Common::Rectangle& r);
 
 	private:
+		bool checkLeaderStatus();
+		void resetRootGoal();
+
 		GoalPtr mCurrentGoal;
 };
 

@@ -123,10 +123,15 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		void turnBy(float rad);
 		void setVelocityToHeading();
 		boost::shared_ptr<Common::Steering> getSteering();
+		bool handleLeaderCheck(float time);
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
 		boost::shared_ptr<Common::Steering> mSteering;
+		Common::SteadyTimer mLeaderStatusTimer;
+
+	private:
+		bool checkLeaderStatus();
 };
 
 typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;
@@ -170,10 +175,13 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		std::vector<EventPtr>& getEvents();
 		bool handleEvents();
 		SoldierRank getRank() const;
+		void setRank(SoldierRank r);
 		void addCommandee(SoldierPtr s);
+		void removeCommandee(SoldierPtr s);
 		std::list<SoldierPtr>& getCommandees();
 		void setLeader(SoldierPtr s);
 		SoldierPtr getLeader();
+		bool seesSoldier(const SoldierPtr s);
 
 		// orders for the crew
 		void setFormationOffset(const Common::Vector3& v);

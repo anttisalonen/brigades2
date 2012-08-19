@@ -149,13 +149,15 @@ int Side::getSideNum() const
 }
 
 SoldierController::SoldierController()
+	: mLeaderStatusTimer(1.0f)
 {
 }
 
 SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	: mWorld(s->getWorld()),
 	mSoldier(s),
-	mSteering(boost::shared_ptr<Steering>(new Steering(*s)))
+	mSteering(boost::shared_ptr<Steering>(new Steering(*s))),
+	mLeaderStatusTimer(1.0f)
 {
 }
 
@@ -239,6 +241,55 @@ void SoldierController::setVelocityToHeading()
 boost::shared_ptr<Common::Steering> SoldierController::getSteering()
 {
 	return mSteering;
+}
+
+bool SoldierController::handleLeaderCheck(float time)
+{
+	if(mLeaderStatusTimer.check(time)) {
+		return checkLeaderStatus();
+	} else {
+		return false;
+	}
+}
+
+bool SoldierController::checkLeaderStatus()
+{
+	if(mSoldier->getWarriorType() != WarriorType::Soldier)
+		return false;
+
+	switch(mSoldier->getRank()) {
+		case SoldierRank::Private:
+		case SoldierRank::Corporal:
+			if(mSoldier->getLeader() &&
+					mSoldier->seesSoldier(mSoldier->getLeader()) &&
+					mSoldier->getLeader()->isDead()) {
+				assert(mSoldier->getCommandees().empty());
+				mSoldier->setRank(SoldierRank::Sergeant);
+				auto deceased = mSoldier->getLeader();
+				auto newleader = deceased->getLeader();
+				deceased->removeCommandee(mSoldier);
+
+				for(auto c : deceased->getCommandees()) {
+					/* TODO: set up a system so that the privates
+					 * not seeing the new sergeant are left dangling. */
+					mSoldier->addCommandee(c);
+				}
+				deceased->getCommandees().clear();
+				if(newleader) {
+					newleader->removeCommandee(deceased);
+					newleader->addCommandee(mSoldier);
+				} else {
+					mSoldier->setLeader(newleader);
+				}
+				return true;
+			}
+			break;
+
+		default:
+			break;
+	}
+
+	return false;
 }
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt)
@@ -418,12 +469,23 @@ SoldierRank Soldier::getRank() const
 	return mRank;
 }
 
+void Soldier::setRank(SoldierRank r)
+{
+	mRank = r;
+}
+
 void Soldier::addCommandee(SoldierPtr s)
 {
 	if(!isDead() && !s->isDead()) {
 		mCommandees.push_back(s);
 		s->setLeader(shared_from_this());
 	}
+}
+
+void Soldier::removeCommandee(SoldierPtr s)
+{
+	mCommandees.remove(s);
+	s->setLeader(SoldierPtr());
 }
 
 std::list<SoldierPtr>& Soldier::getCommandees()
@@ -439,6 +501,17 @@ void Soldier::setLeader(SoldierPtr s)
 SoldierPtr Soldier::getLeader()
 {
 	return mLeader;
+}
+
+bool Soldier::seesSoldier(const SoldierPtr s)
+{
+	for(auto ss : mSensorySystem->getSoldiers()) {
+		if(s == ss) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 void Soldier::setFormationOffset(const Vector3& v)
@@ -540,8 +613,7 @@ bool Soldier::canCommunicateWith(const SoldierPtr p) const
 
 bool Soldier::hasRadio() const
 {
-	/* TODO: items */
-	return mRank >= SoldierRank::Sergeant;
+	return true;
 }
 
 bool Soldier::hasEnemyContact() const

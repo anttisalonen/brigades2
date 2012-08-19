@@ -89,6 +89,10 @@ void Driver::run()
 
 void Driver::act(float time)
 {
+	if(handleLeaderCheck(time)) {
+		std::cout << "Rank updated.\n";
+	}
+
 	mSoldier->handleEvents();
 	Vector3 tot;
 	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
@@ -699,14 +703,8 @@ void Driver::drawTexts()
 		// group leader info
 		char buf[128];
 		buf[127] = 0;
-		int numprivates = 0;
-		auto vis = mSoldier->getSensorySystem()->getSoldiers();
-		for(auto s : mSoldier->getCommandees()) {
-			if(std::find(vis.begin(), vis.end(), s) != vis.end()) {
-				numprivates++;
-			}
-		}
-		snprintf(buf, 127, "%d privates", numprivates);
+		int numprivates = getNumberOfAvailableCommandees(mSoldier);
+		snprintf(buf, 127, "%d private%s", numprivates, numprivates == 1 ? "" : "s");
 		drawOverlayText(buf, 1.0f, Color::White, 0.9f, 0.8f, false);
 	} else if(mSoldier->getRank() == SoldierRank::Lieutenant) {
 		float yp = 0.8f;
@@ -717,11 +715,10 @@ void Driver::drawTexts()
 
 			char buf[128];
 			buf[127] = 0;
-			snprintf(buf, 127, "Sergeant %s", s->getName().c_str());
-			drawOverlayText(buf, 1.0f, c, 0.9f, yp, false);
-			if(mSelectedGroupLeader == s) {
-				drawOverlayText("*", 1.0f, c, 0.88f, yp, false);
-			}
+			int numprivates = getNumberOfAvailableCommandees(s);
+			snprintf(buf, 127, "%s %s (%d)", Soldier::rankToString(s->getRank()),
+					s->getName().c_str(), numprivates + 1);
+			drawOverlayText(buf, 1.0f, c, 0.8f, yp, false);
 			yp -= 0.04f;
 		}
 	}
@@ -1090,6 +1087,20 @@ Common::Color Driver::getGroupRectangleColor(const SoldierPtr commandee, float b
 	}
 
 	return c;
+}
+
+int Driver::getNumberOfAvailableCommandees(const SoldierPtr p)
+{
+	int num = 0;
+	auto vis = p->getSensorySystem()->getSoldiers();
+
+	for(auto s : p->getCommandees()) {
+		if(p->canCommunicateWith(s)) {
+			num++;
+		}
+	}
+
+	return num;
 }
 
 }

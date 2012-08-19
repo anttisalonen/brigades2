@@ -116,6 +116,7 @@ class Driver : public SoldierController, public DebugOutput {
 		void drawOverlayText(const char* text, float size, const Common::Color& c,
 				float x, float y, bool centered, bool pixelcoords = false);
 		Common::Color getGroupRectangleColor(const SoldierPtr commandee, float brightness = 1.0f);
+		int getNumberOfAvailableCommandees(const SoldierPtr p);
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
