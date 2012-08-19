@@ -115,7 +115,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual void act(float time) = 0;
 		virtual bool handleAttackOrder(const Common::Rectangle& r) = 0;
-		virtual bool handleAttackSuccess(const Common::Rectangle& r) = 0;
+		virtual bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r) = 0;
 
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
@@ -140,9 +140,9 @@ class SensorySystem;
 
 enum class SoldierRank {
 	Private,
-	Corporal,
 	Sergeant,
 	Lieutenant,
+	Captain,
 };
 
 enum class WarriorType {
@@ -206,11 +206,11 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		// orders for the group leader
 		bool defending() const;
 		void setDefending();
-		void giveAttackOrder(const Common::Rectangle& r);
+		bool giveAttackOrder(const Common::Rectangle& r);
 		const Common::Rectangle& getAttackArea() const;
 
 		// messages for the platoon leader
-		void reportSuccessfulAttack(const Common::Rectangle& r);
+		bool reportSuccessfulAttack(const Common::Rectangle& r);
 
 	private:
 		boost::shared_ptr<World> mWorld;
@@ -304,7 +304,8 @@ class World : public boost::enable_shared_from_this<World> {
 		void checkForWin();
 		void killSoldier(SoldierPtr s);
 		void updateTriggerSystem(float time);
-		void addPlatoon(int side);
+		SoldierPtr addCompany(int side);
+		SoldierPtr addPlatoon(int side);
 		SoldierPtr addSquad(int side);
 		void addDictator(int side);
 		void setHomeBasePositions();

@@ -21,6 +21,139 @@ static Common::Vector3 sectorMiddlepoint(const Common::Rectangle& r)
 	return Vector3(r.x + r.w * 0.5f, r.y + r.h * 0.5f, 0.0);
 }
 
+SectorMap::SectorMap(float width, float height, int dimx, int dimy)
+{
+	mWidth = width;
+	mHeight = height;
+
+	mDimX = dimx;
+	mDimY = dimy;
+
+	mNumXSectors = width / dimx;
+	mNumYSectors = height / dimy;
+
+	int size = mNumXSectors * mNumYSectors;
+	mSectorMap.resize(size, 0);
+}
+
+signed char SectorMap::getValue(const Common::Vector3& v) const
+{
+	return mSectorMap.at(coordinateToIndex(v));
+}
+
+signed char SectorMap::getValue(const std::pair<unsigned int, unsigned int>& s) const
+{
+	return mSectorMap.at(sectorToIndex(s.first, s.second));
+}
+
+void SectorMap::setValue(const Vector3& v, signed char x)
+{
+	mSectorMap.at(coordinateToIndex(v)) = x;
+}
+
+void SectorMap::setAll(signed char c)
+{
+	for(auto& s : mSectorMap) {
+		s = c;
+	}
+}
+
+std::pair<unsigned int, unsigned int> SectorMap::coordinateToSector(const Vector3& v) const
+{
+	return std::make_pair((v.x + mWidth * 0.5f) / mDimX, (v.y + mHeight * 0.5f) / mDimY);
+}
+
+unsigned int SectorMap::sectorToIndex(unsigned int i, unsigned int j) const
+{
+	return j * mNumYSectors + i;
+}
+
+unsigned int SectorMap::sectorToIndex(const std::pair<unsigned int, unsigned int>& s) const
+{
+	return sectorToIndex(s.first, s.second);
+}
+
+unsigned int SectorMap::coordinateToIndex(const Vector3& v) const
+{
+	return sectorToIndex(coordinateToSector(v));
+}
+
+Vector3 SectorMap::sectorToCoordinate(const std::pair<unsigned int, unsigned int>& s) const
+{
+	Vector3 ret;
+	ret.x = s.first * mDimX - mWidth * 0.5f + mDimY / 2;
+	ret.y = s.second * mDimX - mHeight * 0.5f + mDimY / 2;
+	assert(ret.x > -mWidth * 0.5f);
+	assert(ret.x < mWidth * 0.5f);
+	assert(ret.y > -mHeight * 0.5f);
+	assert(ret.y < mHeight * 0.5f);
+	return ret;
+}
+
+unsigned int SectorMap::getNumXSectors() const
+{
+	return mNumXSectors;
+}
+
+unsigned int SectorMap::getNumYSectors() const
+{
+	return mNumYSectors;
+}
+
+Common::Rectangle SectorMap::getSector(const std::pair<unsigned int, unsigned int>& s) const
+{
+	Vector3 lf = sectorToCoordinate(s);
+	lf.x -= mDimX * 0.5f;
+	lf.y -= mDimY * 0.5f;
+	return Rectangle(lf.x, lf.y, mDimX, mDimY);
+}
+
+Common::Rectangle SectorMap::getSector(const Common::Vector3& v) const
+{
+	return getSector(coordinateToSector(v));
+}
+
+
+SubUnitHandler::SubUnitHandler(SoldierPtr s)
+	: mSoldier(s)
+{
+}
+
+bool SubUnitHandler::subUnitsReady() const
+{
+	for(auto c : mSubUnits) {
+		if(c.second == SubUnitStatus::Attacking)
+			return false;
+	}
+	return true;
+}
+
+void SubUnitHandler::updateSubUnitStatus()
+{
+	mSubUnits.clear();
+
+	for(auto c : mSoldier->getCommandees()) {
+		if(!mSoldier->canCommunicateWith(c))
+			continue;
+
+		if(c->defending())
+			mSubUnits.insert({c, SubUnitStatus::Defending});
+		else
+			mSubUnits.insert({c, SubUnitStatus::Attacking});
+	}
+}
+
+std::map<SoldierPtr, SubUnitStatus>& SubUnitHandler::getStatus()
+{
+	return mSubUnits;
+}
+
+const std::map<SoldierPtr, SubUnitStatus>& SubUnitHandler::getStatus() const
+{
+	return mSubUnits;
+}
+
+
 Goal::Goal(SoldierPtr s)
 	: mSoldier(s),
 	mWorld(s->getWorld())
@@ -32,7 +165,7 @@ bool Goal::handleAttackOrder(const Common::Rectangle& r)
 	return false;
 }
 
-bool Goal::handleAttackSuccess(const Common::Rectangle& r)
+bool Goal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
 {
 	return false;
 }
@@ -145,7 +278,9 @@ bool SquadLeaderGoal::process(float time)
 		if(distToTgt < 10.0f) {
 			if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
 				mSoldier->setDefending();
-				mSoldier->getLeader()->reportSuccessfulAttack(mArea);
+				if(!mSoldier->getLeader()->reportSuccessfulAttack(mArea)) {
+					assert(0);
+				}
 			} else {
 				/* TODO */
 			}
@@ -161,225 +296,250 @@ bool SquadLeaderGoal::handleAttackOrder(const Rectangle& r)
 }
 
 PlatoonLeaderGoal::PlatoonLeaderGoal(SoldierPtr s)
-	: CompositeGoal(s)
+	: CompositeGoal(s),
+	mSubUnitHandler(s),
+	mSubTimer(5.0f)
 {
-	mNumXSectors = mWorld->getHeight() / 64;
-	mNumYSectors = mWorld->getWidth() / 64;
-
-	int size = mNumXSectors * mNumYSectors;
-	mSectorMap.resize(size, -1);
-	bool first = s->getSide()->isFirst();
-	const Vector3& awaypos = mWorld->getHomeBasePosition(!first);
-	markEnemy(awaypos);
 }
 
 void PlatoonLeaderGoal::activate()
 {
-	for(auto s : mSoldier->getCommandees()) {
-		if(mSoldier->canCommunicateWith(s)) {
-			const Vector3& pos = s->getPosition();
-			if(s->hasEnemyContact()) {
-				markCombat(pos);
-			} else {
-				markHome(pos);
-			}
-		}
-	}
-
-	giveOrders();
 }
 
 bool PlatoonLeaderGoal::process(float time)
 {
 	activateIfInactive();
+	if(mSubTimer.check(time)) {
+		mSubUnitHandler.updateSubUnitStatus();
+		if(mSubUnitHandler.subUnitsReady()) {
+			handleAttackFinish();
+		}
+	}
 	if(mSubGoals.empty()) {
-		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier, getSector(mSoldier->getPosition()))));
+		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier,
+						Rectangle(mSoldier->getPosition().x - 16, mSoldier->getPosition().y - 16, 32, 32))));
 	}
 	return processSubGoals(time);
 }
 
-bool PlatoonLeaderGoal::handleAttackSuccess(const Common::Rectangle& r)
+bool PlatoonLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
 {
-	Vector3 p = sectorMiddlepoint(r);
-	markHome(p);
-	{
-		auto s = coordinateToSector(p);
-		std::cout << mSoldier->getSideNum() << ": Sector successfully claimed: (" << s.first << ", " << s.second << ")\n";
+	if(!mSoldier->getLeader())
+		return false;
+
+	mSubUnitHandler.updateSubUnitStatus();
+	if(mSubUnitHandler.subUnitsReady()) {
+		handleAttackFinish();
 	}
-	giveOrders();
+
 	return true;
 }
 
-void PlatoonLeaderGoal::markHome(const Vector3& v)
+bool PlatoonLeaderGoal::handleAttackOrder(const Common::Rectangle& r)
 {
-	unsigned int index = coordinateToIndex(v);
-	signed char& i = mSectorMap.at(index);
-	if(i > 0 && i < 100)
-		i++;
-	else
-		i = 1;
+	mTargetRectangle = r;
+
+	mSubUnitHandler.updateSubUnitStatus();
+	std::vector<Rectangle> rects = splitTargetRectangle();
+	assert(rects.size() == mSubUnitHandler.getStatus().size());
+
+	int i = 0;
+	for(auto p : mSubUnitHandler.getStatus()) {
+		p.first->giveAttackOrder(rects[i++]);
+	}
+
+	return true;
 }
 
-void PlatoonLeaderGoal::reduceHome(const Vector3& v)
+std::vector<Common::Rectangle> PlatoonLeaderGoal::splitTargetRectangle() const
 {
-	signed char& i = mSectorMap.at(coordinateToIndex(v));
-	if(i > 0)
-		i--;
-}
-
-void PlatoonLeaderGoal::markEnemy(const Vector3& v)
-{
-	signed char& i = mSectorMap.at(coordinateToIndex(v));
-	if(i < 0 && i > -100)
-		i--;
-	else
-		i = -1;
-}
-
-void PlatoonLeaderGoal::markCombat(const Vector3& v)
-{
-	mSectorMap.at(coordinateToIndex(v)) = 0;
-}
-
-void PlatoonLeaderGoal::giveOrders()
-{
-	for(auto s : mSoldier->getCommandees()) {
-		if(mSoldier->canCommunicateWith(s)) {
-			if(s->defending()) {
-				Vector3 attackpos;
-				if(calculateAttackPosition(s, attackpos)) {
-					DebugOutput::getInstance()->markArea(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
-							getSector(attackpos), false);
-					s->giveAttackOrder(getSector(attackpos));
-					reduceHome(s->getPosition());
-					markCombat(attackpos);
-				}
+	std::vector<Common::Rectangle> ret;
+	int numgroups = mSubUnitHandler.getStatus().size();
+	if(numgroups == 1) {
+		ret.push_back(mTargetRectangle);
+	} else if(numgroups == 4 && mTargetRectangle.w * 2.0f > mTargetRectangle.h &&
+			mTargetRectangle.h * 2.0f > mTargetRectangle.w) {
+		Rectangle r1(mTargetRectangle);
+		r1.w *= 0.5f;
+		r1.h *= 0.5f;
+		Rectangle r2(r1);
+		r2.x += r1.w;
+		Rectangle r3(r1);
+		r3.y += r1.h;
+		Rectangle r4(r2);
+		r4.y += r1.h;
+		ret.push_back(r1);
+		ret.push_back(r2);
+		ret.push_back(r3);
+		ret.push_back(r4);
+	} else {
+		for(int i = 0; i < numgroups; i++) {
+			Rectangle r1(mTargetRectangle);
+			if(mTargetRectangle.w >= mTargetRectangle.h) {
+				r1.w *= 1.0f / (float)numgroups;
+				r1.x += i * r1.w;
+				ret.push_back(r1);
+			} else {
+				r1.h *= 1.0f / (float)numgroups;
+				r1.y += i * r1.h;
+				ret.push_back(r1);
 			}
+		}
+	}
+
+	return ret;
+}
+
+void PlatoonLeaderGoal::handleAttackFinish()
+{
+	if(!mSoldier->defending()) {
+		mSoldier->setDefending();
+		if(!mSoldier->getLeader()->reportSuccessfulAttack(mTargetRectangle)) {
+			assert(0);
 		}
 	}
 }
 
-bool PlatoonLeaderGoal::calculateAttackPosition(const SoldierPtr s, Vector3& pos)
+
+CompanyLeaderGoal::CompanyLeaderGoal(SoldierPtr s)
+	: CompositeGoal(s),
+	mSectorMap(SectorMap(mWorld->getWidth(), mWorld->getHeight(), 128, 128)),
+	mSubUnitHandler(s),
+	mSubTimer(5.0f)
 {
-	if(criticalSquad(s)) {
-		return false;
+}
+
+void CompanyLeaderGoal::activate()
+{
+	updateSectorMap();
+	mSubUnitHandler.updateSubUnitStatus();
+	issueAttackOrders();
+}
+
+bool CompanyLeaderGoal::process(float time)
+{
+	activateIfInactive();
+	if(mSubTimer.check(time)) {
+		mSubUnitHandler.updateSubUnitStatus();
+		if(mSubUnitHandler.subUnitsReady()) {
+			handleAttackFinish();
+		}
+	}
+	if(mSubGoals.empty()) {
+		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier,
+						Rectangle(mSoldier->getPosition().x - 16, mSoldier->getPosition().y - 16, 32, 32))));
+	}
+	for(auto c : mSubUnitHandler.getStatus()) {
+		DebugOutput::getInstance()->markArea(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
+				c.first->getAttackArea(), false);
+	}
+	return processSubGoals(time);
+}
+
+bool CompanyLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
+{
+	mSubUnitHandler.updateSubUnitStatus();
+	if(mSubUnitHandler.subUnitsReady()) {
+		handleAttackFinish();
 	}
 
-	int shortestdist = INT_MAX;
+	return true;
+}
 
-	std::pair<unsigned int, unsigned int> startpos = coordinateToSector(s->getPosition());
-	std::pair<unsigned int, unsigned int> bestpos = startpos;
-
-	std::queue<std::pair<unsigned int, unsigned int>> freespots;
-
-	std::set<std::pair<unsigned int, unsigned int>> visited;
-
-	freespots.push(startpos);
-
-	while(!freespots.empty()) {
-		auto thispos = freespots.front();
-		visited.insert(thispos);
-		if(mSectorMap.at(sectorToIndex(thispos)) < 1) {
-			// neighbouring cell occupied by enemy
-			int thisdist = (sectorToCoordinate(thispos) - mWorld->getHomeBasePosition(!mSoldier->getSide()->isFirst())).length();
-			if(thisdist < shortestdist) {
-				shortestdist = thisdist;
-				bestpos = thispos;
-			}
-			freespots.pop();
+std::set<Common::Rectangle> CompanyLeaderGoal::nextAttackSectors() const
+{
+	std::set<Common::Rectangle> ret;
+	for(auto c : mSubUnitHandler.getStatus()) {
+		if(!c.first->canCommunicateWith(c.first))
 			continue;
+
+		if(!c.first->defending())
+			continue;
+
+		Vector3 exppoint;
+		if(c.first->getAttackArea().w == 0) {
+			// not initialised
+			exppoint = c.first->getPosition();
+		} else {
+			exppoint = sectorMiddlepoint(c.first->getAttackArea());
 		}
 
 		for(int j = -1; j <= 1; j++) {
 			for(int i = -1; i <= 1; i++) {
-				auto p = std::make_pair(thispos.first + i, thispos.second + j);
-				if(visited.find(p) != visited.end())
+				if(abs(i) == abs(j) && (i || j))
 					continue;
 
-				if((abs(i) == 0) == (abs(j) == 0))
+				auto s = mSectorMap.coordinateToSector(exppoint);
+				if((s.first == 0 && i < 0) || (s.second == 0 && j < 0))
 					continue;
 
-				if(thispos.first == 0 && i == -1)
+				s.first += i;
+				s.second += j;
+
+				if(s.first >= mSectorMap.getNumXSectors() ||
+						s.second >= mSectorMap.getNumYSectors())
 					continue;
 
-				if(thispos.first == mNumXSectors - 1 && i ==  1)
+				if(mSectorMap.getValue(s))
 					continue;
 
-				if(thispos.second == 0 && j == -1)
-					continue;
-
-				if(thispos.second == mNumYSectors - 1 && j ==  1)
-					continue;
-
-				freespots.push(p);
+				ret.insert(mSectorMap.getSector(s));
 			}
 		}
-		freespots.pop();
 	}
 
-	if(shortestdist < INT_MAX) {
-		pos = sectorToCoordinate(bestpos);
-		std::cout << mSoldier->getSideNum() << ": Order to attack (" << bestpos.first << ", " << bestpos.second << ")\n";
-		return true;
-	} else {
-		return false;
+	if(ret.empty()) {
+		for(int j = 0; j < mSectorMap.getNumYSectors(); j++) {
+			for(int i = 0; i < mSectorMap.getNumYSectors(); i++) {
+				if(!mSectorMap.getValue({i, j})) {
+					ret.insert(mSectorMap.getSector({i, j}));
+				}
+			}
+		}
 	}
-}
 
-std::pair<unsigned int, unsigned int> PlatoonLeaderGoal::coordinateToSector(const Vector3& v) const
-{
-	return std::make_pair((v.x + mWorld->getWidth() * 0.5f) / 64, (v.y + mWorld->getHeight() * 0.5f) / 64);
-}
-
-unsigned int PlatoonLeaderGoal::sectorToIndex(unsigned int i, unsigned int j) const
-{
-	return j * mNumYSectors + i;
-}
-
-unsigned int PlatoonLeaderGoal::sectorToIndex(const std::pair<unsigned int, unsigned int>& s) const
-{
-	return sectorToIndex(s.first, s.second);
-}
-
-unsigned int PlatoonLeaderGoal::coordinateToIndex(const Vector3& v) const
-{
-	return sectorToIndex(coordinateToSector(v));
-}
-
-Vector3 PlatoonLeaderGoal::sectorToCoordinate(const std::pair<unsigned int, unsigned int>& s) const
-{
-	Vector3 ret;
-	ret.x = s.first * 64 - mWorld->getWidth() * 0.5f + 64 / 2;
-	ret.y = s.second * 64 - mWorld->getHeight() * 0.5f + 64 / 2;
-	assert(ret.x > -mWorld->getWidth() * 0.5f);
-	assert(ret.x < mWorld->getWidth() * 0.5f);
-	assert(ret.y > -mWorld->getHeight() * 0.5f);
-	assert(ret.y < mWorld->getHeight() * 0.5f);
 	return ret;
 }
 
-bool PlatoonLeaderGoal::criticalSquad(const SoldierPtr p) const
+void CompanyLeaderGoal::updateSectorMap()
 {
-	/* TODO: rewrite the function so that it reports whether a hole in the line
-	 * would be created or the dictator left unprotected. */
-	bool first = mSoldier->getSide()->isFirst();
-	const Vector3& homepos = mWorld->getHomeBasePosition(first);
-	return coordinateToIndex(p->getPosition()) == coordinateToIndex(homepos) &&
-		mSectorMap.at(coordinateToIndex(p->getPosition())) == 1;
+	for(auto c : mSubUnitHandler.getStatus()) {
+		if(!mSoldier->canCommunicateWith(c.first))
+			continue;
+
+		if(c.first->defending() && c.first->getAttackArea().w) {
+			mSectorMap.setValue(sectorMiddlepoint(c.first->getAttackArea()), 1);
+		}
+	}
 }
 
-Common::Rectangle PlatoonLeaderGoal::getSector(const std::pair<unsigned int, unsigned int>& s) const
+void CompanyLeaderGoal::issueAttackOrders()
 {
-	Vector3 lf = sectorToCoordinate(s);
-	lf.x -= 32.0f;
-	lf.y -= 32.0f;
-	return Rectangle(lf.x, lf.y, 64, 64);
+	auto rs = nextAttackSectors();
+	if(rs.empty())
+		return;
+
+	auto rsit = rs.begin();
+
+	/* TODO: set up some smarter way for distributing sectors to platoons. */
+	for(auto c : mSubUnitHandler.getStatus()) {
+		if(c.first->giveAttackOrder(*rsit)) {
+			rsit++;
+			if(rsit == rs.end()) {
+				break;
+			}
+		} else {
+			std::cout << "AI: platoon unable to comply to attack order.\n";
+		}
+	}
 }
 
-Common::Rectangle PlatoonLeaderGoal::getSector(const Common::Vector3& v) const
+void CompanyLeaderGoal::handleAttackFinish()
 {
-	return getSector(coordinateToSector(v));
+	updateSectorMap();
+	issueAttackOrders();
 }
+
 
 SeekAndDestroyGoal::SeekAndDestroyGoal(SoldierPtr s, const Common::Rectangle& r)
 	: AtomicGoal(s),
@@ -458,8 +618,7 @@ void SeekAndDestroyGoal::move(float time)
 		}
 	} else {
 		if(mWorld->teamWon() < 0) {
-			if((!mArea.w && !mArea.h) ||
-					(mArea.pointWithin(mSoldier->getPosition().x, mSoldier->getPosition().y))) {
+			if(!mArea.w || !mArea.h || mArea.pointWithin(mSoldier->getPosition().x, mSoldier->getPosition().y)) {
 				vel = steering->wander(2.0f, 10.0f, 3.0f);
 			} else {
 				Vector3 p = sectorMiddlepoint(mArea);
@@ -585,7 +744,6 @@ void SoldierController::resetRootGoal()
 {
 	switch(mSoldier->getRank()) {
 		case SoldierRank::Private:
-		case SoldierRank::Corporal:
 			mCurrentGoal = GoalPtr(new PrivateGoal(mSoldier));
 			break;
 
@@ -595,6 +753,10 @@ void SoldierController::resetRootGoal()
 
 		case SoldierRank::Lieutenant:
 			mCurrentGoal = GoalPtr(new PlatoonLeaderGoal(mSoldier));
+			break;
+
+		case SoldierRank::Captain:
+			mCurrentGoal = GoalPtr(new CompanyLeaderGoal(mSoldier));
 			break;
 	}
 }
@@ -612,9 +774,9 @@ bool SoldierController::handleAttackOrder(const Rectangle& r)
 	return mCurrentGoal->handleAttackOrder(r);
 }
 
-bool SoldierController::handleAttackSuccess(const Common::Rectangle& r)
+bool SoldierController::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
 {
-	return mCurrentGoal->handleAttackSuccess(r);
+	return mCurrentGoal->handleAttackSuccess(s, r);
 }
 
 }

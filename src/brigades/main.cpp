@@ -35,6 +35,8 @@ int main(int argc, char** argv)
 					r = SoldierRank::Sergeant;
 				} else if(!strcmp(argv[i], "lieutenant")) {
 					r = SoldierRank::Lieutenant;
+				} else if(!strcmp(argv[i], "captain")) {
+					r = SoldierRank::Captain;
 				} else {
 					err = true;
 				}

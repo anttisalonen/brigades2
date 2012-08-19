@@ -87,7 +87,7 @@ class Driver : public SoldierController, public DebugOutput {
 		void run();
 		void act(float time) override;
 		bool handleAttackOrder(const Common::Rectangle& r) override;
-		bool handleAttackSuccess(const Common::Rectangle& r) override;
+		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r) override;
 		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
 		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
 
@@ -120,6 +120,7 @@ class Driver : public SoldierController, public DebugOutput {
 		Common::Color getGroupRectangleColor(const SoldierPtr commandee, float brightness = 1.0f);
 		int getNumberOfAvailableCommandees(const SoldierPtr p);
 		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
+		bool allCommandeesDefending() const;
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
@@ -156,6 +157,7 @@ class Driver : public SoldierController, public DebugOutput {
 		bool mCreatingRectangle;
 		bool mRectangleFinished;
 		SoldierPtr mSelectedGroupLeader;
+		bool mChangeFocus;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

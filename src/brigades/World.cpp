@@ -174,7 +174,7 @@ bool SoldierController::handleAttackOrder(const Common::Rectangle& r)
 	return false;
 }
 
-bool SoldierController::handleAttackSuccess(const Common::Rectangle& r)
+bool SoldierController::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
 {
 	return false;
 }
@@ -259,7 +259,6 @@ bool SoldierController::checkLeaderStatus()
 
 	switch(mSoldier->getRank()) {
 		case SoldierRank::Private:
-		case SoldierRank::Corporal:
 			if(mSoldier->getLeader() &&
 					mSoldier->seesSoldier(mSoldier->getLeader()) &&
 					mSoldier->getLeader()->isDead()) {
@@ -281,6 +280,7 @@ bool SoldierController::checkLeaderStatus()
 				} else {
 					mSoldier->setLeader(newleader);
 				}
+				mSoldier->setDefending();
 				return true;
 			}
 			break;
@@ -636,12 +636,12 @@ const char* Soldier::rankToString(SoldierRank r)
 	switch(r) {
 		case SoldierRank::Private:
 			return "Private";
-		case SoldierRank::Corporal:
-			return "Corporal";
 		case SoldierRank::Sergeant:
 			return "Sergeant";
 		case SoldierRank::Lieutenant:
 			return "Lieutenant";
+		case SoldierRank::Captain:
+			return "Captain";
 	}
 }
 
@@ -655,13 +655,15 @@ void Soldier::setDefending()
 	mAttacking = false;
 }
 
-void Soldier::giveAttackOrder(const Common::Rectangle& r)
+bool Soldier::giveAttackOrder(const Common::Rectangle& r)
 {
 	mAttackArea = r;
 	mAttacking = true;
 	if(!mController->handleAttackOrder(r)) {
 		std::cout << "Warning: controller couldn't handle attack order\n";
-		assert(0);
+		return false;
+	} else {
+		return true;
 	}
 }
 
@@ -670,11 +672,13 @@ const Common::Rectangle& Soldier::getAttackArea() const
 	return mAttackArea;
 }
 
-void Soldier::reportSuccessfulAttack(const Common::Rectangle& r)
+bool Soldier::reportSuccessfulAttack(const Common::Rectangle& r)
 {
-	if(!mController->handleAttackSuccess(r)) {
+	if(!mController->handleAttackSuccess(shared_from_this(), r)) {
 		std::cout << "Warning: controller couldn't handle successful attack\n";
-		assert(0);
+		return false;
+	} else {
+		return true;
 	}
 }
 
@@ -716,8 +720,8 @@ const WeaponPtr Bullet::getWeapon() const
 }
 
 World::World()
-	: mWidth(256.0f),
-	mHeight(256.0f),
+	: mWidth(512.0f),
+	mHeight(512.0f),
 	mMaxSoldiers(1024),
 	mSoldierCSP(mWidth, mHeight, 16, 16, mMaxSoldiers),
 	mTrees(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
@@ -954,7 +958,7 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
-		addPlatoon(i);
+		addCompany(i);
 		addDictator(i);
 	}
 }
@@ -995,7 +999,8 @@ void World::addTrees()
 				       (k == numYSquares / 2 - 1 && j == numXSquares / 2 -1))
 				continue;
 
-			for(int i = 0; i < 10; i++) {
+			int treefactor = Random::uniform() * 10;
+			for(int i = 0; i < treefactor; i++) {
 				float x = Random::uniform();
 				float y = Random::uniform();
 				float r = Random::uniform();
@@ -1141,7 +1146,19 @@ void World::updateTriggerSystem(float time)
 	mTriggerSystem.update(soldiers, time);
 }
 
-void World::addPlatoon(int side)
+SoldierPtr World::addCompany(int side)
+{
+	SoldierPtr companyleader = addSoldier(side == 0, SoldierRank::Captain, WarriorType::Soldier, false);
+	for(int k = 0; k < 4; k++) {
+		auto s = addPlatoon(side);
+		assert(s);
+		companyleader->addCommandee(s);
+	}
+
+	return companyleader;
+}
+
+SoldierPtr World::addPlatoon(int side)
 {
 	SoldierPtr platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, WarriorType::Soldier, false);
 	for(int k = 0; k < 4; k++) {
@@ -1149,6 +1166,8 @@ void World::addPlatoon(int side)
 		assert(s);
 		platoonleader->addCommandee(s);
 	}
+
+	return platoonleader;
 }
 
 SoldierPtr World::addSquad(int side)

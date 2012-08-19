@@ -2,6 +2,7 @@
 #define BRIGADES_AI_SOLDIERCONTROLLER_H
 
 #include <deque>
+#include <set>
 
 #include "common/Clock.h"
 #include "common/Rectangle.h"
@@ -12,6 +13,52 @@ namespace Brigades {
 
 namespace AI {
 
+class SectorMap {
+	public:
+		SectorMap(float width, float height, int numx, int numy);
+		signed char getValue(const Common::Vector3& v) const;
+		signed char getValue(const std::pair<unsigned int, unsigned int>& s) const;
+		void setValue(const Common::Vector3& v, signed char x);
+		void setAll(signed char c);
+		Common::Rectangle getSector(const Common::Vector3& v) const;
+		Common::Rectangle getSector(const std::pair<unsigned int, unsigned int>& s) const;
+		std::pair<unsigned int, unsigned int> coordinateToSector(const Common::Vector3& v) const;
+		Common::Vector3 sectorToCoordinate(const std::pair<unsigned int, unsigned int>& s) const;
+		unsigned int getNumXSectors() const;
+		unsigned int getNumYSectors() const;
+
+	private:
+		unsigned int sectorToIndex(unsigned int i, unsigned int j) const;
+		unsigned int sectorToIndex(const std::pair<unsigned int, unsigned int>& s) const;
+		unsigned int coordinateToIndex(const Common::Vector3& v) const;
+
+		std::vector<signed char> mSectorMap;
+		unsigned int mNumXSectors;
+		unsigned int mNumYSectors;
+		float mWidth;
+		float mHeight;
+		float mDimX;
+		float mDimY;
+};
+
+enum class SubUnitStatus {
+	Defending,
+	Attacking,
+};
+
+class SubUnitHandler {
+	public:
+		SubUnitHandler(SoldierPtr s);
+		bool subUnitsReady() const;
+		void updateSubUnitStatus();
+		std::map<SoldierPtr, SubUnitStatus>& getStatus();
+		const std::map<SoldierPtr, SubUnitStatus>& getStatus() const;
+
+	private:
+		SoldierPtr mSoldier;
+		std::map<SoldierPtr, SubUnitStatus> mSubUnits;
+};
+
 class Goal {
 	public:
 		Goal(SoldierPtr s);
@@ -21,7 +68,7 @@ class Goal {
 		virtual void deactivate() { }
 		virtual void addSubGoal(boost::shared_ptr<Goal> g) = 0;
 		virtual bool handleAttackOrder(const Common::Rectangle& r);
-		virtual bool handleAttackSuccess(const Common::Rectangle& r);
+		virtual bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
 
 	protected:
 		SoldierPtr mSoldier;
@@ -76,28 +123,34 @@ class PlatoonLeaderGoal : public CompositeGoal {
 		PlatoonLeaderGoal(SoldierPtr s);
 		void activate();
 		bool process(float time);
-		bool handleAttackSuccess(const Common::Rectangle& r);
+		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
+		bool handleAttackOrder(const Common::Rectangle& r);
 
 	private:
-		void markHome(const Common::Vector3& v);
-		void reduceHome(const Common::Vector3& v);
-		void markEnemy(const Common::Vector3& v);
-		void markCombat(const Common::Vector3& v);
-		void giveOrders();
-		bool calculateAttackPosition(const SoldierPtr s, Common::Vector3& pos);
-		std::pair<unsigned int, unsigned int> coordinateToSector(const Common::Vector3& v) const;
-		unsigned int sectorToIndex(unsigned int i, unsigned int j) const;
-		unsigned int sectorToIndex(const std::pair<unsigned int, unsigned int>& s) const;
-		unsigned int coordinateToIndex(const Common::Vector3& v) const;
-		Common::Vector3 sectorToCoordinate(const std::pair<unsigned int, unsigned int>& s) const;
-		bool criticalSquad(const SoldierPtr p) const;
-		Common::Rectangle getSector(const std::pair<unsigned int, unsigned int>& s) const;
-		Common::Rectangle getSector(const Common::Vector3& v) const;
+		std::vector<Common::Rectangle> splitTargetRectangle() const;
+		void handleAttackFinish();
 
-		std::vector<signed char> mSectorMap;
-		unsigned int mNumXSectors;
-		unsigned int mNumYSectors;
+		SubUnitHandler mSubUnitHandler;
+		Common::Rectangle mTargetRectangle;
+		Common::SteadyTimer mSubTimer;
+};
 
+class CompanyLeaderGoal : public CompositeGoal {
+	public:
+		CompanyLeaderGoal(SoldierPtr s);
+		void activate();
+		bool process(float time);
+		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
+
+	private:
+		std::set<Common::Rectangle> nextAttackSectors() const;
+		void updateSectorMap();
+		void issueAttackOrders();
+		void handleAttackFinish();
+
+		SectorMap mSectorMap;
+		SubUnitHandler mSubUnitHandler;
+		Common::SteadyTimer mSubTimer;
 };
 
 class SeekAndDestroyGoal : public AtomicGoal {
@@ -125,7 +178,7 @@ class SoldierController : public Brigades::SoldierController {
 		SoldierController(SoldierPtr p);
 		void act(float time);
 		bool handleAttackOrder(const Common::Rectangle& r);
-		bool handleAttackSuccess(const Common::Rectangle& r);
+		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
 
 	private:
 		bool checkLeaderStatus();
