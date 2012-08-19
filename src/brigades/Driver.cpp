@@ -196,6 +196,7 @@ void Driver::loadTextures()
 	mSoldierShadowTexture = boost::shared_ptr<Texture>(new Texture("share/soldier1shadow.png", 0, 32));
 	mTreeTexture = boost::shared_ptr<Texture>(new Texture("share/tree.png", 0, 0));
 	mTreeShadowTexture = mSoldierShadowTexture;
+	mBrightSpot = boost::shared_ptr<Texture>(new Texture("share/spot.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::Unknown)]      = boost::shared_ptr<Texture>(new Texture("share/question.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::AssaultRifle)] = boost::shared_ptr<Texture>(new Texture("share/assaultrifle.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::MachineGun)]   = boost::shared_ptr<Texture>(new Texture("share/machinegun.png", 0, 0));
@@ -847,30 +848,34 @@ void Driver::drawEntities()
 		mWorld->getSoldiersAt(mCamera, getDrawRadius()) :
 		mSoldier->getSensorySystem()->getSoldiers();
 
-	std::set<SoldierPtr> soldiers;
-
-	soldiers.insert(soldiervec.begin(), soldiervec.end());
+	std::set<Sprite> soldiers;
+	includeSoldierSprite(soldiers, mSoldier);
 
 	if(!mObserver) {
 		for(auto s : mSoldier->getCommandees()) {
 			if(mSoldier->canCommunicateWith(s)) {
-				soldiers.insert(s);
+				bool addbrightspot = s == mSelectedGroupLeader;
+				includeSoldierSprite(soldiers, s, addbrightspot);
 
 				for(auto p : s->getSensorySystem()->getSoldiers()) {
-					soldiers.insert(p);
+					includeSoldierSprite(soldiers, p);
 				}
 
 				for(auto c : s->getCommandees()) {
 					if(s->canCommunicateWith(c)) {
-						soldiers.insert(c);
+						includeSoldierSprite(soldiers, c, addbrightspot);
 
 						for(auto p : c->getSensorySystem()->getSoldiers()) {
-							soldiers.insert(p);
+							includeSoldierSprite(soldiers, p);
 						}
 					}
 				}
 			}
 		}
+	}
+
+	for(auto s : soldiervec) {
+		includeSoldierSprite(soldiers, s);
 	}
 
 	std::function<bool (const Vector3&)> observefunc;
@@ -890,6 +895,7 @@ void Driver::drawEntities()
 		comrades.insert(mSoldier);
 
 		for(auto s : mSoldier->getCommandees()) {
+
 			if(mSoldier->canCommunicateWith(s)) {
 				comrades.insert(s);
 
@@ -913,14 +919,11 @@ void Driver::drawEntities()
 
 	std::vector<Sprite> sprites;
 	for(auto s : soldiers) {
-		float xp, yp, sxp, syp;
-		float scale;
-		boost::shared_ptr<Texture> t = soldierTexture(s, sxp, syp, xp, yp, scale);
-		sprites.push_back(Sprite(s->getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
-					sxp, syp));
+		sprites.push_back(s);
 	}
 
 	auto trees = mWorld->getTreesAt(mCamera, getDrawRadius());
+
 	for(auto t : trees) {
 		sprites.push_back(Sprite(t->getPosition(), SpriteType::Tree,
 					t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
@@ -998,7 +1001,7 @@ void Driver::drawEntities()
 
 		if(s.mSpriteType != SpriteType::Bullet) {
 			SDL_utils::drawSprite(*s.mTexture, r,
-					Rectangle(1, 1, -1, -1), 0.0f);
+					Rectangle(1, 1, -1, -1), 0.0f, s.mAlpha);
 		} else {
 			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), s.mScale, Color::White);
 		}
@@ -1101,6 +1104,22 @@ int Driver::getNumberOfAvailableCommandees(const SoldierPtr p)
 	}
 
 	return num;
+}
+
+void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot)
+{
+	float xp, yp, sxp, syp;
+	float scale;
+	boost::shared_ptr<Texture> t = soldierTexture(s, sxp, syp, xp, yp, scale);
+	sprites.insert(Sprite(s->getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
+				sxp, syp));
+	if(addbrightspot) {
+		Vector3 p = s->getPosition();
+		p.y -= 0.001f;
+		sprites.insert(Sprite(p, SpriteType::BrightSpot, scale, mBrightSpot,
+					boost::shared_ptr<Common::Texture>(), xp, yp,
+					0.0f, 0.0f, 0.5f));
+	}
 }
 
 }

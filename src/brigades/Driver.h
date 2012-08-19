@@ -22,16 +22,17 @@ enum class SpriteType {
 	Soldier,
 	Tree,
 	Bullet,
-	WeaponPickup
+	WeaponPickup,
+	BrightSpot
 };
 
 struct Sprite {
 	Sprite(const Common::Vector3& pos, SpriteType t, float scale,
 			boost::shared_ptr<Common::Texture> texture,
 			boost::shared_ptr<Common::Texture> shadow, float xp, float yp,
-			float sxp, float syp)
+			float sxp, float syp, float alpha = 1.0f)
 		: mPosition(pos), mSpriteType(t), mScale(scale), mTexture(texture), mShadowTexture(shadow),
-		mXP(xp), mYP(yp), mSXP(sxp), mSYP(syp) { }
+		mXP(xp), mYP(yp), mSXP(sxp), mSYP(syp), mAlpha(alpha) { }
 	Common::Vector3 mPosition;
 	SpriteType mSpriteType;
 	float mScale;
@@ -41,6 +42,7 @@ struct Sprite {
 	float mYP;
 	float mSXP;
 	float mSYP;
+	float mAlpha;
 	bool operator<(const Sprite& s1) const;
 };
 
@@ -117,6 +119,7 @@ class Driver : public SoldierController, public DebugOutput {
 				float x, float y, bool centered, bool pixelcoords = false);
 		Common::Color getGroupRectangleColor(const SoldierPtr commandee, float brightness = 1.0f);
 		int getNumberOfAvailableCommandees(const SoldierPtr p);
+		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
@@ -138,6 +141,7 @@ class Driver : public SoldierController, public DebugOutput {
 		boost::shared_ptr<Common::Texture> mTreeTexture;
 		boost::shared_ptr<Common::Texture> mTreeShadowTexture;
 		boost::shared_ptr<Common::Texture> mWeaponPickupTextures[int(WeaponPickupTexture::END)];
+		boost::shared_ptr<Common::Texture> mBrightSpot;
 		Common::TextMap mTextMap;
 		SoldierPtr mSoldier;
 		bool mSoldierVisible;
