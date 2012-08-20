@@ -623,7 +623,9 @@ void Driver::drawTexts()
 		// weapons
 		int i = 0;
 		for(auto w : mSoldier->getWeapons()) {
-			drawOverlayText(w->getName(), 1.0f, Common::Color::White, 40.0f, screenHeight - 100.0f - 15.0f * i, false, true);
+			drawOverlayText(w->getName(), 1.0f, w->getLoadTime() < 0.2f || w->canShoot() ?
+					Common::Color::White : Common::Color::Black,
+					40.0f, screenHeight - 100.0f - 15.0f * i, false, true);
 			if(w == mSoldier->getCurrentWeapon()) {
 				drawOverlayText("*", 1.0f, Common::Color::White, 30.0f, screenHeight - 100.0f - 15.0f * i, false, true);
 			}
