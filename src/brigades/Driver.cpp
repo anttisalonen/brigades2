@@ -112,7 +112,11 @@ void Driver::act(float time)
 			float rot(mPlayerControlVelocity.x);
 			rot *= -0.05f;
 			turnBy(rot);
-			setVelocityToHeading();
+			if(mSoldier->getHeadingVector().dot(mSoldier->getVelocity()) > 0.0f) {
+				setVelocityToHeading();
+			} else {
+				mSoldier->setVelocityToNegativeHeading();
+			}
 		}
 	}
 	moveTo(tot, time, false);
