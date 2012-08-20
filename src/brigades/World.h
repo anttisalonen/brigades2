@@ -183,10 +183,6 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		SoldierPtr getLeader();
 		bool seesSoldier(const SoldierPtr s);
 
-		// orders for the crew
-		void setFormationOffset(const Common::Vector3& v);
-		const Common::Vector3& getFormationOffset() const;
-
 		void setLineFormation(float dist);
 		void setColumnFormation(float dist);
 		void pruneCommandees();
@@ -203,13 +199,19 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		const std::string& getName() const;
 		static const char* rankToString(SoldierRank r);
 
-		// orders for the group leader
+		// orders for the privates
+		void setFormationOffset(const Common::Vector3& v);
+		void setDefendPosition(const Common::Vector3& v);
+		const Common::Vector3& getFormationOffset() const;
+		const Common::Vector3& getDefendPosition() const;
+
+		// orders for the group leader and above
 		bool defending() const;
 		void setDefending();
 		bool giveAttackOrder(const Common::Rectangle& r);
 		const Common::Rectangle& getAttackArea() const;
 
-		// messages for the platoon leader
+		// messages for the platoon leader and above
 		bool reportSuccessfulAttack(const Common::Rectangle& r);
 
 	private:
@@ -226,12 +228,18 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		SoldierRank mRank;
 		std::list<SoldierPtr> mCommandees;
 		SoldierPtr mLeader;
-		Common::Vector3 mFormationOffset;
 		WarriorType mWarriorType;
 		float mHealth;
 		bool mDictator;
+
+		// crew status
+		Common::Vector3 mFormationOffset;
+		Common::Vector3 mDefendPosition;
+
+		// leader status
 		bool mAttacking;
 		Common::Rectangle mAttackArea;
+
 		std::string mName;
 
 		static int getNextID();

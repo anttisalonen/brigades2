@@ -5,6 +5,8 @@
 #include <queue>
 #include <set>
 
+#include "common/Random.h"
+
 #include "brigades/SensorySystem.h"
 #include "brigades/DebugOutput.h"
 
@@ -261,6 +263,7 @@ SquadLeaderGoal::SquadLeaderGoal(SoldierPtr s)
 
 bool SquadLeaderGoal::process(float time)
 {
+	static const float minDistToTgt = 10.0f;
 	activateIfInactive();
 	if(mSubGoals.empty()) {
 		if(mSoldier->defending()) {
@@ -270,13 +273,18 @@ bool SquadLeaderGoal::process(float time)
 			mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier, mArea)));
 		} else {
 			mArea = mSoldier->getAttackArea();
+			mArea.x += mArea.w * 0.5f - minDistToTgt * 0.5f;
+			mArea.y += mArea.h * 0.5f - minDistToTgt * 0.5f;
+			mArea.w = minDistToTgt * 0.5f;
+			mArea.h = minDistToTgt * 0.5f;
 			mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier, mArea)));
 		}
 	} else if(!mSoldier->defending() && !mSoldier->hasEnemyContact()) {
 		Vector3 tgt = sectorMiddlepoint(mArea);
 		float distToTgt = mSoldier->getPosition().distance(tgt);
-		if(distToTgt < 10.0f) {
+		if(distToTgt < minDistToTgt) {
 			if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
+				commandDefendPositions();
 				mSoldier->setDefending();
 				if(!mSoldier->getLeader()->reportSuccessfulAttack(mArea)) {
 					assert(0);
@@ -293,6 +301,40 @@ bool SquadLeaderGoal::handleAttackOrder(const Rectangle& r)
 {
 	emptySubGoals();
 	return true;
+}
+
+void SquadLeaderGoal::commandDefendPositions()
+{
+	if(mSoldier->getCommandees().empty()) {
+		return;
+	}
+
+	auto& defarea = mSoldier->getAttackArea();
+	Vector3 midp(mSoldier->getPosition());
+	float rad = std::max(defarea.w, defarea.h) * 0.5f;
+	Vector3 towardsopp = mWorld->getHomeBasePosition(!mSoldier->getSide()->isFirst()) - midp;
+	towardsopp.normalize();
+	towardsopp *= rad;
+
+	int numCommandees = mSoldier->getCommandees().size();
+	if(numCommandees == 1) {
+		(*(mSoldier->getCommandees().begin()))->setDefendPosition(midp + towardsopp);
+	} else if(numCommandees == 2) {
+		towardsopp = Math::rotate2D(towardsopp, QUARTER_PI * 0.5f);
+		float ang = 0.0f;
+		for(auto c : mSoldier->getCommandees()) {
+			c->setDefendPosition(midp + Math::rotate2D(towardsopp, ang));
+			ang -= QUARTER_PI;
+		}
+	} else {
+		towardsopp = Math::rotate2D(towardsopp, HALF_PI);
+		float ang = 0.0f;
+
+		for(auto c : mSoldier->getCommandees()) {
+			c->setDefendPosition(midp + Math::rotate2D(towardsopp, ang));
+			ang -= PI / (numCommandees - 1);
+		}
+	}
 }
 
 PlatoonLeaderGoal::PlatoonLeaderGoal(SoldierPtr s)
@@ -546,7 +588,9 @@ SeekAndDestroyGoal::SeekAndDestroyGoal(SoldierPtr s, const Common::Rectangle& r)
 	mTargetUpdateTimer(0.25f),
 	mCommandTimer(1.0f),
 	mRetreat(false),
-	mArea(r)
+	mArea(r),
+	mBoredTimer(Random::uniform() * 30.0f + 10.0f),
+	mEnoughWanderTimer(Random::uniform() * 10.0f + 5.0f)
 {
 }
 
@@ -571,7 +615,8 @@ bool SeekAndDestroyGoal::process(float time)
 void SeekAndDestroyGoal::updateCommandeeOrders()
 {
 	mSoldier->pruneCommandees();
-	mSoldier->setLineFormation(10.0f);
+	if(!mSoldier->defending())
+		mSoldier->setLineFormation(10.0f);
 }
 
 void SeekAndDestroyGoal::updateShootTarget()
@@ -619,7 +664,18 @@ void SeekAndDestroyGoal::move(float time)
 	} else {
 		if(mWorld->teamWon() < 0) {
 			if(!mArea.w || !mArea.h || mArea.pointWithin(mSoldier->getPosition().x, mSoldier->getPosition().y)) {
-				vel = steering->wander(2.0f, 10.0f, 3.0f);
+				if(mEnoughWanderTimer.running()) {
+					vel = steering->wander(2.0f, 10.0f, 3.0f);
+					mEnoughWanderTimer.doCountdown(time);
+					if(mEnoughWanderTimer.check()) {
+						mBoredTimer.rewind();
+					}
+				} else {
+					mBoredTimer.doCountdown(time);
+					if(mBoredTimer.check()) {
+						mEnoughWanderTimer.rewind();
+					}
+				}
 			} else {
 				Vector3 p = sectorMiddlepoint(mArea);
 				vel = steering->arrive(p);
@@ -646,7 +702,8 @@ void SeekAndDestroyGoal::move(float time)
 		}
 
 		beingLead = mSoldier->getRank() < SoldierRank::Sergeant &&
-			!mSoldier->getFormationOffset().null() && leaderVisible;
+			leaderVisible && (!mSoldier->getFormationOffset().null() ||
+					!mSoldier->getDefendPosition().null());
 
 		if(beingLead) {
 			Vector3 sep = steering->separation(neighbours);
@@ -657,8 +714,13 @@ void SeekAndDestroyGoal::move(float time)
 				steering->accumulate(tot, coh);
 			}
 
-			Vector3 offset = steering->offsetPursuit(*leader, mSoldier->getFormationOffset());
-			steering->accumulate(tot, offset);
+			if(!mSoldier->getFormationOffset().null()) {
+				Vector3 offset = steering->offsetPursuit(*leader, mSoldier->getFormationOffset());
+				steering->accumulate(tot, offset);
+			} else {
+				Vector3 arr = steering->arrive(mSoldier->getDefendPosition());
+				steering->accumulate(tot, arr);
+			}
 		}
 	}
 

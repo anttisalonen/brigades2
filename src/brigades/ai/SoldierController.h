@@ -115,6 +115,7 @@ class SquadLeaderGoal : public CompositeGoal {
 		bool handleAttackOrder(const Common::Rectangle& r);
 
 	private:
+		void commandDefendPositions();
 		Common::Rectangle mArea;
 };
 
@@ -171,6 +172,8 @@ class SeekAndDestroyGoal : public AtomicGoal {
 		Common::SteadyTimer mCommandTimer;
 		bool mRetreat;
 		Common::Rectangle mArea;
+		Common::Countdown mBoredTimer;
+		Common::Countdown mEnoughWanderTimer;
 };
 
 class SoldierController : public Brigades::SoldierController {

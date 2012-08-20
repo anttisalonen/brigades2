@@ -516,12 +516,24 @@ bool Soldier::seesSoldier(const SoldierPtr s)
 
 void Soldier::setFormationOffset(const Vector3& v)
 {
+	mDefendPosition = Vector3();
 	mFormationOffset = v;
+}
+
+void Soldier::setDefendPosition(const Common::Vector3& v)
+{
+	mFormationOffset = Vector3();
+	mDefendPosition = v;
 }
 
 const Vector3& Soldier::getFormationOffset() const
 {
 	return mFormationOffset;
+}
+
+const Vector3& Soldier::getDefendPosition() const
+{
+	return mDefendPosition;
 }
 
 void Soldier::setColumnFormation(float dist)

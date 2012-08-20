@@ -113,7 +113,10 @@ class Driver : public SoldierController, public DebugOutput {
 		void drawEntities();
 		void setFocusSoldier();
 		Common::Vector3 getMousePositionOnField() const;
+		void drawText(const char* text, float size, const Common::Color& c,
+				const Common::Vector3& pos, bool centered);
 		void drawSoldierName(const SoldierPtr s, const Common::Color& c);
+		void drawSoldierGotoMarker(const SoldierPtr s, bool alwaysdraw);
 		float getDrawRadius() const;
 		void drawOverlayText(const char* text, float size, const Common::Color& c,
 				float x, float y, bool centered, bool pixelcoords = false);
@@ -154,9 +157,10 @@ class Driver : public SoldierController, public DebugOutput {
 		SoldierRank mSoldierRank;
 
 		Common::Rectangle mDrawnRectangle;
+		Common::Vector3 mDesignatedDefendPosition;
 		bool mCreatingRectangle;
 		bool mRectangleFinished;
-		SoldierPtr mSelectedGroupLeader;
+		SoldierPtr mSelectedCommandee;
 		bool mChangeFocus;
 };
 
