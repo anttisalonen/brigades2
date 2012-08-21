@@ -35,8 +35,9 @@ WeaponPickupEvent::WeaponPickupEvent(WeaponPtr w)
 
 void WeaponPickupEvent::handleEvent(SoldierPtr p)
 {
-	// this should've been checked by now
-	assert(!p->hasWeaponType(mWeapon->getName()));
+	if(p->hasWeaponType(mWeapon->getName()))
+		return;
+
 	p->addWeapon(mWeapon);
 }
 
