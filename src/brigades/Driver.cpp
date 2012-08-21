@@ -383,9 +383,7 @@ bool Driver::handleInput(float frameTime)
 						break;
 
 					case SDLK_TAB:
-						/* TODO: add changing focus also during play */
-						if(mObserver)
-							setFocusSoldier();
+						setFocusSoldier();
 						break;
 
 					case SDLK_1:

@@ -163,6 +163,9 @@ SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 
 void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
 {
+	if(mSoldier) {
+		mSoldier->setAIController();
+	}
 	mSoldier = s;
 	mWorld = mSoldier->getWorld();
 	mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier));
@@ -321,7 +324,7 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 
 void Soldier::init()
 {
-	setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this())));
+	setAIController();
 	mSensorySystem = SensorySystemPtr(new SensorySystem(shared_from_this()));
 }
 
@@ -381,6 +384,11 @@ float Soldier::getFOV() const
 void Soldier::setController(SoldierControllerPtr p)
 {
 	mController = p;
+}
+
+void Soldier::setAIController()
+{
+	setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this())));
 }
 
 SoldierControllerPtr Soldier::getController()

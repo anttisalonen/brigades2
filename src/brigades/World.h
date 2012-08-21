@@ -160,6 +160,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void update(float time) override;
 		float getFOV() const; // total FOV in radians
 		void setController(SoldierControllerPtr p);
+		void setAIController();
 		SoldierControllerPtr getController();
 		void die();
 		bool isDead() const;
