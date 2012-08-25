@@ -20,7 +20,7 @@ COMMONLIB = $(COMMONSRCDIR)/libcommon.a
 BRIGADESBINNAME = brigades
 BRIGADESBIN     = $(BINDIR)/$(BRIGADESBINNAME)
 BRIGADESSRCDIR = src/brigades
-BRIGADESSRCFILES = World.cpp SensorySystem.cpp Trigger.cpp Event.cpp ai/SoldierController.cpp Driver.cpp DebugOutput.cpp main.cpp
+BRIGADESSRCFILES = World.cpp Armory.cpp SensorySystem.cpp Trigger.cpp Event.cpp ai/SoldierController.cpp Driver.cpp DebugOutput.cpp main.cpp
 
 BRIGADESSRCS = $(addprefix $(BRIGADESSRCDIR)/, $(BRIGADESSRCFILES))
 BRIGADESOBJS = $(BRIGADESSRCS:.cpp=.o)

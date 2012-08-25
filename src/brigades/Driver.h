@@ -134,6 +134,7 @@ class Driver : public SoldierController, public DebugOutput {
 		float mScaleLevelVelocity;
 		bool mFreeCamera;
 		Common::Vector3 mCamera;
+		Common::Vector3 mCameraMouseOffset;
 		Common::Vector3 mCameraVelocity;
 		Common::Vector3 mPlayerControlVelocity;
 		boost::shared_ptr<Common::Texture> mTankTexture[NUM_SIDES][4];

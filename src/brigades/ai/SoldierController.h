@@ -111,6 +111,7 @@ class PrivateGoal : public CompositeGoal {
 class SquadLeaderGoal : public CompositeGoal {
 	public:
 		SquadLeaderGoal(SoldierPtr s);
+		void activate();
 		bool process(float time);
 		bool handleAttackOrder(const Common::Rectangle& r);
 

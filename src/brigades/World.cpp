@@ -18,121 +18,6 @@ Tree::Tree(const Vector3& pos, float radius)
 	mPosition = pos;
 }
 
-Weapon::Weapon(float range, float velocity, float loadtime,
-		float softd,
-		float lightd,
-		float heavyd)
-	: mRange(range),
-	mVelocity(velocity),
-	mLoadTime(loadtime),
-	mSoftDamage(softd),
-	mLightArmorDamage(lightd),
-	mHeavyArmorDamage(heavyd)
-{
-}
-
-void Weapon::update(float time)
-{
-	mLoadTime.doCountdown(time);
-	mLoadTime.check();
-}
-
-bool Weapon::canShoot() const
-{
-	return !mLoadTime.running();
-}
-
-float Weapon::getRange() const
-{
-	return mRange;
-}
-
-float Weapon::getVelocity() const
-{
-	return mVelocity;
-}
-
-float Weapon::getLoadTime() const
-{
-	return mLoadTime.getMaxTime();
-}
-
-void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
-{
-	if(!canShoot())
-		return;
-
-	w->addBullet(shared_from_this(), s, dir);
-	mLoadTime.rewind();
-}
-
-float Weapon::getDamageAgainstSoftTargets() const
-{
-	return mSoftDamage;
-}
-
-float Weapon::getDamageAgainstLightArmor() const
-{
-	return mLightArmorDamage;
-}
-
-float Weapon::getDamageAgainstHeavyArmor() const
-{
-	return mHeavyArmorDamage;
-}
-
-/* NOTE: increasing bullet speed is an excellent way to
- * make the game harder. */
-AssaultRifle::AssaultRifle()
-	: Weapon(25.0f, 20.0f, 0.1f)
-{
-}
-
-const char* AssaultRifle::getName() const
-{
-	return "Assault Rifle";
-}
-
-MachineGun::MachineGun()
-	: Weapon(35.0f, 20.0f, 0.04f)
-{
-}
-
-const char* MachineGun::getName() const
-{
-	return "Machine Gun";
-}
-
-AutomaticCannon::AutomaticCannon()
-	: Weapon(40.0f, 20.0f, 0.4f, 1.0f, 1.0f, 0.0f)
-{
-}
-
-const char* AutomaticCannon::getName() const
-{
-	return "Automatic Cannon";
-}
-
-Bazooka::Bazooka()
-	: Weapon(30.0f, 16.0f, 4.0f, 1.0f, 1.0f, 0.0f)
-{
-}
-
-const char* Bazooka::getName() const
-{
-	return "Bazooka";
-}
-
-Pistol::Pistol()
-	: Weapon(15.0f, 18.0f, 0.5f)
-{
-}
-
-const char* Pistol::getName() const
-{
-	return "Pistol";
-}
-
 Side::Side(bool first)
 	: mFirst(first)
 {
@@ -314,11 +199,11 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 		mRadius = 3.5f;
 		mMaxSpeed = 30.0f;
 		mMaxAcceleration = 10.0f;
-		addWeapon(WeaponPtr(new AutomaticCannon()));
-		addWeapon(WeaponPtr(new MachineGun()));
+		addWeapon(mWorld->getArmory().getAutomaticCannon());
+		addWeapon(mWorld->getArmory().getMachineGun());
 		mFOV = TWO_PI;
 	} else {
-		addWeapon(WeaponPtr(new AssaultRifle()));
+		addWeapon(mWorld->getArmory().getAssaultRifle());
 	}
 }
 
@@ -639,7 +524,10 @@ bool Soldier::hasRadio() const
 bool Soldier::hasEnemyContact() const
 {
 	for(auto s : mSensorySystem->getSoldiers()) {
-		if(!s->isDead() && s->getSideNum() != getSideNum()) {
+		if(!s->isDead() && s->getSideNum() != getSideNum() &&
+					mPosition.distance2(s->getPosition()) <
+					mWorld->getVisibilityFactor() *
+					mWorld->getVisibilityFactor()) {
 			return true;
 		}
 	}
@@ -739,16 +627,26 @@ const WeaponPtr Bullet::getWeapon() const
 	return mWeapon;
 }
 
-World::World()
-	: mWidth(512.0f),
-	mHeight(512.0f),
+float Bullet::getOriginalSpeed() const
+{
+	return mWeapon->getVelocity();
+}
+
+World::World(float width, float height, float visibility, 
+		float sounddistance, UnitSize unitsize, bool dictator, Armory& armory)
+	: mWidth(width),
+	mHeight(height),
 	mMaxSoldiers(1024),
-	mSoldierCSP(mWidth, mHeight, 16, 16, mMaxSoldiers),
+	mSoldierCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxSoldiers),
 	mTrees(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
-	mVisibility(40.0f),
+	mVisibilityFactor(visibility),
+	mSoundDistance(sounddistance),
 	mTeamWon(-1),
 	mWinTimer(1.0f),
-	mSquareSide(64)
+	mSquareSide(64),
+	mArmory(armory),
+	mUnitSize(unitsize),
+	mDictator(dictator)
 {
 	memset(mSoldiersAlive, 0, sizeof(mSoldiersAlive));
 
@@ -813,8 +711,8 @@ std::vector<WallPtr> World::getWallsAt(const Common::Vector3& v, float radius) c
 
 std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 {
-	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibility);
-	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibility);
+	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibilityFactor);
+	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibilityFactor);
 	std::vector<SoldierPtr> ret;
 
 	for(auto s : nearbysoldiers) {
@@ -831,13 +729,13 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 			continue;
 		}
 
-		if(distToMe < mVisibility && s->getSideNum() == p->getSideNum()) {
+		if(distToMe < mVisibilityFactor * 2.0f * s->getRadius() && s->getSideNum() == p->getSideNum()) {
 			// "see" any nearby friendly soldiers
 			ret.push_back(s);
 			continue;
 		}
 
-		if(distToMe > mVisibility) {
+		if(distToMe > mVisibilityFactor * 2.0f * s->getRadius()) {
 			continue;
 		}
 
@@ -887,14 +785,24 @@ const Vector3& World::getHomeBasePosition(bool first) const
 	return mHomeBasePositions[first ? 0 : 1];
 }
 
-float World::getMaxVisibility() const
+float World::getVisibilityFactor() const
 {
-	return mVisibility;
+	return mVisibilityFactor;
 }
 
 float World::getShootSoundHearingDistance() const
 {
-	return 50.0f;
+	return mSoundDistance;
+}
+
+Armory& World::getArmory() const
+{
+	return mArmory;
+}
+
+Common::Rectangle World::getArea() const
+{
+	return Rectangle(-mWidth * 0.5f, -mHeight * 0.5f, mWidth, mHeight);
 }
 
 
@@ -944,6 +852,20 @@ void World::update(float time)
 			}
 		}
 
+		for(auto t : getTreesAt((*bit)->getPosition(), (*bit)->getVelocity().length())) {
+			if(Math::segmentCircleIntersect((*bit)->getPosition(),
+						(*bit)->getPosition() + (*bit)->getVelocity() * time,
+						t->getPosition(), t->getRadius())) {
+				(*bit)->setVelocity((*bit)->getVelocity() * 0.8f);
+				float orig = (*bit)->getOriginalSpeed();
+				orig *= 0.5f;
+				orig = orig * orig;
+				if((*bit)->getVelocity().length2() < orig) {
+					erase = true;
+				}
+			}
+		}
+
 		if(!erase) {
 			(*bit)->update(time);
 			if(!(*bit)->isAlive()) {
@@ -978,8 +900,23 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
-		addCompany(i);
-		addDictator(i);
+		switch(mUnitSize) {
+			case UnitSize::Squad:
+				addSquad(i);
+				break;
+
+			case UnitSize::Platoon:
+				addPlatoon(i);
+				break;
+
+			case UnitSize::Company:
+				addCompany(i);
+				break;
+		}
+
+		if(mDictator) {
+			addDictator(i);
+		}
 	}
 }
 
@@ -996,7 +933,7 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool 
 	if(dictator) {
 		s->setDictator(true);
 		s->clearWeapons();
-		s->addWeapon(WeaponPtr(new Pistol()));
+		s->addWeapon(mArmory.getPistol());
 	}
 	else {
 		mSoldiersAlive[first ? 0 : 1]++;
@@ -1205,10 +1142,10 @@ SoldierPtr World::addSquad(int side)
 		else {
 			if(j == 2) {
 				s->clearWeapons();
-				s->addWeapon(WeaponPtr(new MachineGun()));
+				s->addWeapon(mArmory.getMachineGun());
 			}
 			else if(j == 3 || j == 4 || j == 5) {
-				s->addWeapon(WeaponPtr(new Bazooka()));
+				s->addWeapon(mArmory.getBazooka());
 			}
 			squadleader->addCommandee(s);
 		}

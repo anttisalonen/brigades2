@@ -261,6 +261,13 @@ SquadLeaderGoal::SquadLeaderGoal(SoldierPtr s)
 {
 }
 
+void SquadLeaderGoal::activate()
+{
+	if(!mSoldier->getLeader() || !mSoldier->canCommunicateWith(mSoldier->getLeader())) {
+		mSoldier->giveAttackOrder(mWorld->getArea());
+	}
+}
+
 bool SquadLeaderGoal::process(float time)
 {
 	static const float minDistToTgt = 10.0f;
@@ -282,15 +289,14 @@ bool SquadLeaderGoal::process(float time)
 	} else if(!mSoldier->defending() && !mSoldier->hasEnemyContact()) {
 		Vector3 tgt = sectorMiddlepoint(mArea);
 		float distToTgt = mSoldier->getPosition().distance(tgt);
-		if(distToTgt < minDistToTgt) {
+		if(distToTgt < minDistToTgt && mSoldier->getLeader()) {
 			if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
 				commandDefendPositions();
 				mSoldier->setDefending();
 				if(!mSoldier->getLeader()->reportSuccessfulAttack(mArea)) {
-					assert(0);
+					/* TODO */
 				}
 			} else {
-				/* TODO */
 			}
 		}
 	}
@@ -366,7 +372,7 @@ bool PlatoonLeaderGoal::process(float time)
 
 bool PlatoonLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
 {
-	if(!mSoldier->getLeader())
+	if(!mSoldier->getLeader() || !mSoldier->canCommunicateWith(mSoldier->getLeader()))
 		return false;
 
 	mSubUnitHandler.updateSubUnitStatus();
@@ -436,7 +442,7 @@ void PlatoonLeaderGoal::handleAttackFinish()
 {
 	if(!mSoldier->defending()) {
 		mSoldier->setDefending();
-		if(!mSoldier->getLeader()->reportSuccessfulAttack(mTargetRectangle)) {
+		if(mSoldier->getLeader() && !mSoldier->getLeader()->reportSuccessfulAttack(mTargetRectangle)) {
 			assert(0);
 		}
 	}
@@ -445,7 +451,8 @@ void PlatoonLeaderGoal::handleAttackFinish()
 
 CompanyLeaderGoal::CompanyLeaderGoal(SoldierPtr s)
 	: CompositeGoal(s),
-	mSectorMap(SectorMap(mWorld->getWidth(), mWorld->getHeight(), 128, 128)),
+	mSectorMap(SectorMap(mWorld->getWidth(), mWorld->getHeight(), mWorld->getWidth() / 4,
+				mWorld->getHeight() / 4)),
 	mSubUnitHandler(s),
 	mSubTimer(5.0f)
 {
@@ -663,12 +670,17 @@ void SeekAndDestroyGoal::move(float time)
 		}
 	} else {
 		if(mWorld->teamWon() < 0) {
-			if(!mArea.w || !mArea.h || mArea.pointWithin(mSoldier->getPosition().x, mSoldier->getPosition().y)) {
-				if(mEnoughWanderTimer.running()) {
+			bool alone = (!mSoldier->getLeader() || !mSoldier->canCommunicateWith(mSoldier->getLeader())) &&
+				mSoldier->getRank() <= SoldierRank::Sergeant;
+			if(!mArea.w || !mArea.h || mArea.pointWithin(mSoldier->getPosition().x, mSoldier->getPosition().y) ||
+					alone) {
+				if(alone || mEnoughWanderTimer.running()) {
 					vel = steering->wander(2.0f, 10.0f, 3.0f);
-					mEnoughWanderTimer.doCountdown(time);
-					if(mEnoughWanderTimer.check()) {
-						mBoredTimer.rewind();
+					if(!alone) {
+						mEnoughWanderTimer.doCountdown(time);
+						if(mEnoughWanderTimer.check()) {
+							mBoredTimer.rewind();
+						}
 					}
 				} else {
 					mBoredTimer.doCountdown(time);
@@ -734,7 +746,17 @@ void SeekAndDestroyGoal::move(float time)
 
 void SeekAndDestroyGoal::updateTargetSoldier()
 {
-	auto soldiers = mSoldier->getSensorySystem()->getSoldiers();
+	auto soldiervec = mSoldier->getSensorySystem()->getSoldiers();
+	std::set<SoldierPtr> soldiers;
+	soldiers.insert(soldiervec.begin(), soldiervec.end());
+	if(mSoldier->getLeader()) {
+		auto ss = mSoldier->getLeader()->getSensorySystem()->getSoldiers();
+		soldiers.insert(ss.begin(), ss.end());
+		for(auto s : mSoldier->getLeader()->getCommandees()) {
+			auto ss = s->getSensorySystem()->getSoldiers();
+			soldiers.insert(ss.begin(), ss.end());
+		}
+	}
 	float distToNearest = FLT_MAX;
 	SoldierPtr nearest;
 	unsigned int weapontouse = INT_MAX;

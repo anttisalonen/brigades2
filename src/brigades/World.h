@@ -15,6 +15,7 @@
 #include "common/QuadTree.h"
 #include "common/CellSpacePartition.h"
 
+#include "Armory.h"
 #include "Event.h"
 #include "Trigger.h"
 
@@ -33,65 +34,6 @@ class Tree : public Common::Obstacle {
 typedef boost::shared_ptr<Tree> TreePtr;
 typedef boost::shared_ptr<Soldier> SoldierPtr;
 typedef boost::shared_ptr<World> WorldPtr;
-
-class Weapon : public boost::enable_shared_from_this<Weapon> {
-	public:
-		Weapon(float range, float velocity, float loadtime,
-				float softd = 1.0f,
-				float lightd = 0.0f,
-				float heavyd = 0.0f);
-		virtual ~Weapon() { }
-		void update(float time);
-		bool canShoot() const;
-		float getRange() const;
-		float getVelocity() const;
-		float getLoadTime() const;
-		void shoot(WorldPtr w, const SoldierPtr s, const Common::Vector3& dir);
-		float getDamageAgainstSoftTargets() const;
-		float getDamageAgainstLightArmor() const;
-		float getDamageAgainstHeavyArmor() const;
-		virtual const char* getName() const = 0;
-
-	protected:
-		float mRange;
-		float mVelocity;
-		Common::Countdown mLoadTime;
-		float mSoftDamage;
-		float mLightArmorDamage;
-		float mHeavyArmorDamage;
-};
-
-class AssaultRifle : public Weapon {
-	public:
-		AssaultRifle();
-		const char* getName() const;
-};
-
-class MachineGun : public Weapon {
-	public:
-		MachineGun();
-		const char* getName() const;
-};
-
-class Bazooka : public Weapon {
-	public:
-		Bazooka();
-		const char* getName() const;
-};
-
-class Pistol : public Weapon {
-	public:
-		Pistol();
-		const char* getName() const;
-};
-
-class AutomaticCannon : public Weapon {
-	public:
-		AutomaticCannon();
-		const char* getName() const;
-};
-
-typedef boost::shared_ptr<Weapon> WeaponPtr;
 
 class Side {
 	public:
@@ -268,6 +210,7 @@ class Bullet : public Common::Entity {
 		bool isAlive() const;
 		SoldierPtr getShooter() const;
 		const WeaponPtr getWeapon() const;
+		float getOriginalSpeed() const;
 
 	private:
 		SoldierPtr mShooter;
@@ -277,10 +220,17 @@ class Bullet : public Common::Entity {
 
 typedef boost::shared_ptr<Bullet> BulletPtr;
 
+enum class UnitSize {
+	Squad,
+	Platoon,
+	Company
+};
+
 class World : public boost::enable_shared_from_this<World> {
 
 	public:
-		World();
+		World(float width, float height, float visibility,
+				float sounddistance, UnitSize unitsize, bool dictator, Armory& armory);
 		void create();
 
 		// accessors
@@ -296,8 +246,10 @@ class World : public boost::enable_shared_from_this<World> {
 		int soldiersAlive(int t) const;
 		const TriggerSystem& getTriggerSystem() const;
 		const Common::Vector3& getHomeBasePosition(bool first) const;
-		float getMaxVisibility() const;
+		float getVisibilityFactor() const;
 		float getShootSoundHearingDistance() const;
+		Armory& getArmory() const;
+		Common::Rectangle getArea() const;
 
 		// modifiers
 		void update(float time);
@@ -327,7 +279,8 @@ class World : public boost::enable_shared_from_this<World> {
 		std::map<int, SoldierPtr> mSoldierMap;
 		Common::QuadTree<TreePtr> mTrees;
 		std::vector<WallPtr> mWalls;
-		float mVisibility;
+		float mVisibilityFactor;
+		float mSoundDistance;
 		std::list<BulletPtr> mBullets;
 		int mTeamWon;
 		int mSoldiersAlive[NUM_SIDES];
@@ -335,6 +288,9 @@ class World : public boost::enable_shared_from_this<World> {
 		TriggerSystem mTriggerSystem;
 		Common::Vector3 mHomeBasePositions[NUM_SIDES];
 		int mSquareSide;
+		Armory& mArmory;
+		UnitSize mUnitSize;
+		bool mDictator;
 };
 
 };

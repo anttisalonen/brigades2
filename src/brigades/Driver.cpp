@@ -302,11 +302,13 @@ bool Driver::handleInput(float frameTime)
 					case SDLK_MINUS:
 					case SDLK_KP_MINUS:
 					case SDLK_PAGEDOWN:
-						mScaleLevelVelocity = -1.0f; break;
+						if(mFreeCamera)
+							mScaleLevelVelocity = -1.0f; break;
 					case SDLK_PLUS:
 					case SDLK_KP_PLUS:
 					case SDLK_PAGEUP:
-						mScaleLevelVelocity = 1.0f; break;
+						if(mFreeCamera)
+							mScaleLevelVelocity = 1.0f; break;
 
 					case SDLK_w:
 					case SDLK_UP:
@@ -374,7 +376,7 @@ bool Driver::handleInput(float frameTime)
 							if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
 								mSoldier->setDefending();
 								if(!mSoldier->getLeader()->reportSuccessfulAttack(mSoldier->getAttackArea())) {
-									assert(0);
+									/* TODO */
 								}
 							} else {
 								/* TODO */
@@ -434,7 +436,8 @@ bool Driver::handleInput(float frameTime)
 					case SDLK_KP_PLUS:
 					case SDLK_PAGEUP:
 					case SDLK_PAGEDOWN:
-						mScaleLevelVelocity = 0.0f; break;
+						if(mFreeCamera)
+							mScaleLevelVelocity = 0.0f; break;
 
 					case SDLK_w:
 					case SDLK_s:
@@ -490,9 +493,11 @@ bool Driver::handleInput(float frameTime)
 			case SDL_MOUSEBUTTONUP:
 				switch(event.button.button) {
 					case SDL_BUTTON_WHEELUP:
-						mScaleLevel += 1.0f; break;
+						if(mFreeCamera)
+							mScaleLevel += 0.5f; break;
 					case SDL_BUTTON_WHEELDOWN:
-						mScaleLevel -= 1.0f; break;
+						if(mFreeCamera)
+							mScaleLevel -= 0.5f; break;
 
 					case SDL_BUTTON_LEFT:
 						mShooting = false;
@@ -518,6 +523,7 @@ bool Driver::handleInput(float frameTime)
 					mDrawnRectangle.w = p.x - mDrawnRectangle.x;
 					mDrawnRectangle.h = p.y - mDrawnRectangle.y;
 				}
+				mCameraMouseOffset = (getMousePositionOnField() - mSoldier->getPosition()) * 0.45f;
 				break;
 
 			case SDL_QUIT:
@@ -535,6 +541,8 @@ void Driver::handleInputState(float frameTime)
 {
 	if(mFreeCamera) {
 		mCamera -= mCameraVelocity * frameTime * 50.0f;
+		mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
+		mScaleLevel = clamp(1.0f, mScaleLevel, 10.0f);
 	}
 	else if(mSoldier) {
 		if(mObserver && mSoldier->isDead()) {
@@ -543,33 +551,18 @@ void Driver::handleInputState(float frameTime)
 				mFreeCamera = true;
 			}
 		}
-		mCamera = mSoldier->getPosition();
+		mCamera = mSoldier->getPosition() + mCameraMouseOffset;
+		static const float scalechangevelocity = 0.9f;
+		static const float scalecoefficient = 1.5f;
+		float n;
+		if(mSoldier->getCurrentWeapon())
+			n = std::min(mSoldier->getCurrentWeapon()->getRange(), 0.5f * float(std::min(screenWidth, screenHeight)));
+		else
+			n = 50.0f;
+		float d = clamp(std::min(n, 30.0f), mCameraMouseOffset.length() * mScaleLevel, n);
+		float newScaleLevel = std::max(scalecoefficient * n / d, 300.0f * (1.0f / n));
+		mScaleLevel = mScaleLevel * scalechangevelocity + newScaleLevel * (1.0f - scalechangevelocity);
 	}
-	mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
-	static const float maxScale = 1.0f;
-	float thisMaxScale = mObserver ? 1.0f : mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
-	if(mObserver) {
-		thisMaxScale = 1.0f;
-	} else {
-		thisMaxScale = mSoldier->getMaxSpeed() ? 100.0f / mSoldier->getMaxSpeed() : 5.0f;
-		switch(mSoldier->getRank()) {
-			case SoldierRank::Private:
-				break;
-
-			case SoldierRank::Sergeant:
-				thisMaxScale *= 0.75f;
-				break;
-
-			case SoldierRank::Lieutenant:
-				thisMaxScale *= 0.25f;
-				break;
-
-			case SoldierRank::Captain:
-				thisMaxScale *= 0.15f;
-				break;
-		}
-	}
-	mScaleLevel = clamp(clamp(maxScale, thisMaxScale, 20.0f), mScaleLevel, 20.0f);
 }
 
 float Driver::restrictCameraCoordinate(float t, float w, float res)
@@ -929,6 +922,16 @@ void Driver::drawEntities()
 				}
 			}
 		}
+
+		auto l = mSoldier->getLeader();
+		if(l && mSoldier->canCommunicateWith(l)) {
+			includeSoldierSprite(soldiers, l);
+			for(auto s : l->getCommandees()) {
+				if(mSoldier->canCommunicateWith(s)) {
+					includeSoldierSprite(soldiers, s);
+				}
+			}
+		}
 	}
 
 	for(auto s : soldiervec) {
@@ -1082,6 +1085,15 @@ void Driver::setFocusSoldier()
 		}
 	}
 
+	if(soldiercandidates.empty()) {
+		// try again without rank preference
+		for(auto s : soldiers) {
+			if(s->getSideNum() == 0 && !s->isDead() && !s->isDictator()) {
+				soldiercandidates.push_back(s);
+			}
+		}
+	}
+
 	if(soldiercandidates.empty())
 		return;
 
@@ -1137,13 +1149,13 @@ void Driver::drawSoldierGotoMarker(const SoldierPtr s, bool alwaysdraw)
 		if(!offset.null()) {
 			Vector3 rotatedOffset = Math::rotate2D(offset, leader->getXYRotation());
 			rotatedOffset += leader->getPosition();
-			if(alwaysdraw || rotatedOffset.distance2(s->getPosition()) > 4.0f)
-				drawText("x", 0.08f, Common::Color::White, rotatedOffset, true);
+			if(alwaysdraw || rotatedOffset.distance2(s->getPosition()) > 8.0f)
+				drawText("x", 0.18f, Common::Color::White, rotatedOffset, true);
 		} else {
 			auto& defpos = s->getDefendPosition();
 			if(!defpos.null()) {
-				if(alwaysdraw || defpos.distance2(s->getPosition()) > 4.0f)
-					drawText("x", 0.08f, Common::Color::White, defpos, true);
+				if(alwaysdraw || defpos.distance2(s->getPosition()) > 8.0f)
+					drawText("x", 0.18f, Common::Color::White, defpos, true);
 			}
 		}
 	}
