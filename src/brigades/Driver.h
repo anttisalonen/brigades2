@@ -163,6 +163,7 @@ class Driver : public SoldierController, public DebugOutput {
 		bool mRectangleFinished;
 		SoldierPtr mSelectedCommandee;
 		bool mChangeFocus;
+		float mTimeAcceleration;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

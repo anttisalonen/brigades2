@@ -43,7 +43,8 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mSoldierRank(r),
 	mCreatingRectangle(false),
 	mRectangleFinished(false),
-	mChangeFocus(false)
+	mChangeFocus(false),
+	mTimeAcceleration(1.0f)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -67,7 +68,14 @@ void Driver::run()
 		frameTime = std::min(frameTime, 0.1);
 
 		if(!mPaused) {
-			mWorld->update(frameTime);
+			float ta = mTimeAcceleration;
+			while(ta >= 1.0f) {
+				mWorld->update(frameTime);
+				ta--;
+			}
+			if(ta > 0.0f) {
+				mWorld->update(ta * frameTime);
+			}
 		}
 
 		if(handleInput(frameTime))
@@ -299,13 +307,23 @@ bool Driver::handleInput(float frameTime)
 					case SDLK_ESCAPE:
 						quitting = true;
 						break;
+
 					case SDLK_MINUS:
 					case SDLK_KP_MINUS:
+						if(mTimeAcceleration > 1.0f)
+							mTimeAcceleration = std::max(1.0f, mTimeAcceleration / 2.0f);
+						break;
+
+					case SDLK_PLUS:
+					case SDLK_KP_PLUS:
+						if(mTimeAcceleration < 128.0f)
+							mTimeAcceleration = std::min(128.0f, mTimeAcceleration * 2.0f);
+						break;
+
 					case SDLK_PAGEDOWN:
 						if(mFreeCamera)
 							mScaleLevelVelocity = -1.0f; break;
-					case SDLK_PLUS:
-					case SDLK_KP_PLUS:
+
 					case SDLK_PAGEUP:
 						if(mFreeCamera)
 							mScaleLevelVelocity = 1.0f; break;
@@ -430,10 +448,6 @@ bool Driver::handleInput(float frameTime)
 
 			case SDL_KEYUP:
 				switch(event.key.keysym.sym) {
-					case SDLK_MINUS:
-					case SDLK_KP_MINUS:
-					case SDLK_PLUS:
-					case SDLK_KP_PLUS:
 					case SDLK_PAGEUP:
 					case SDLK_PAGEDOWN:
 						if(mFreeCamera)
@@ -610,6 +624,12 @@ void Driver::drawTexts()
 		drawOverlayText("Paused", 2.0f, Common::Color::White, 0.5f, 0.5f, true);
 	}
 
+	if(fabs(mTimeAcceleration - 1.0f) > 0.1f) {
+		char buf[128];
+		snprintf(buf, 128, "%.1fx time", mTimeAcceleration);
+		drawOverlayText(buf, 1.0f, Common::Color::White, screenWidth - 100.0f, 20.0f, false, true);
+	}
+
 	{
 		// weapons
 		int i = 0;
@@ -634,7 +654,6 @@ void Driver::drawTexts()
 		// "n soldiers"
 		for(int i = 0; i < NUM_SIDES; i++) {
 			char alivebuf[128];
-			memset(alivebuf, 0, sizeof(alivebuf));
 			Color c = i == 0 ? Color::Red : Color::Blue;
 			int alive = mWorld->soldiersAlive(i);
 			snprintf(alivebuf, 127, "%d soldier%s", alive, alive == 1 ? "" : "s");
