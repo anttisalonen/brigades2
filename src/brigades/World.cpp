@@ -1106,7 +1106,7 @@ void World::updateTriggerSystem(float time)
 SoldierPtr World::addCompany(int side)
 {
 	SoldierPtr companyleader = addSoldier(side == 0, SoldierRank::Captain, WarriorType::Soldier, false);
-	for(int k = 0; k < 4; k++) {
+	for(int k = 0; k < 3; k++) {
 		auto s = addPlatoon(side);
 		assert(s);
 		companyleader->addCommandee(s);
@@ -1118,7 +1118,7 @@ SoldierPtr World::addCompany(int side)
 SoldierPtr World::addPlatoon(int side)
 {
 	SoldierPtr platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, WarriorType::Soldier, false);
-	for(int k = 0; k < 4; k++) {
+	for(int k = 0; k < 3; k++) {
 		auto s = addSquad(side);
 		assert(s);
 		platoonleader->addCommandee(s);
@@ -1130,9 +1130,9 @@ SoldierPtr World::addPlatoon(int side)
 SoldierPtr World::addSquad(int side)
 {
 	SoldierPtr squadleader;
-	for(int j = 0; j < 9; j++) {
+	for(int j = 0; j < 8; j++) {
 		WarriorType wt = WarriorType::Soldier;
-		if(j == 8)
+		if(j == 7)
 			wt = WarriorType::Vehicle;
 
 		auto s = addSoldier(side == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt, false);
