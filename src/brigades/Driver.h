@@ -23,7 +23,8 @@ enum class SpriteType {
 	Tree,
 	Bullet,
 	WeaponPickup,
-	BrightSpot
+	BrightSpot,
+	Foxhole
 };
 
 struct Sprite {
@@ -144,6 +145,7 @@ class Driver : public SoldierController, public DebugOutput {
 		boost::shared_ptr<Common::Texture> mSoldierShadowTexture;
 		boost::shared_ptr<Common::Texture> mGrassTexture;
 		boost::shared_ptr<Common::Texture> mTreeTexture;
+		boost::shared_ptr<Common::Texture> mFoxholeTexture;
 		boost::shared_ptr<Common::Texture> mTreeShadowTexture;
 		boost::shared_ptr<Common::Texture> mWeaponPickupTextures[int(WeaponPickupTexture::END)];
 		boost::shared_ptr<Common::Texture> mBrightSpot;

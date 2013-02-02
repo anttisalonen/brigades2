@@ -103,6 +103,11 @@ void Driver::act(float time)
 		std::cout << "Rank updated.\n";
 	}
 
+	if(mSoldier->digging()) {
+		mSoldier->dig(time);
+		return;
+	}
+
 	mSoldier->handleEvents();
 	Vector3 tot;
 	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
@@ -219,6 +224,7 @@ void Driver::loadTextures()
 	mGrassTexture = boost::shared_ptr<Texture>(new Texture("share/grass1.png", 0, 0));
 	mSoldierShadowTexture = boost::shared_ptr<Texture>(new Texture("share/soldier1shadow.png", 0, 32));
 	mTreeTexture = boost::shared_ptr<Texture>(new Texture("share/tree.png", 0, 0));
+	mFoxholeTexture = boost::shared_ptr<Texture>(new Texture("share/foxhole.png", 0, 0));
 	mTreeShadowTexture = mSoldierShadowTexture;
 	mBrightSpot = boost::shared_ptr<Texture>(new Texture("share/spot.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::Unknown)]      = boost::shared_ptr<Texture>(new Texture("share/question.png", 0, 0));
@@ -402,6 +408,12 @@ bool Driver::handleInput(float frameTime)
 						}
 						break;
 
+					case SDLK_b:
+						if(!mObserver && mSoldier->getWarriorType() == WarriorType::Soldier) {
+							mSoldier->startDigging();
+						}
+						break;
+
 					case SDLK_TAB:
 						setFocusSoldier();
 						break;
@@ -471,6 +483,12 @@ bool Driver::handleInput(float frameTime)
 							mCameraVelocity.x = 0.0f;
 						else
 							mPlayerControlVelocity.x = 0.0f;
+						break;
+
+					case SDLK_b:
+						if(!mObserver) {
+							mSoldier->stopDigging();
+						}
 						break;
 
 					default:
@@ -1001,6 +1019,18 @@ void Driver::drawEntities()
 		sprites.push_back(s);
 	}
 
+	auto foxholes = mWorld->getFoxholesAt(mCamera, getDrawRadius());
+
+	for(auto f : foxholes) {
+		if(!observefunc(f->getPosition())) {
+			continue;
+		}
+
+		sprites.push_back(Sprite(f->getPosition(), SpriteType::Foxhole,
+					4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
+					-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f->getDepth(), 1.0f)));
+	}
+
 	auto trees = mWorld->getTreesAt(mCamera, getDrawRadius());
 
 	for(auto t : trees) {
@@ -1061,7 +1091,7 @@ void Driver::drawEntities()
 		if(s.mSpriteType != SpriteType::Bullet) {
 			SDL_utils::drawSprite(*s.mShadowTexture,
 					r,
-					Rectangle(1, 1, -1, -1), 0.0f);
+					Rectangle(1, 1, -1, -1), 0.0f, s.mAlpha);
 		} else {
 			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), s.mScale, Color::Black);
 		}

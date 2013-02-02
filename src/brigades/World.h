@@ -67,6 +67,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		boost::shared_ptr<Common::Steering> getSteering();
 		bool handleLeaderCheck(float time);
 
+	protected:
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
 		boost::shared_ptr<Common::Steering> mSteering;
@@ -106,6 +107,10 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		SoldierControllerPtr getController();
 		void die();
 		bool isDead() const;
+		void startDigging();
+		void stopDigging();
+		bool digging() const;
+		void dig(float time);
 		void clearWeapons();
 		void addWeapon(WeaponPtr w);
 		WeaponPtr getCurrentWeapon();
@@ -174,6 +179,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		WarriorType mWarriorType;
 		float mHealth;
 		bool mDictator;
+		bool mDigging;
 
 		// crew status
 		Common::Vector3 mFormationOffset;
@@ -226,6 +232,21 @@ enum class UnitSize {
 	Company
 };
 
+class Foxhole {
+	public:
+		Foxhole(const WorldPtr world, const Common::Vector3& pos);
+		void deepen(float d);
+		float getDepth() const;
+		const Common::Vector3& getPosition() const;
+
+	private:
+		WorldPtr mWorld;
+		Common::Vector3 mPosition;
+		float mDepth;
+};
+
+typedef boost::shared_ptr<Foxhole> FoxholePtr;
+
 class World : public boost::enable_shared_from_this<World> {
 
 	public:
@@ -237,6 +258,7 @@ class World : public boost::enable_shared_from_this<World> {
 		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius);
 		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
+		std::vector<FoxholePtr> getFoxholesAt(const Common::Vector3& v, float radius) const;
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
@@ -255,6 +277,8 @@ class World : public boost::enable_shared_from_this<World> {
 		void update(float time);
 		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
 		void addBullet(const WeaponPtr w, const SoldierPtr s, const Common::Vector3& dir);
+		void dig(float time, const Common::Vector3& pos);
+		FoxholePtr getFoxholeAt(const Common::Vector3& pos);
 
 	private:
 		void setupSides();
@@ -278,6 +302,7 @@ class World : public boost::enable_shared_from_this<World> {
 		Common::CellSpacePartition<SoldierPtr> mSoldierCSP;
 		std::map<int, SoldierPtr> mSoldierMap;
 		Common::QuadTree<TreePtr> mTrees;
+		Common::QuadTree<FoxholePtr> mFoxholes;
 		std::vector<WallPtr> mWalls;
 		float mVisibilityFactor;
 		float mSoundDistance;

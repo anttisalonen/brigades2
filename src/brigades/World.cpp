@@ -1,5 +1,6 @@
 #include <string.h>
 #include <stdexcept>
+#include <float.h>
 
 #include "World.h"
 #include "SensorySystem.h"
@@ -97,6 +98,8 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 		return;
 	}
 
+	mSoldier->stopDigging();
+
 	if(dir.null() && !mSoldier->getVelocity().null()) {
 		assert(!isnan(mSoldier->getVelocity().x));
 		assert(!isnan(mSoldier->getVelocity().y));
@@ -192,6 +195,7 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mWarriorType(wt),
 	mHealth(1.0f),
 	mDictator(false),
+	mDigging(false),
 	mAttacking(false)
 {
 	mName = generateName();
@@ -289,6 +293,26 @@ void Soldier::die()
 bool Soldier::isDead() const
 {
 	return !mAlive;
+}
+
+void Soldier::startDigging()
+{
+	mDigging = true;
+}
+
+void Soldier::stopDigging()
+{
+	mDigging = false;
+}
+
+bool Soldier::digging() const
+{
+	return mDigging;
+}
+
+void Soldier::dig(float time)
+{
+	mWorld->dig(time, mPosition);
 }
 
 void Soldier::clearWeapons()
@@ -632,6 +656,32 @@ float Bullet::getOriginalSpeed() const
 	return mWeapon->getVelocity();
 }
 
+
+Foxhole::Foxhole(const WorldPtr world, const Common::Vector3& pos)
+	: mWorld(world),
+	mPosition(pos),
+	mDepth(0.0f)
+{
+}
+
+void Foxhole::deepen(float d)
+{
+	mDepth += d;
+	if(mDepth > 1.0f)
+		mDepth = 1.0f;
+}
+
+float Foxhole::getDepth() const
+{
+	return mDepth;
+}
+
+const Common::Vector3& Foxhole::getPosition() const
+{
+	return mPosition;
+}
+
+
 World::World(float width, float height, float visibility, 
 		float sounddistance, UnitSize unitsize, bool dictator, Armory& armory)
 	: mWidth(width),
@@ -639,6 +689,7 @@ World::World(float width, float height, float visibility,
 	mMaxSoldiers(1024),
 	mSoldierCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxSoldiers),
 	mTrees(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
+	mFoxholes(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
 	mVisibilityFactor(visibility),
 	mSoundDistance(sounddistance),
 	mTeamWon(-1),
@@ -686,6 +737,11 @@ std::list<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius)
 {
 	/* TODO */
 	return mBullets;
+}
+
+std::vector<FoxholePtr> World::getFoxholesAt(const Common::Vector3& v, float radius) const
+{
+	return mFoxholes.query(AABB(Point(v.x, v.y), Point(radius, radius)));
 }
 
 float World::getWidth() const
@@ -837,9 +893,14 @@ void World::update(float time)
 			if(s->isDead())
 				continue;
 
+			float soldierWidth = s->getRadius();
+			auto foxhole = getFoxholeAt(s->getPosition());
+			if(foxhole)
+				soldierWidth = soldierWidth * (1.0f - foxhole->getDepth() * 0.8f);
+
 			if(Math::segmentCircleIntersect((*bit)->getPosition(),
 						(*bit)->getPosition() + (*bit)->getVelocity() * time,
-						s->getPosition(), s->getRadius())) {
+						s->getPosition(), soldierWidth)) {
 				s->reduceHealth(s->damageFactorFromWeapon((*bit)->getWeapon()));
 				if(s->getHealth() <= 0.0f) {
 					killSoldier(s);
@@ -895,6 +956,36 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 				dir.normalized() * w->getVelocity(),
 				time)));
 	mTriggerSystem.add(SoundTriggerPtr(new SoundTrigger(s, getShootSoundHearingDistance())));
+}
+
+void World::dig(float time, const Common::Vector3& pos)
+{
+	FoxholePtr foxhole = getFoxholeAt(pos);
+	if(!foxhole) {
+		foxhole = FoxholePtr(new Foxhole(shared_from_this(), pos));
+		bool ret = mFoxholes.insert(foxhole, Point(pos.x, pos.y));
+		if(!ret) {
+			std::cerr << "Error: couldn't add foxhole at " << pos << "\n";
+			assert(0);
+			return;
+		}
+	}
+	// 20 sec for completion
+	foxhole->deepen(time * 0.05f);
+}
+
+FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
+{
+	FoxholePtr p;
+	float mindist2 = FLT_MAX;
+	for(auto f : mFoxholes.query(AABB(Point(pos.x, pos.y), Point(1.5f, 1.5f)))) {
+		float d2 = f->getPosition().distance2(pos);
+		if(d2 < mindist2) {
+			mindist2 = d2;
+			p = f;
+		}
+	}
+	return p;
 }
 
 void World::setupSides()
