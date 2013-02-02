@@ -665,7 +665,16 @@ void SeekAndDestroyGoal::move(float time)
 
 	if(mTargetSoldier) {
 		if(!mRetreat) {
-			vel = steering->pursuit(*mTargetSoldier);
+			// decide whether to shoot or advance here
+			auto foxhole = mWorld->getFoxholeAt(mSoldier->getPosition());
+			bool dugIn = mSoldier->getWarriorType() == WarriorType::Soldier &&
+				foxhole && foxhole->getDepth() > 0.4f;
+			float dist = mShootTargetPosition.length();
+			float distCoeff = dugIn ? 0.8f : 0.5f;
+			if(!mSoldier->getCurrentWeapon()->speedVariates() ||
+					dist * distCoeff > mSoldier->getCurrentWeapon()->getRange()) {
+				vel = steering->pursuit(*mTargetSoldier);
+			}
 		} else {
 			vel = steering->evade(*mTargetSoldier);
 		}
@@ -781,7 +790,7 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 				float bestscore = 0.0f;
 				float rangeToTgt = Entity::distanceBetween(*mSoldier, *s);
 				for(auto w : mSoldier->getWeapons()) {
-					if(w->getRange() < rangeToTgt && bestscore > 0.0f)
+					if(w->getRange() < rangeToTgt)
 						continue;
 
 					float thisscore = s->damageFactorFromWeapon(w) * w->getVelocity() / std::max(0.01f, w->getLoadTime());

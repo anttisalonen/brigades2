@@ -62,6 +62,7 @@ class Weapon : public boost::enable_shared_from_this<Weapon> {
 		float getDamageAgainstLightArmor() const;
 		float getDamageAgainstHeavyArmor() const;
 		const char* getName() const;
+		bool speedVariates() const;
 
 	protected:
 		boost::shared_ptr<WeaponType> mWeapon;

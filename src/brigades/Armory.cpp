@@ -158,6 +158,11 @@ const char* Weapon::getName() const
 	return mWeapon->getName();
 }
 
+bool Weapon::speedVariates() const
+{
+	return mWeapon->speedVariates();
+}
+
 
 WeaponPtr Armory::getAssaultRifle()
 {
