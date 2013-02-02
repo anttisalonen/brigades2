@@ -8,50 +8,90 @@ using namespace Common;
 
 namespace Brigades {
 
-Weapon::Weapon(const char* name, float range, float velocity, float loadtime,
+WeaponType::WeaponType(const char* name, float range, float velocity, float loadtime,
 		float variation,
+		bool speedVariate,
 		float softd,
 		float lightd,
 		float heavyd)
-	: mName(name), mRange(range),
+	: mName(name),
+	mRange(range),
 	mVelocity(velocity),
 	mLoadTime(loadtime),
 	mVariation(variation),
+	mSpeedVariates(speedVariate),
 	mSoftDamage(softd),
 	mLightArmorDamage(lightd),
 	mHeavyArmorDamage(heavyd)
 {
 }
 
-void Weapon::update(float time)
-{
-	mLoadTime.doCountdown(time);
-	mLoadTime.check();
-}
-
-bool Weapon::canShoot() const
-{
-	return !mLoadTime.running();
-}
-
-float Weapon::getRange() const
+float WeaponType::getRange() const
 {
 	return mRange;
 }
 
-float Weapon::getVelocity() const
+float WeaponType::getVelocity() const
 {
 	return mVelocity;
 }
 
-float Weapon::getLoadTime() const
+float WeaponType::getLoadTime() const
 {
-	return mLoadTime.getMaxTime();
+	return mLoadTime;
 }
 
-float Weapon::getVariation() const
+float WeaponType::getVariation() const
 {
 	return mVariation;
+}
+
+float WeaponType::getDamageAgainstSoftTargets() const
+{
+	return mSoftDamage;
+}
+
+float WeaponType::getDamageAgainstLightArmor() const
+{
+	return mLightArmorDamage;
+}
+
+float WeaponType::getDamageAgainstHeavyArmor() const
+{
+	return mHeavyArmorDamage;
+}
+
+const char* WeaponType::getName() const
+{
+	return mName;
+}
+
+bool WeaponType::speedVariates() const
+{
+	return mSpeedVariates;
+}
+
+
+Weapon::Weapon(boost::shared_ptr<WeaponType> type)
+	: mWeapon(type),
+	mLoading(type->getLoadTime())
+{
+}
+
+boost::shared_ptr<WeaponType> Weapon::getWeaponType() const
+{
+	return mWeapon;
+}
+
+void Weapon::update(float time)
+{
+	mLoading.doCountdown(time);
+	mLoading.check();
+}
+
+bool Weapon::canShoot() const
+{
+	return !mLoading.running();
 }
 
 void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
@@ -59,30 +99,89 @@ void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
 	if(!canShoot())
 		return;
 
-	Vector3 d = Math::rotate2D(dir.normalized(), Random::clamped() * mVariation);
+	float var = mWeapon->getVariation();
+
+	if(mWeapon->speedVariates()) {
+		if(s->getSpeed() > 0.5f) {
+			var *= 4.0f;
+		}
+		if(s->getSpeed() > 5.0f) {
+			var *= 4.0f;
+		}
+	}
+
+	var = std::min(var, 0.78539f);
+
+	Vector3 d = Math::rotate2D(dir.normalized(), Random::clamped() * var);
 
 	w->addBullet(shared_from_this(), s, d);
-	mLoadTime.rewind();
+	mLoading.rewind();
+}
+
+float Weapon::getRange() const
+{
+	return mWeapon->getRange();
+}
+
+float Weapon::getVelocity() const
+{
+	return mWeapon->getVelocity();
+}
+
+float Weapon::getLoadTime() const
+{
+	return mWeapon->getLoadTime();
+}
+
+float Weapon::getVariation() const
+{
+	return mWeapon->getVariation();
 }
 
 float Weapon::getDamageAgainstSoftTargets() const
 {
-	return mSoftDamage;
+	return mWeapon->getDamageAgainstSoftTargets();
 }
 
 float Weapon::getDamageAgainstLightArmor() const
 {
-	return mLightArmorDamage;
+	return mWeapon->getDamageAgainstLightArmor();
 }
 
 float Weapon::getDamageAgainstHeavyArmor() const
 {
-	return mHeavyArmorDamage;
+	return mWeapon->getDamageAgainstHeavyArmor();
 }
 
 const char* Weapon::getName() const
 {
-	return mName;
+	return mWeapon->getName();
+}
+
+
+WeaponPtr Armory::getAssaultRifle()
+{
+	return WeaponPtr(new Weapon(mAssaultRifle));
+}
+
+WeaponPtr Armory::getMachineGun()
+{
+	return WeaponPtr(new Weapon(mMachineGun));
+}
+
+WeaponPtr Armory::getBazooka()
+{
+	return WeaponPtr(new Weapon(mBazooka));
+}
+
+WeaponPtr Armory::getPistol()
+{
+	return WeaponPtr(new Weapon(mPistol));
+}
+
+WeaponPtr Armory::getAutomaticCannon()
+{
+	return WeaponPtr(new Weapon(mAutoCannon));
 }
 
 Armory* Armory::getInstance()

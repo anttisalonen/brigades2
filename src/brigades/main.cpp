@@ -37,92 +37,52 @@ bool getParameter(int argc, char** argv, int& i,
 
 class ArcadeArmory : public Armory {
 	public:
-		WeaponPtr getAssaultRifle();
-		WeaponPtr getMachineGun();
-		WeaponPtr getBazooka();
-		WeaponPtr getPistol();
-		WeaponPtr getAutomaticCannon();
+		ArcadeArmory();
 };
 
 class SimulationArmory : public Armory {
 	public:
-		WeaponPtr getAssaultRifle();
-		WeaponPtr getMachineGun();
-		WeaponPtr getBazooka();
-		WeaponPtr getPistol();
-		WeaponPtr getAutomaticCannon();
+		SimulationArmory();
 };
 
-WeaponPtr SimulationArmory::getAssaultRifle()
+SimulationArmory::SimulationArmory()
 {
-	return WeaponPtr(new Weapon("Assault Rifle",
+	mAssaultRifle = boost::shared_ptr<WeaponType>(new WeaponType("Assault Rifle",
 				250.0f, 200.0f, 0.1f,
-				Math::degreesToRadians(5.0f)));
-}
-
-WeaponPtr SimulationArmory::getMachineGun()
-{
-	return WeaponPtr(new Weapon("Machine Gun",
+				Math::degreesToRadians(5.0f), true));
+	mMachineGun = boost::shared_ptr<WeaponType>(new WeaponType("Machine Gun",
 				350.0f, 200.0f, 0.04f,
-				Math::degreesToRadians(5.0f)));
-}
-
-WeaponPtr SimulationArmory::getBazooka()
-{
-	return WeaponPtr(new Weapon("Bazooka",
+				Math::degreesToRadians(5.0f), true));
+	mBazooka = boost::shared_ptr<WeaponType>(new WeaponType("Bazooka",
 				300.0f, 160.0f, 4.0f,
-				Math::degreesToRadians(5.0f),
+				Math::degreesToRadians(5.0f), true,
 				1.0f, 1.0f, 1.0f));
-}
-
-WeaponPtr SimulationArmory::getPistol()
-{
-	return WeaponPtr(new Weapon("Pistol",
+	mPistol = boost::shared_ptr<WeaponType>(new WeaponType("Pistol",
 				150.0f, 180.0f, 0.5f,
-				Math::degreesToRadians(5.0f)));
-}
-
-WeaponPtr SimulationArmory::getAutomaticCannon()
-{
-	return WeaponPtr(new Weapon("Automatic Cannon",
+				Math::degreesToRadians(5.0f), true));
+	mAutoCannon = boost::shared_ptr<WeaponType>(new WeaponType("Automatic Cannon",
 				400.0f, 200.0f, 0.25f,
-				Math::degreesToRadians(5.0f), 1.0f, 1.0f, 0.0f));
+				Math::degreesToRadians(5.0f), false, 1.0f, 1.0f, 0.0f));
 }
 
-WeaponPtr ArcadeArmory::getAssaultRifle()
+ArcadeArmory::ArcadeArmory()
 {
-	return WeaponPtr(new Weapon("Assault Rifle",
+	mAssaultRifle = boost::shared_ptr<WeaponType>(new WeaponType("Assault Rifle",
 				25.0f, 20.0f, 0.1f,
-				Math::degreesToRadians(5.0f)));
-}
-
-WeaponPtr ArcadeArmory::getMachineGun()
-{
-	return WeaponPtr(new Weapon("Machine Gun",
+				Math::degreesToRadians(5.0f), false));
+	mMachineGun = boost::shared_ptr<WeaponType>(new WeaponType("Machine Gun",
 				35.0f, 20.0f, 0.04f,
-				Math::degreesToRadians(5.0f)));
-}
-
-WeaponPtr ArcadeArmory::getBazooka()
-{
-	return WeaponPtr(new Weapon("Bazooka",
+				Math::degreesToRadians(5.0f), false));
+	mBazooka = boost::shared_ptr<WeaponType>(new WeaponType("Bazooka",
 				30.0f, 16.0f, 4.0f,
-				Math::degreesToRadians(5.0f),
+				Math::degreesToRadians(5.0f), false,
 				1.0f, 1.0f, 1.0f));
-}
-
-WeaponPtr ArcadeArmory::getPistol()
-{
-	return WeaponPtr(new Weapon("Pistol",
+	mPistol = boost::shared_ptr<WeaponType>(new WeaponType("Pistol",
 				15.0f, 18.0f, 0.5f,
-				Math::degreesToRadians(5.0f)));
-}
-
-WeaponPtr ArcadeArmory::getAutomaticCannon()
-{
-	return WeaponPtr(new Weapon("Automatic Cannon",
+				Math::degreesToRadians(5.0f), false));
+	mAutoCannon = boost::shared_ptr<WeaponType>(new WeaponType("Automatic Cannon",
 				40.0f, 20.0f, 0.25f,
-				Math::degreesToRadians(5.0f), 1.0f, 1.0f, 0.0f));
+				Math::degreesToRadians(5.0f), false, 1.0f, 1.0f, 0.0f));
 }
 
 int main(int argc, char** argv)
