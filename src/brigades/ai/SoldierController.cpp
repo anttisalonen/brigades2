@@ -657,6 +657,7 @@ void SeekAndDestroyGoal::updateShootTarget()
 void SeekAndDestroyGoal::move(float time)
 {
 	Vector3 vel;
+	bool digging = false;
 
 	auto controller = mSoldier->getController();
 	auto steering = controller->getSteering();
@@ -720,27 +721,37 @@ void SeekAndDestroyGoal::move(float time)
 		if(beingLead) {
 			Vector3 sep = steering->separation(neighbours);
 			sep.truncate(10.0f);
-			if(steering->accumulate(tot, sep)) {
+			if(sep.length2() > 1.0f && steering->accumulate(tot, sep)) {
 				Vector3 coh = steering->cohesion(neighbours);
 				coh.truncate(1.5f);
-				steering->accumulate(tot, coh);
+				if(coh.length2() > 1.0f)
+					steering->accumulate(tot, coh);
 			}
 
 			if(!mSoldier->getFormationOffset().null()) {
 				Vector3 offset = steering->offsetPursuit(*leader, mSoldier->getFormationOffset());
 				steering->accumulate(tot, offset);
 			} else {
-				Vector3 arr = steering->arrive(mSoldier->getDefendPosition());
-				steering->accumulate(tot, arr);
+				float dist2 = mSoldier->getPosition().distance2(mSoldier->getDefendPosition());
+				if(dist2 > 2.0f) {
+					Vector3 arr = steering->arrive(mSoldier->getDefendPosition());
+					steering->accumulate(tot, arr);
+				} else if(mShootTargetPosition.null()) {
+					mSoldier->dig(time);
+					digging = true;
+				}
 			}
 		}
 	}
 
-	controller->moveTo(tot, time, mShootTargetPosition.null());
-	DebugOutput::getInstance()->addArrow(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
-			mSoldier->getPosition(), tot + mSoldier->getPosition());
-	if(!mShootTargetPosition.null()) {
-		controller->turnTo(mShootTargetPosition);
+	if(!digging) {
+		controller->moveTo(tot, time, mShootTargetPosition.null());
+		DebugOutput::getInstance()->addArrow(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
+				mSoldier->getPosition(), tot + mSoldier->getPosition());
+
+		if(!mShootTargetPosition.null()) {
+			controller->turnTo(mShootTargetPosition);
+		}
 	}
 }
 

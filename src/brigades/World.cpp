@@ -98,8 +98,6 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 		return;
 	}
 
-	mSoldier->stopDigging();
-
 	if(dir.null() && !mSoldier->getVelocity().null()) {
 		assert(!isnan(mSoldier->getVelocity().x));
 		assert(!isnan(mSoldier->getVelocity().y));
@@ -108,6 +106,7 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 	else {
 		assert(time);
 		mSoldier->setAcceleration(dir * (10.0f / time));
+		mSoldier->stopDigging();
 	}
 	mSoldier->Vehicle::update(time);
 	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
