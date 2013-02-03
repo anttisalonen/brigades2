@@ -101,7 +101,7 @@ void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
 
 	float var = mWeapon->getVariation();
 
-	if(mWeapon->speedVariates()) {
+	if(s->getWarriorType() == WarriorType::Soldier && mWeapon->speedVariates()) {
 		if(s->getSpeed() > 0.5f) {
 			var *= 4.0f;
 		}
