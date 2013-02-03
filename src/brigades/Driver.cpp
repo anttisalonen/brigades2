@@ -29,6 +29,12 @@ bool Sprite::operator<(const Sprite& s1) const
 	return false;
 }
 
+bool SpeechBubble::expired(float t)
+{
+	mTime.doCountdown(t);
+	return mTime.check();
+}
+
 Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	: mWorld(w),
 	mPaused(false),
@@ -40,7 +46,8 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mShooting(false),
 	mRestarting(false),
 	mDriving(false),
-	mNextDebugMessageIndex(0),
+	mSpeechBubbleTimer(2.0f),
+	mNextInfoMessageIndex(0),
 	mSoldierRank(r),
 	mCreatingRectangle(false),
 	mRectangleFinished(false),
@@ -76,6 +83,20 @@ void Driver::run()
 			}
 			if(ta > 0.0f) {
 				mWorld->update(ta * frameTime);
+			}
+		}
+
+		{
+			mSpeechBubbleTimer.doCountdown(frameTime);
+			if(mSpeechBubbleTimer.check()) {
+				mSpeechBubbleTimer.rewind();
+				for(auto it = mSpeechBubbles.begin(); it != mSpeechBubbles.end(); ) {
+					if(it->second.expired(mSpeechBubbleTimer.getMaxTime())) {
+						it = mSpeechBubbles.erase(it);
+					} else {
+						++it;
+					}
+				}
 			}
 		}
 
@@ -182,11 +203,19 @@ void Driver::addArrow(const Common::Color& c, const Common::Vector3& start, cons
 	mDebugSymbols.arrows.push_back(DebugSymbolCollection::Arrow(c, start, end));
 }
 
-void Driver::addMessage(const Common::Color& c, const char* text)
+void Driver::addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text)
 {
-	mDebugMessages[mNextDebugMessageIndex++] = DebugMessage(c, text);
-	if(mNextDebugMessageIndex >= mDebugMessages.size())
-		mNextDebugMessageIndex = 0;
+	if(s->getSideNum() != 0)
+		return;
+
+	mInfoMessages[mNextInfoMessageIndex++] = InfoMessage(c, text);
+	if(mNextInfoMessageIndex >= mInfoMessages.size())
+		mNextInfoMessageIndex = 0;
+}
+
+void Driver::say(boost::shared_ptr<Soldier> s, const char* msg)
+{
+	mSpeechBubbles[s] = SpeechBubble(msg);
 }
 
 void Driver::loadTextures()
@@ -650,10 +679,19 @@ void Driver::drawTexts()
 		drawOverlayText("Paused", 2.0f, Common::Color::White, 0.5f, 0.5f, true);
 	}
 
+	{
+		// time
+		char buf[128];
+		auto ts = mWorld->getCurrentTime();
+		snprintf(buf, 128, "Day %d %02d:%02d", ts.Day, ts.Hour, ts.Minute);
+		drawOverlayText(buf, 1.0f, Common::Color::White, screenWidth - 100.0f, 10.0f, false, true);
+	}
+
 	if(fabs(mTimeAcceleration - 1.0f) > 0.1f) {
+		// time acceleration
 		char buf[128];
 		snprintf(buf, 128, "%.1fx time", mTimeAcceleration);
-		drawOverlayText(buf, 1.0f, Common::Color::White, screenWidth - 100.0f, 20.0f, false, true);
+		drawOverlayText(buf, 1.0f, Common::Color::White, screenWidth - 100.0f, 24.0f, false, true);
 	}
 
 	{
@@ -671,8 +709,11 @@ void Driver::drawTexts()
 	}
 
 	{
-		// rank
-		drawOverlayText(Soldier::rankToString(mSoldier->getRank()), 1.0f, Common::Color::White,
+		// name and rank
+		char buf[128];
+		snprintf(buf, 127, "%s %s", Soldier::rankToString(mSoldier->getRank()), mSoldier->getName().c_str());
+		buf[127] = 0;
+		drawOverlayText(buf, 1.0f, Common::Color::White,
 				40.0f, screenHeight - 145.0f, false, true);
 	}
 
@@ -804,20 +845,20 @@ void Driver::drawTexts()
 
 	{
 		// debug messages
-		unsigned int i = mNextDebugMessageIndex; 
+		unsigned int i = mNextInfoMessageIndex; 
 		float y = 0.16f;
 
 		while(1) {
 			i++;
-			if(i >= mDebugMessages.size())
+			if(i >= mInfoMessages.size())
 				i = 0;
-			if(mDebugMessages[i].mText.size()) {
-				drawOverlayText(mDebugMessages[i].mText.c_str(), 1.0,
-						mDebugMessages[i].mColor,
+			if(mInfoMessages[i].mText.size()) {
+				drawOverlayText(mInfoMessages[i].mText.c_str(), 1.0,
+						mInfoMessages[i].mColor,
 						0.05f, y, false, false);
 				y -= 0.03f;
 			}
-			if(i == mNextDebugMessageIndex)
+			if(i == mNextInfoMessageIndex)
 				break;
 		}
 	}
@@ -1046,13 +1087,10 @@ void Driver::drawEntities()
 		sprites.push_back(s);
 	}
 
-	auto foxholes = mWorld->getFoxholesAt(mCamera, getDrawRadius());
+	auto foxholes = mObserver ? mWorld->getFoxholesAt(mCamera, getDrawRadius()) :
+		mSoldier->getSensorySystem()->getFoxholes();
 
 	for(auto f : foxholes) {
-		if(!observefunc(f->getPosition())) {
-			continue;
-		}
-
 		sprites.push_back(Sprite(f->getPosition(), SpriteType::Foxhole,
 					4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
 					-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f->getDepth(), 1.0f)));
@@ -1215,6 +1253,18 @@ void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
 	auto pos(s->getPosition());
 	pos.y += 2.0f;
 	drawText(s->getName().c_str(), 0.08f, c, pos, true);
+
+	{
+		// speech bubble
+		auto it = mSpeechBubbles.find(s);
+		if(it != mSpeechBubbles.end()) {
+			auto& s = it->second.mText;
+			auto pos(it->first->getPosition());
+			pos.y += 3.0f;
+			drawText(s.c_str(), 0.4f, Common::Color::White, pos, true);
+		}
+	}
+
 }
 
 void Driver::drawSoldierGotoMarker(const SoldierPtr s, bool alwaysdraw)
@@ -1226,12 +1276,12 @@ void Driver::drawSoldierGotoMarker(const SoldierPtr s, bool alwaysdraw)
 			Vector3 rotatedOffset = Math::rotate2D(offset, leader->getXYRotation());
 			rotatedOffset += leader->getPosition();
 			if(alwaysdraw || rotatedOffset.distance2(s->getPosition()) > 8.0f)
-				drawText("x", 0.18f, Common::Color::White, rotatedOffset, true);
+				drawText("x", 0.32f, Common::Color::White, rotatedOffset, true);
 		} else {
 			auto& defpos = s->getDefendPosition();
 			if(!defpos.null()) {
 				if(alwaysdraw || defpos.distance2(s->getPosition()) > 8.0f)
-					drawText("x", 0.18f, Common::Color::White, defpos, true);
+					drawText("x", 0.40f, Common::Color::White, defpos, true);
 			}
 		}
 	}

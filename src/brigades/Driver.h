@@ -16,6 +16,7 @@
 
 #include "World.h"
 #include "DebugOutput.h"
+#include "InfoChannel.h"
 
 
 namespace Brigades {
@@ -83,16 +84,25 @@ struct DebugSymbolCollection {
 	}
 };
 
-struct DebugMessage {
-	DebugMessage() { }
-	DebugMessage(const Common::Color& c, const char* t)
+struct InfoMessage {
+	InfoMessage() { }
+	InfoMessage(const Common::Color& c, const char* t)
 		: mColor(c),
 		mText(t) { }
 	Common::Color mColor;
 	std::string mText;
 };
 
-class Driver : public SoldierController, public DebugOutput {
+struct SpeechBubble {
+	SpeechBubble(const char* s = "", float ts = 8.0f)
+		: mTime(ts), mText(s) { }
+	bool expired(float t);
+
+	Common::Countdown mTime;
+	std::string mText;
+};
+
+class Driver : public SoldierController, public DebugOutput, public InfoChannel {
 	public:
 		Driver(WorldPtr w, bool observer, SoldierRank r);
 		void init();
@@ -102,7 +112,8 @@ class Driver : public SoldierController, public DebugOutput {
 		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r) override;
 		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
 		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
-		void addMessage(const Common::Color& c, const char* text);
+		void addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text);
+		void say(boost::shared_ptr<Soldier> s, const char* msg) override;
 
 	private:
 		void loadTextures();
@@ -169,8 +180,10 @@ class Driver : public SoldierController, public DebugOutput {
 		bool mRestarting;
 		bool mDriving;
 		DebugSymbolCollection mDebugSymbols;
-		std::array<DebugMessage, 5> mDebugMessages;
-		unsigned int mNextDebugMessageIndex;
+		std::array<InfoMessage, 5> mInfoMessages;
+		std::map<SoldierPtr, SpeechBubble> mSpeechBubbles;
+		Common::Countdown mSpeechBubbleTimer;
+		unsigned int mNextInfoMessageIndex;
 		SoldierRank mSoldierRank;
 
 		Common::Rectangle mDrawnRectangle;

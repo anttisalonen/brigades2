@@ -5,6 +5,7 @@
 #include "World.h"
 #include "SensorySystem.h"
 #include "DebugOutput.h"
+#include "InfoChannel.h"
 
 #include "common/Random.h"
 
@@ -604,24 +605,24 @@ const Common::Rectangle& Soldier::getAttackArea() const
 	return mAttackArea;
 }
 
-void Soldier::say(const char* s)
+void Soldier::globalMessage(const char* s)
 {
-	if(mSide->isFirst()) {
-		char buf[256];
-		snprintf(buf, 255, "%s %s: %s", rankToString(mRank), mName.c_str(), s);
-		buf[255] = 0;
-		DebugOutput::getInstance()->addMessage(Common::Color::White, buf);
-	}
+	char buf[256];
+	snprintf(buf, 255, "%s %s: %s", rankToString(mRank), mName.c_str(), s);
+	buf[255] = 0;
+	InfoChannel::getInstance()->addMessage(shared_from_this(), Common::Color::White, buf);
 }
 
 bool Soldier::reportSuccessfulAttack()
 {
-	char buf[256];
-	buf[255] = 0;
-	snprintf(buf, 255, "I'm reporting a successful attack to %s %s",
-			rankToString(mLeader->getRank()),
-			mLeader->getName().c_str());
-	say(buf);
+	if(mRank >= SoldierRank::Lieutenant) {
+		char buf[256];
+		buf[255] = 0;
+		snprintf(buf, 255, "I'm reporting a successful attack to %s %s",
+				rankToString(mLeader->getRank()),
+				mLeader->getName().c_str());
+		globalMessage(buf);
+	}
 	return mLeader->successfulAttackReported(getAttackArea());
 }
 
@@ -702,6 +703,28 @@ const Common::Vector3& Foxhole::getPosition() const
 	return mPosition;
 }
 
+int Timestamp::secondDifferenceTo(const Timestamp& ts) const
+{
+	int sd = Second - ts.Second;
+	sd += (Minute - ts.Minute) * 60;
+	sd += (Hour - ts.Hour) * 3600;
+	sd += (Day - ts.Day) * 86400;
+	return sd;
+}
+
+void Timestamp::addMilliseconds(unsigned int ms)
+{
+	Millisecond += ms;
+	Second += Millisecond / 1000;
+	Millisecond = Millisecond % 1000;
+	Minute += Second / 60;
+	Second = Second % 60;
+	Hour += Minute / 60;
+	Minute = Minute % 60;
+	Day += Hour / 24;
+	Hour = Hour % 24;
+}
+
 
 World::World(float width, float height, float visibility, 
 		float sounddistance, UnitSize unitsize, bool dictator, Armory& armory)
@@ -727,6 +750,8 @@ World::World(float width, float height, float visibility,
 	}
 
 	setHomeBasePositions();
+
+	mTime.Hour = 6;
 }
 
 void World::create()
@@ -784,6 +809,42 @@ std::vector<WallPtr> World::getWallsAt(const Common::Vector3& v, float radius) c
 {
 	/* TODO */
 	return mWalls;
+}
+
+std::vector<FoxholePtr> World::getFoxholesInFOV(const SoldierPtr p)
+{
+	std::vector<FoxholePtr> nearbytgts = getFoxholesAt(p->getPosition(), mVisibilityFactor);
+	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibilityFactor);
+	std::vector<FoxholePtr> ret;
+
+	for(auto s : nearbytgts) {
+		float distToMe = s->getPosition().distance(p->getPosition());
+
+		if(distToMe < 2.0f) {
+			ret.push_back(s);
+			continue;
+		}
+
+		if(distToMe > mVisibilityFactor * 4.0f) {
+			continue;
+		}
+
+		bool treeblocks = false;
+		for(auto t : nearbytrees) {
+			if(Math::segmentCircleIntersect(p->getPosition(), s->getPosition(),
+						t->getPosition(), t->getRadius())) {
+				treeblocks = true;
+				break;
+			}
+		}
+		if(treeblocks) {
+			continue;
+		}
+
+		ret.push_back(s);
+	}
+
+	return ret;
 }
 
 std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
@@ -967,6 +1028,13 @@ void World::update(float time)
 	}
 
 	updateTriggerSystem(time);
+
+	mTime.addMilliseconds(time * 60 * 1000);
+}
+
+const Timestamp& World::getCurrentTime()
+{
+	return mTime;
 }
 
 void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)

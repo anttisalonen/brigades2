@@ -9,6 +9,7 @@
 
 #include "brigades/SensorySystem.h"
 #include "brigades/DebugOutput.h"
+#include "brigades/InfoChannel.h"
 
 #include "brigades/ai/SoldierController.h"
 
@@ -293,6 +294,7 @@ bool SquadLeaderGoal::process(float time)
 			if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
 				commandDefendPositions();
 				mSoldier->setDefending();
+				InfoChannel::getInstance()->say(mSoldier, "Reporting successful attack");
 				if(!mSoldier->reportSuccessfulAttack()) {
 					/* TODO */
 				}
@@ -568,6 +570,8 @@ void CompanyLeaderGoal::issueAttackOrders()
 	if(rs.empty())
 		return;
 
+	InfoChannel::getInstance()->say(mSoldier, "Issuing company attack orders");
+
 	auto rsit = rs.begin();
 
 	/* TODO: set up some smarter way for distributing sectors to platoons. */
@@ -675,6 +679,7 @@ void SeekAndDestroyGoal::move(float time)
 			if((!dugIn && !mAssaultTimer.running()) || !mSoldier->getCurrentWeapon()->speedVariates() ||
 					dist * distCoeff > mSoldier->getCurrentWeapon()->getRange()) {
 				vel = steering->pursuit(*mTargetSoldier);
+				InfoChannel::getInstance()->say(mSoldier, "Assaulting");
 			} else {
 				mAssaultTimer.doCountdown(time);
 				mAssaultTimer.check();

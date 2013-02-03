@@ -17,14 +17,20 @@ bool SensorySystem::update(float time)
 	return false;
 }
 
-const std::vector<SoldierPtr> SensorySystem::getSoldiers() const
+const std::vector<SoldierPtr>& SensorySystem::getSoldiers() const
 {
 	return mSoldiers;
+}
+
+const std::vector<FoxholePtr>& SensorySystem::getFoxholes() const
+{
+	return mFoxholes;
 }
 
 void SensorySystem::updateFOV()
 {
 	mSoldiers = mSoldier->getWorld()->getSoldiersInFOV(mSoldier);
+	mFoxholes = mSoldier->getWorld()->getFoxholesInFOV(mSoldier);
 }
 
 void SensorySystem::addSound(SoldierPtr s)

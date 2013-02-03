@@ -67,6 +67,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		boost::shared_ptr<Common::Steering> getSteering();
 		bool handleLeaderCheck(float time);
 
+		virtual void say(boost::shared_ptr<Soldier> s, const char* msg) { }
+
 	protected:
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
@@ -166,7 +168,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool successfulAttackReported(const Common::Rectangle& r);
 
 	private:
-		void say(const char* s);
+		void globalMessage(const char* s);
 
 		boost::shared_ptr<World> mWorld;
 		SidePtr mSide;
@@ -252,12 +254,24 @@ class Foxhole {
 
 typedef boost::shared_ptr<Foxhole> FoxholePtr;
 
+struct Timestamp {
+	unsigned int Day = 1;
+	unsigned int Hour = 0;
+	unsigned int Minute = 0;
+	unsigned int Second = 0;
+	unsigned int Millisecond = 0;
+
+	int secondDifferenceTo(const Timestamp& ts) const;
+	void addMilliseconds(unsigned int ms);
+};
+
 class World : public boost::enable_shared_from_this<World> {
 
 	public:
 		World(float width, float height, float visibility,
 				float sounddistance, UnitSize unitsize, bool dictator, Armory& armory);
 		void create();
+		const Timestamp& getCurrentTime();
 
 		// accessors
 		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
@@ -269,6 +283,7 @@ class World : public boost::enable_shared_from_this<World> {
 		SidePtr getSide(bool first) const;
 		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p);
+		std::vector<FoxholePtr> getFoxholesInFOV(const SoldierPtr p);
 		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
 		int soldiersAlive(int t) const;
 		const TriggerSystem& getTriggerSystem() const;
@@ -321,6 +336,8 @@ class World : public boost::enable_shared_from_this<World> {
 		Armory& mArmory;
 		UnitSize mUnitSize;
 		bool mDictator;
+
+		Timestamp mTime;
 };
 
 };

@@ -154,6 +154,8 @@ int main(int argc, char** argv)
 	if(debug)
 		DebugOutput::setInstance(driver);
 
+	InfoChannel::setInstance(driver);
+
 	int seed = time(NULL);
 	srand(seed);
 	std::cout << "Seed: " << seed << "\n";

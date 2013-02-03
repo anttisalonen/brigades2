@@ -15,7 +15,8 @@ class SensorySystem {
 	public:
 		SensorySystem(SoldierPtr s);
 		bool update(float time);
-		const std::vector<SoldierPtr> getSoldiers() const;
+		const std::vector<SoldierPtr>& getSoldiers() const;
+		const std::vector<FoxholePtr>& getFoxholes() const;
 		void addSound(SoldierPtr s);
 
 	private:
@@ -24,6 +25,7 @@ class SensorySystem {
 		SoldierPtr mSoldier;
 		Common::SteadyTimer mVisionUpdater;
 		std::vector<SoldierPtr> mSoldiers;
+		std::vector<FoxholePtr> mFoxholes;
 };
 
 typedef boost::shared_ptr<SensorySystem> SensorySystemPtr;
