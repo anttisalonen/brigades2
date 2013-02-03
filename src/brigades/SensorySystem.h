@@ -25,7 +25,9 @@ class SensorySystem {
 		SoldierPtr mSoldier;
 		Common::SteadyTimer mVisionUpdater;
 		std::vector<SoldierPtr> mSoldiers;
-		std::vector<FoxholePtr> mFoxholes;
+
+		mutable std::vector<FoxholePtr> mFoxholes;
+		mutable bool mFoxholesUpdated;
 };
 
 typedef boost::shared_ptr<SensorySystem> SensorySystemPtr;

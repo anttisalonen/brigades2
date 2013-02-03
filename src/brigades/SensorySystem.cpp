@@ -4,7 +4,8 @@ namespace Brigades {
 
 SensorySystem::SensorySystem(SoldierPtr s)
 	: mSoldier(s),
-	mVisionUpdater(0.25f)
+	mVisionUpdater(0.25f),
+	mFoxholesUpdated(false)
 {
 }
 
@@ -24,13 +25,17 @@ const std::vector<SoldierPtr>& SensorySystem::getSoldiers() const
 
 const std::vector<FoxholePtr>& SensorySystem::getFoxholes() const
 {
+	if(!mFoxholesUpdated) {
+		mFoxholes = mSoldier->getWorld()->getFoxholesInFOV(mSoldier);
+		mFoxholesUpdated = true;
+	}
 	return mFoxholes;
 }
 
 void SensorySystem::updateFOV()
 {
 	mSoldiers = mSoldier->getWorld()->getSoldiersInFOV(mSoldier);
-	mFoxholes = mSoldier->getWorld()->getFoxholesInFOV(mSoldier);
+	mFoxholesUpdated = false;
 }
 
 void SensorySystem::addSound(SoldierPtr s)
