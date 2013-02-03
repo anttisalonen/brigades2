@@ -108,7 +108,6 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 	else {
 		assert(time);
 		mSoldier->setAcceleration(dir * (10.0f / time));
-		mSoldier->stopDigging();
 	}
 	mSoldier->Vehicle::update(time);
 	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
@@ -196,7 +195,6 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mWarriorType(wt),
 	mHealth(1.0f),
 	mDictator(false),
-	mDigging(false),
 	mAttacking(false)
 {
 	mName = generateName();
@@ -294,21 +292,6 @@ void Soldier::die()
 bool Soldier::isDead() const
 {
 	return !mAlive;
-}
-
-void Soldier::startDigging()
-{
-	mDigging = true;
-}
-
-void Soldier::stopDigging()
-{
-	mDigging = false;
-}
-
-bool Soldier::digging() const
-{
-	return mDigging;
 }
 
 void Soldier::dig(float time)
@@ -1059,8 +1042,8 @@ void World::dig(float time, const Common::Vector3& pos)
 			return;
 		}
 	}
-	// 20 sec for completion
-	foxhole->deepen(time * 0.05f);
+	// 4 hours game time for completion
+	foxhole->deepen(time / 240.0f);
 }
 
 FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)

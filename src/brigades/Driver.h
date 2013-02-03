@@ -193,6 +193,7 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		SoldierPtr mSelectedCommandee;
 		bool mChangeFocus;
 		float mTimeAcceleration;
+		bool mDigging;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

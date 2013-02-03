@@ -109,9 +109,6 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		SoldierControllerPtr getController();
 		void die();
 		bool isDead() const;
-		void startDigging();
-		void stopDigging();
-		bool digging() const;
 		void dig(float time);
 		void clearWeapons();
 		void addWeapon(WeaponPtr w);
@@ -186,7 +183,6 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		WarriorType mWarriorType;
 		float mHealth;
 		bool mDictator;
-		bool mDigging;
 
 		// crew status
 		Common::Vector3 mFormationOffset;
@@ -278,6 +274,7 @@ class World : public boost::enable_shared_from_this<World> {
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius);
 		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
 		std::vector<FoxholePtr> getFoxholesAt(const Common::Vector3& v, float radius) const;
+		FoxholePtr getFoxholeAt(const Common::Vector3& pos);
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
@@ -298,7 +295,6 @@ class World : public boost::enable_shared_from_this<World> {
 		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
 		void addBullet(const WeaponPtr w, const SoldierPtr s, const Common::Vector3& dir);
 		void dig(float time, const Common::Vector3& pos);
-		FoxholePtr getFoxholeAt(const Common::Vector3& pos);
 
 	private:
 		void setupSides();

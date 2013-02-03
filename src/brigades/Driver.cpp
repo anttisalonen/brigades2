@@ -52,7 +52,8 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mCreatingRectangle(false),
 	mRectangleFinished(false),
 	mChangeFocus(false),
-	mTimeAcceleration(1.0f)
+	mTimeAcceleration(1.0f),
+	mDigging(false)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
@@ -125,7 +126,7 @@ void Driver::act(float time)
 		std::cout << "Rank updated.\n";
 	}
 
-	if(mSoldier->digging()) {
+	if(mDigging) {
 		mSoldier->dig(time);
 		return;
 	}
@@ -135,6 +136,8 @@ void Driver::act(float time)
 	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
 
 	if(!mDriving) {
+		if(!mPlayerControlVelocity.null())
+			mDigging = false;
 		tot = defaultMovement(time);
 		mSteering->accumulate(tot, mPlayerControlVelocity);
 		turnTo(mousedir);
@@ -447,7 +450,9 @@ bool Driver::handleInput(float frameTime)
 
 					case SDLK_b:
 						if(!mObserver && mSoldier->getWarriorType() == WarriorType::Soldier) {
-							mSoldier->startDigging();
+							mDigging = !mDigging;
+							if(mDigging)
+								InfoChannel::getInstance()->say(mSoldier, "Digging a foxhole");
 						}
 						break;
 
@@ -523,9 +528,6 @@ bool Driver::handleInput(float frameTime)
 						break;
 
 					case SDLK_b:
-						if(!mObserver) {
-							mSoldier->stopDigging();
-						}
 						break;
 
 					default:
@@ -1218,6 +1220,7 @@ void Driver::setFocusSoldier()
 	mSoldier = s;
 	if(!mObserver) {
 		mDriving = s->getWarriorType() == WarriorType::Vehicle;
+		mDigging = false;
 		setSoldier(mSoldier);
 		if(mSoldier->getRank() == SoldierRank::Lieutenant && mSoldier->getCommandees().size() > 0) {
 			mSelectedCommandee = *mSoldier->getCommandees().begin();
