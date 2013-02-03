@@ -679,7 +679,7 @@ void SeekAndDestroyGoal::move(float time)
 			if((!dugIn && !mAssaultTimer.running()) || !mSoldier->getCurrentWeapon()->speedVariates() ||
 					dist * distCoeff > mSoldier->getCurrentWeapon()->getRange()) {
 				vel = steering->pursuit(*mTargetSoldier);
-				InfoChannel::getInstance()->say(mSoldier, "Assaulting");
+				InfoChannel::getInstance()->say(mSoldier, "Attacking an enemy");
 			} else {
 				mAssaultTimer.doCountdown(time);
 				mAssaultTimer.check();
