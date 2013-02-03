@@ -208,10 +208,14 @@ void Driver::addArrow(const Common::Color& c, const Common::Vector3& start, cons
 
 void Driver::addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text)
 {
-	if(s->getSideNum() != 0)
+	if(s && s->getSideNum() != 0)
 		return;
 
-	mInfoMessages[mNextInfoMessageIndex++] = InfoMessage(c, text);
+	char buf[256];
+	snprintf(buf, 255, "%s: %s", mWorld->getCurrentTimeAsString().c_str(), text);
+	buf[255] = 0;
+
+	mInfoMessages[mNextInfoMessageIndex++] = InfoMessage(c, buf);
 	if(mNextInfoMessageIndex >= mInfoMessages.size())
 		mNextInfoMessageIndex = 0;
 }
@@ -683,10 +687,9 @@ void Driver::drawTexts()
 
 	{
 		// time
-		char buf[128];
-		auto ts = mWorld->getCurrentTime();
-		snprintf(buf, 128, "Day %d %02d:%02d", ts.Day, ts.Hour, ts.Minute);
-		drawOverlayText(buf, 1.0f, Common::Color::White, screenWidth - 100.0f, 10.0f, false, true);
+		drawOverlayText(mWorld->getCurrentTimeAsString().c_str(),
+				1.0f, Common::Color::White,
+				screenWidth - 100.0f, 10.0f, false, true);
 	}
 
 	if(fabs(mTimeAcceleration - 1.0f) > 0.1f) {
@@ -715,7 +718,7 @@ void Driver::drawTexts()
 		char buf[128];
 		snprintf(buf, 127, "%s %s", Soldier::rankToString(mSoldier->getRank()), mSoldier->getName().c_str());
 		buf[127] = 0;
-		drawOverlayText(buf, 1.0f, Common::Color::White,
+		drawOverlayText(buf, 1.0f, getGroupRectangleColor(mSoldier, 1.0f),
 				40.0f, screenHeight - 145.0f, false, true);
 	}
 
@@ -851,15 +854,15 @@ void Driver::drawTexts()
 		float y = 0.16f;
 
 		while(1) {
-			i++;
-			if(i >= mInfoMessages.size())
-				i = 0;
 			if(mInfoMessages[i].mText.size()) {
 				drawOverlayText(mInfoMessages[i].mText.c_str(), 1.0,
 						mInfoMessages[i].mColor,
 						0.05f, y, false, false);
 				y -= 0.03f;
 			}
+			i++;
+			if(i >= mInfoMessages.size())
+				i = 0;
 			if(i == mNextInfoMessageIndex)
 				break;
 		}
@@ -1257,7 +1260,7 @@ void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
 	pos.y += 2.0f;
 	drawText(s->getName().c_str(), 0.08f, c, pos, true);
 
-	{
+	if(!s->isDead()) {
 		// speech bubble
 		auto it = mSpeechBubbles.find(s);
 		if(it != mSpeechBubbles.end()) {

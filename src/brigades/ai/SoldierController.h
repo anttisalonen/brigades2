@@ -18,14 +18,21 @@ class SectorMap {
 		SectorMap(float width, float height, int numx, int numy);
 		signed char getValue(const Common::Vector3& v) const;
 		signed char getValue(const std::pair<unsigned int, unsigned int>& s) const;
+		signed char getValue(unsigned int i, unsigned int j) const;
 		void setValue(const Common::Vector3& v, signed char x);
+		void setBit(const Common::Vector3& v, signed char x);
+		void clearBit(const Common::Vector3& v, signed char x);
 		void setAll(signed char c);
 		Common::Rectangle getSector(const Common::Vector3& v) const;
 		Common::Rectangle getSector(const std::pair<unsigned int, unsigned int>& s) const;
+		std::vector<std::pair<unsigned int, unsigned int>> getAdjacentSectors(const Common::Vector3& v) const;
+		std::vector<std::pair<unsigned int, unsigned int>> getAdjacentSectors(const std::pair<unsigned int, unsigned int>& sec) const;
 		std::pair<unsigned int, unsigned int> coordinateToSector(const Common::Vector3& v) const;
 		Common::Vector3 sectorToCoordinate(const std::pair<unsigned int, unsigned int>& s) const;
 		unsigned int getNumXSectors() const;
 		unsigned int getNumYSectors() const;
+		float getDistanceBetween(const std::pair<unsigned int, unsigned int>& s1,
+				const std::pair<unsigned int, unsigned int>& s2) const;
 
 	private:
 		unsigned int sectorToIndex(unsigned int i, unsigned int j) const;
@@ -145,10 +152,11 @@ class CompanyLeaderGoal : public CompositeGoal {
 		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
 
 	private:
-		std::set<Common::Rectangle> nextAttackSectors() const;
 		void updateSectorMap();
 		void issueAttackOrders();
-		void handleAttackFinish();
+		void tryUpdateDefensePosition(SoldierPtr lieu);
+		bool isAdjacentToEnemy(const Common::Vector3& pos) const;
+		Common::Rectangle findNextDefensiveSector() const;
 
 		SectorMap mSectorMap;
 		SubUnitHandler mSubUnitHandler;

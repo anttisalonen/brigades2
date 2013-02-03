@@ -193,6 +193,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		Common::Rectangle mAttackArea;
 
 		std::string mName;
+		bool mEnemyContact;
+		Common::Countdown mEnemyContactTimer;
 
 		static int getNextID();
 		static std::string generateName();
@@ -267,7 +269,6 @@ class World : public boost::enable_shared_from_this<World> {
 		World(float width, float height, float visibility,
 				float sounddistance, UnitSize unitsize, bool dictator, Armory& armory);
 		void create();
-		const Timestamp& getCurrentTime();
 
 		// accessors
 		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
@@ -289,6 +290,8 @@ class World : public boost::enable_shared_from_this<World> {
 		float getShootSoundHearingDistance() const;
 		Armory& getArmory() const;
 		Common::Rectangle getArea() const;
+		const Timestamp& getCurrentTime() const;
+		std::string getCurrentTimeAsString() const;
 
 		// modifiers
 		void update(float time);
@@ -298,6 +301,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 	private:
 		void setupSides();
+		SoldierPtr addUnit(UnitSize u, unsigned int side);
 		SoldierPtr addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator);
 		void addTrees();
 		void addWalls();
@@ -325,6 +329,8 @@ class World : public boost::enable_shared_from_this<World> {
 		std::list<BulletPtr> mBullets;
 		int mTeamWon;
 		int mSoldiersAlive[NUM_SIDES];
+		int mSoldiersAtStart;
+		SoldierPtr mRootLeader[NUM_SIDES];
 		Common::SteadyTimer mWinTimer;
 		TriggerSystem mTriggerSystem;
 		Common::Vector3 mHomeBasePositions[NUM_SIDES];
@@ -334,6 +340,9 @@ class World : public boost::enable_shared_from_this<World> {
 		bool mDictator;
 
 		Timestamp mTime;
+		Common::Countdown mReinforcementTimer[NUM_SIDES];
+
+		static const float TimeCoefficient;
 };
 
 };

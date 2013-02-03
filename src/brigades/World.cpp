@@ -195,7 +195,9 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mWarriorType(wt),
 	mHealth(1.0f),
 	mDictator(false),
-	mAttacking(false)
+	mAttacking(false),
+	mEnemyContact(false),
+	mEnemyContactTimer(1.0f)
 {
 	mName = generateName();
 	if(wt == WarriorType::Vehicle) {
@@ -262,6 +264,30 @@ void Soldier::update(float time)
 	if(mController) {
 		mController->act(time);
 	}
+
+	mEnemyContactTimer.doCountdown(time);
+	if(mEnemyContactTimer.checkAndRewind()) {
+		mEnemyContact = false;
+		for(auto s : mSensorySystem->getSoldiers()) {
+			if(!s->isDead() && s->getSideNum() != getSideNum() &&
+					mPosition.distance2(s->getPosition()) <
+					mWorld->getVisibilityFactor() *
+					mWorld->getVisibilityFactor()) {
+				mEnemyContact = true;
+				break;
+			}
+		}
+
+		if(!mEnemyContact) {
+			for(auto s : mCommandees) {
+				if(s->hasEnemyContact()) {
+					mEnemyContact = true;
+					break;
+				}
+			}
+		}
+	}
+
 }
 
 float Soldier::getFOV() const
@@ -531,15 +557,7 @@ bool Soldier::hasRadio() const
 
 bool Soldier::hasEnemyContact() const
 {
-	for(auto s : mSensorySystem->getSoldiers()) {
-		if(!s->isDead() && s->getSideNum() != getSideNum() &&
-					mPosition.distance2(s->getPosition()) <
-					mWorld->getVisibilityFactor() *
-					mWorld->getVisibilityFactor()) {
-			return true;
-		}
-	}
-	return false;
+	return mEnemyContact;
 }
 
 const std::string& Soldier::getName() const
@@ -709,6 +727,8 @@ void Timestamp::addMilliseconds(unsigned int ms)
 }
 
 
+const float World::TimeCoefficient = 60.0f;
+
 World::World(float width, float height, float visibility, 
 		float sounddistance, UnitSize unitsize, bool dictator, Armory& armory)
 	: mWidth(width),
@@ -720,11 +740,13 @@ World::World(float width, float height, float visibility,
 	mVisibilityFactor(visibility),
 	mSoundDistance(sounddistance),
 	mTeamWon(-1),
+	mSoldiersAtStart(0),
 	mWinTimer(1.0f),
 	mSquareSide(64),
 	mArmory(armory),
 	mUnitSize(unitsize),
-	mDictator(dictator)
+	mDictator(dictator),
+	mReinforcementTimer{3600.0f / TimeCoefficient, 3600.0f / TimeCoefficient}
 {
 	memset(mSoldiersAlive, 0, sizeof(mSoldiersAlive));
 
@@ -1012,12 +1034,49 @@ void World::update(float time)
 
 	updateTriggerSystem(time);
 
-	mTime.addMilliseconds(time * 60 * 1000);
+	if(mUnitSize > UnitSize::Squad) {
+		for(unsigned int i = 0; i < NUM_SIDES; i++) {
+			if(mRootLeader[i]->isDead())
+				continue;
+
+			auto& c = mReinforcementTimer[i];
+			c.doCountdown(time);
+			if(c.check()) {
+				if(mSoldiersAlive[i] * 2 < mSoldiersAtStart) {
+					// TODO: need to do something about all those idle lieutenants.
+					auto s = addUnit(UnitSize(int(mUnitSize) - 1), i);
+					mRootLeader[i]->addCommandee(s);
+					float oldTime = mReinforcementTimer[i].getMaxTime();
+					float newTime = oldTime + 3600.0f / TimeCoefficient;
+					mReinforcementTimer[i] = Common::Countdown(newTime);
+
+					char buf[128];
+					snprintf(buf, 127, "The %s team got reinforcement",
+							i == 0 ? "Red" : "Blue");
+					buf[127] = 0;
+					InfoChannel::getInstance()->addMessage(SoldierPtr(), Common::Color::White, buf);
+				} else {
+					c.rewind();
+				}
+			}
+		}
+	}
+
+	mTime.addMilliseconds(time * TimeCoefficient * 1000);
 }
 
-const Timestamp& World::getCurrentTime()
+const Timestamp& World::getCurrentTime() const
 {
 	return mTime;
+}
+
+std::string World::getCurrentTimeAsString() const
+{
+	char buf[128];
+	auto ts = getCurrentTime();
+	snprintf(buf, 128, "Day %d %02d:%02d", ts.Day, ts.Hour, ts.Minute);
+	buf[127] = 0;
+	return std::string(buf);
 }
 
 void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
@@ -1043,7 +1102,7 @@ void World::dig(float time, const Common::Vector3& pos)
 		}
 	}
 	// 4 hours game time for completion
-	foxhole->deepen(time / 240.0f);
+	foxhole->deepen(time * 14400.0f / TimeCoefficient);
 }
 
 FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
@@ -1060,27 +1119,30 @@ FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
 	return p;
 }
 
+SoldierPtr World::addUnit(UnitSize u, unsigned int side)
+{
+	switch(u) {
+		case UnitSize::Squad:
+			return addSquad(side);
+
+		case UnitSize::Platoon:
+			return addPlatoon(side);
+
+		case UnitSize::Company:
+			return addCompany(side);
+	}
+}
+
 void World::setupSides()
 {
 	for(int i = 0; i < NUM_SIDES; i++) {
-		switch(mUnitSize) {
-			case UnitSize::Squad:
-				addSquad(i);
-				break;
-
-			case UnitSize::Platoon:
-				addPlatoon(i);
-				break;
-
-			case UnitSize::Company:
-				addCompany(i);
-				break;
-		}
+		mRootLeader[i] = addUnit(mUnitSize, i);
 
 		if(mDictator) {
 			addDictator(i);
 		}
 	}
+	mSoldiersAtStart = mSoldiersAlive[0];
 }
 
 SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator)

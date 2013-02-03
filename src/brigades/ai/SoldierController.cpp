@@ -13,6 +13,10 @@
 
 #include "brigades/ai/SoldierController.h"
 
+#define SECTOR_OWN_PRESENCE	0x01
+#define SECTOR_ENEMY_PRESENCE	0x02
+#define SECTOR_PLANNED_ATTACK	0x04
+
 using namespace Common;
 
 namespace Brigades {
@@ -49,9 +53,24 @@ signed char SectorMap::getValue(const std::pair<unsigned int, unsigned int>& s) 
 	return mSectorMap.at(sectorToIndex(s.first, s.second));
 }
 
+signed char SectorMap::getValue(unsigned int i, unsigned int j) const
+{
+	return mSectorMap.at(sectorToIndex(i, j));
+}
+
 void SectorMap::setValue(const Vector3& v, signed char x)
 {
 	mSectorMap.at(coordinateToIndex(v)) = x;
+}
+
+void SectorMap::setBit(const Common::Vector3& v, signed char x)
+{
+	mSectorMap.at(coordinateToIndex(v)) |= x;
+}
+
+void SectorMap::clearBit(const Common::Vector3& v, signed char x)
+{
+	mSectorMap.at(coordinateToIndex(v)) &= ~x;
 }
 
 void SectorMap::setAll(signed char c)
@@ -103,6 +122,15 @@ unsigned int SectorMap::getNumYSectors() const
 	return mNumYSectors;
 }
 
+float SectorMap::getDistanceBetween(const std::pair<unsigned int, unsigned int>& s1,
+		const std::pair<unsigned int, unsigned int>& s2) const
+{
+	int dx = int(s2.first) - int(s1.first);
+	int dy = int(s2.second) - int(s1.second);
+	return sqrt(dx * dx + dy * dy);
+}
+
+
 Common::Rectangle SectorMap::getSector(const std::pair<unsigned int, unsigned int>& s) const
 {
 	Vector3 lf = sectorToCoordinate(s);
@@ -114,6 +142,38 @@ Common::Rectangle SectorMap::getSector(const std::pair<unsigned int, unsigned in
 Common::Rectangle SectorMap::getSector(const Common::Vector3& v) const
 {
 	return getSector(coordinateToSector(v));
+}
+
+std::vector<std::pair<unsigned int, unsigned int>> SectorMap::getAdjacentSectors(const std::pair<unsigned int, unsigned int>& sec) const
+{
+	std::vector<std::pair<unsigned int, unsigned int>> ret;
+	if(sec.first > 0) {
+		auto s(sec);
+		s.first--;
+		ret.push_back(s);
+	}
+	if(sec.second > 0) {
+		auto s(sec);
+		s.second--;
+		ret.push_back(s);
+	}
+	if(sec.first < mNumXSectors - 1) {
+		auto s(sec);
+		s.first++;
+		ret.push_back(s);
+	}
+	if(sec.second < mNumYSectors - 1) {
+		auto s(sec);
+		s.second++;
+		ret.push_back(s);
+	}
+	return ret;
+}
+
+std::vector<std::pair<unsigned int, unsigned int>> SectorMap::getAdjacentSectors(const Common::Vector3& v) const
+{
+	auto sec = coordinateToSector(v);
+	return getAdjacentSectors(sec);
 }
 
 
@@ -297,6 +357,7 @@ bool SquadLeaderGoal::process(float time)
 				InfoChannel::getInstance()->say(mSoldier, "Reporting successful attack");
 				if(!mSoldier->reportSuccessfulAttack()) {
 					/* TODO */
+					std::cerr << "Unable to report successful attack!\n";
 				}
 			} else {
 			}
@@ -361,9 +422,6 @@ bool PlatoonLeaderGoal::process(float time)
 	activateIfInactive();
 	if(mSubTimer.check(time)) {
 		mSubUnitHandler.updateSubUnitStatus();
-		if(mSubUnitHandler.subUnitsReady()) {
-			handleAttackFinish();
-		}
 	}
 	if(mSubGoals.empty()) {
 		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier,
@@ -378,7 +436,7 @@ bool PlatoonLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangl
 		return false;
 
 	mSubUnitHandler.updateSubUnitStatus();
-	if(mSubUnitHandler.subUnitsReady()) {
+	if(mSubUnitHandler.subUnitsReady() && !mSoldier->getCommandees().empty()) {
 		handleAttackFinish();
 	}
 
@@ -458,98 +516,69 @@ CompanyLeaderGoal::CompanyLeaderGoal(SoldierPtr s)
 	mSubUnitHandler(s),
 	mSubTimer(5.0f)
 {
+	mSectorMap.setBit(mWorld->getHomeBasePosition(mSoldier->getSide()->isFirst()),
+			SECTOR_OWN_PRESENCE);
 }
 
 void CompanyLeaderGoal::activate()
 {
 	updateSectorMap();
 	mSubUnitHandler.updateSubUnitStatus();
-	issueAttackOrders();
 }
 
 bool CompanyLeaderGoal::process(float time)
 {
 	activateIfInactive();
 	if(mSubTimer.check(time)) {
+		updateSectorMap();
 		mSubUnitHandler.updateSubUnitStatus();
-		if(mSubUnitHandler.subUnitsReady()) {
-			handleAttackFinish();
+		for(auto c : mSubUnitHandler.getStatus()) {
+			if(c.second == SubUnitStatus::Defending) {
+				tryUpdateDefensePosition(c.first);
+			}
 		}
 	}
 	if(mSubGoals.empty()) {
 		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier,
 						Rectangle(mSoldier->getPosition().x - 16, mSoldier->getPosition().y - 16, 32, 32))));
 	}
-	for(auto c : mSubUnitHandler.getStatus()) {
-		DebugOutput::getInstance()->markArea(mSoldier->getSideNum() == 0 ? Common::Color::Red : Common::Color::Blue,
-				c.first->getAttackArea(), false);
+
+	if(mSoldier->getSideNum() == 0) {
+		for(unsigned int j = 0; j < mSectorMap.getNumYSectors(); j++) {
+			for(unsigned int i = 0; i < mSectorMap.getNumXSectors(); i++) {
+				Common::Color c;
+				auto v = mSectorMap.getValue({i, j});
+				if(v == 0) {
+					continue;
+				}
+				if(v & SECTOR_OWN_PRESENCE)
+					c.g = 255;
+				if(v & SECTOR_ENEMY_PRESENCE)
+					c.r = 255;
+				if(v & SECTOR_PLANNED_ATTACK)
+					c.b = 255;
+				DebugOutput::getInstance()->markArea(c, mSectorMap.getSector({i, j}), false);
+			}
+		}
 	}
+
 	return processSubGoals(time);
 }
 
 bool CompanyLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
 {
-	mSubUnitHandler.updateSubUnitStatus();
-	if(mSubUnitHandler.subUnitsReady()) {
-		handleAttackFinish();
+	// TODO: need notification when platoon is lost
+	auto v = sectorMiddlepoint(r);
+
+	mSectorMap.setBit(v, SECTOR_OWN_PRESENCE);
+	mSectorMap.clearBit(v, SECTOR_ENEMY_PRESENCE);
+	for(auto& s : mSectorMap.getAdjacentSectors(v)) {
+		mSectorMap.clearBit(mSectorMap.sectorToCoordinate(s),
+				SECTOR_ENEMY_PRESENCE);
 	}
+	mSectorMap.clearBit(v, SECTOR_PLANNED_ATTACK);
 
 	return true;
-}
-
-std::set<Common::Rectangle> CompanyLeaderGoal::nextAttackSectors() const
-{
-	std::set<Common::Rectangle> ret;
-	for(auto c : mSubUnitHandler.getStatus()) {
-		if(!c.first->canCommunicateWith(c.first))
-			continue;
-
-		if(!c.first->defending())
-			continue;
-
-		Vector3 exppoint;
-		if(c.first->getAttackArea().w == 0) {
-			// not initialised
-			exppoint = c.first->getPosition();
-		} else {
-			exppoint = sectorMiddlepoint(c.first->getAttackArea());
-		}
-
-		for(int j = -1; j <= 1; j++) {
-			for(int i = -1; i <= 1; i++) {
-				if(abs(i) == abs(j) && (i || j))
-					continue;
-
-				auto s = mSectorMap.coordinateToSector(exppoint);
-				if((s.first == 0 && i < 0) || (s.second == 0 && j < 0))
-					continue;
-
-				s.first += i;
-				s.second += j;
-
-				if(s.first >= mSectorMap.getNumXSectors() ||
-						s.second >= mSectorMap.getNumYSectors())
-					continue;
-
-				if(mSectorMap.getValue(s))
-					continue;
-
-				ret.insert(mSectorMap.getSector(s));
-			}
-		}
-	}
-
-	if(ret.empty()) {
-		for(int j = 0; j < mSectorMap.getNumYSectors(); j++) {
-			for(int i = 0; i < mSectorMap.getNumYSectors(); i++) {
-				if(!mSectorMap.getValue({i, j})) {
-					ret.insert(mSectorMap.getSector({i, j}));
-				}
-			}
-		}
-	}
-
-	return ret;
 }
 
 void CompanyLeaderGoal::updateSectorMap()
@@ -558,39 +587,103 @@ void CompanyLeaderGoal::updateSectorMap()
 		if(!mSoldier->canCommunicateWith(c.first))
 			continue;
 
-		if(c.first->defending() && c.first->getAttackArea().w) {
-			mSectorMap.setValue(sectorMiddlepoint(c.first->getAttackArea()), 1);
+		auto aa = c.first->getAttackArea();
+		auto v = sectorMiddlepoint(aa);
+
+		if(!aa.w)
+			continue;
+
+		if(c.first->hasEnemyContact()) {
+			// TODO: should rather have an event from lieutenant
+			// reporting enemy contact, and the position
+			// (attack area is incorrect)
+			mSectorMap.setBit(v, SECTOR_ENEMY_PRESENCE);
+		} else if(c.first->defending() &&
+				(mSectorMap.getValue(v) & SECTOR_OWN_PRESENCE) &&
+				!c.first->getCommandees().empty()) {
+			// repelled enemy offensive
+			mSectorMap.clearBit(v, SECTOR_ENEMY_PRESENCE);
+			for(auto& s : mSectorMap.getAdjacentSectors(v)) {
+				mSectorMap.clearBit(mSectorMap.sectorToCoordinate(s),
+						SECTOR_ENEMY_PRESENCE);
+			}
 		}
 	}
 }
 
-void CompanyLeaderGoal::issueAttackOrders()
+void CompanyLeaderGoal::tryUpdateDefensePosition(SoldierPtr lieu)
 {
-	auto rs = nextAttackSectors();
-	if(rs.empty())
+	if(mSectorMap.getValue(sectorMiddlepoint(lieu->getAttackArea())) & SECTOR_ENEMY_PRESENCE)
 		return;
 
-	InfoChannel::getInstance()->say(mSoldier, "Issuing company attack orders");
+	auto r2 = findNextDefensiveSector();
+	auto vec = sectorMiddlepoint(r2);
 
-	auto rsit = rs.begin();
-
-	/* TODO: set up some smarter way for distributing sectors to platoons. */
-	for(auto c : mSubUnitHandler.getStatus()) {
-		if(c.first->giveAttackOrder(*rsit)) {
-			rsit++;
-			if(rsit == rs.end()) {
-				break;
-			}
+	if(mSectorMap.coordinateToSector(sectorMiddlepoint(lieu->getAttackArea())) !=
+		       mSectorMap.coordinateToSector(vec)) {
+		if(!lieu->giveAttackOrder(r2)) {
+			std::cerr << "AI: platoon unable to comply to attack order when updating defense position.\n";
 		} else {
-			std::cout << "AI: platoon unable to comply to attack order.\n";
+			// TODO: the lieutenant should report failure, in which case this bit should be cleared
+			mSectorMap.setBit(vec, SECTOR_PLANNED_ATTACK);
 		}
 	}
 }
 
-void CompanyLeaderGoal::handleAttackFinish()
+bool CompanyLeaderGoal::isAdjacentToEnemy(const Common::Vector3& pos) const
 {
-	updateSectorMap();
-	issueAttackOrders();
+	auto adj = mSectorMap.getAdjacentSectors(pos);
+	for(auto& s : adj) {
+		if(mSectorMap.getValue(s) & SECTOR_ENEMY_PRESENCE) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+Common::Rectangle CompanyLeaderGoal::findNextDefensiveSector() const
+{
+	auto homevec = mWorld->getHomeBasePosition(mSoldier->getSide()->isFirst());
+	auto homesec = mSectorMap.coordinateToSector(homevec);
+	float maxdist = FLT_MAX;
+	std::pair<unsigned int, unsigned int> threatsec;
+
+	for(unsigned int j = 0; j < mSectorMap.getNumYSectors(); j++) {
+		for(unsigned int i = 0; i < mSectorMap.getNumXSectors(); i++) {
+			// pick either a sector adjacent to the enemy (towards our base)
+			// or the nearest unclaimed sector
+			// TODO: should take current platoon position into account
+			auto val = mSectorMap.getValue(i, j);
+			if(val & SECTOR_PLANNED_ATTACK) {
+				continue;
+			}
+
+			if(val & SECTOR_ENEMY_PRESENCE) {
+				auto adj = mSectorMap.getAdjacentSectors({i, j});
+				for(auto& s : adj) {
+					float dist = mSectorMap.getDistanceBetween(homesec, s);
+					if(dist < maxdist) {
+						threatsec = s;
+						maxdist = dist;
+					}
+				}
+			} else if(val == 0) {
+				float dist = mSectorMap.getDistanceBetween(homesec, {i, j});
+				if(dist < maxdist) {
+					threatsec = {i, j};
+					maxdist = dist;
+				}
+			}
+		}
+	}
+
+	if(maxdist != INT_MAX) {
+		return mSectorMap.getSector(threatsec);
+	} else {
+		auto enemyvec = mWorld->getHomeBasePosition(!mSoldier->getSide()->isFirst());
+		return mSectorMap.getSector(enemyvec);
+	}
 }
 
 
