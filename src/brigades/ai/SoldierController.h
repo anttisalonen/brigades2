@@ -175,6 +175,7 @@ class SeekAndDestroyGoal : public AtomicGoal {
 		Common::Rectangle mArea;
 		Common::Countdown mBoredTimer;
 		Common::Countdown mEnoughWanderTimer;
+		Common::Countdown mAssaultTimer;
 };
 
 class SoldierController : public Brigades::SoldierController {

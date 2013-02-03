@@ -17,12 +17,14 @@ class DebugOutput {
 
 		virtual void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes) = 0;
 		virtual void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& end) = 0;
+		virtual void addMessage(const Common::Color& c, const char* text) = 0;
 };
 
 class DummyDebugOutput : public DebugOutput {
 	public:
 		virtual void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes) { }
 		virtual void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& end) { }
+		virtual void addMessage(const Common::Color& c, const char* text) { }
 };
 
 extern boost::shared_ptr<DebugOutput> DebugOutputInstance;

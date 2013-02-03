@@ -40,6 +40,7 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mShooting(false),
 	mRestarting(false),
 	mDriving(false),
+	mNextDebugMessageIndex(0),
 	mSoldierRank(r),
 	mCreatingRectangle(false),
 	mRectangleFinished(false),
@@ -179,6 +180,13 @@ void Driver::markArea(const Common::Color& c, const Common::Rectangle& r, bool o
 void Driver::addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& end)
 {
 	mDebugSymbols.arrows.push_back(DebugSymbolCollection::Arrow(c, start, end));
+}
+
+void Driver::addMessage(const Common::Color& c, const char* text)
+{
+	mDebugMessages[mNextDebugMessageIndex++] = DebugMessage(c, text);
+	if(mNextDebugMessageIndex >= mDebugMessages.size())
+		mNextDebugMessageIndex = 0;
 }
 
 void Driver::loadTextures()
@@ -399,7 +407,7 @@ bool Driver::handleInput(float frameTime)
 								allCommandeesDefending()))) {
 							if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
 								mSoldier->setDefending();
-								if(!mSoldier->getLeader()->reportSuccessfulAttack(mSoldier->getAttackArea())) {
+								if(!mSoldier->reportSuccessfulAttack()) {
 									/* TODO */
 								}
 							} else {
@@ -763,7 +771,6 @@ void Driver::drawTexts()
 		case -2:
 			drawOverlayText("Draw", 3.0f, Color::White, 0.5f, 0.45f, true);
 			break;
-
 	}
 
 	if(mSoldier->getRank() >= SoldierRank::Sergeant) {
@@ -792,6 +799,26 @@ void Driver::drawTexts()
 			}
 			drawOverlayText(buf, 1.0f, c, 0.8f, yp, false);
 			yp -= 0.04f;
+		}
+	}
+
+	{
+		// debug messages
+		unsigned int i = mNextDebugMessageIndex; 
+		float y = 0.16f;
+
+		while(1) {
+			i++;
+			if(i >= mDebugMessages.size())
+				i = 0;
+			if(mDebugMessages[i].mText.size()) {
+				drawOverlayText(mDebugMessages[i].mText.c_str(), 1.0,
+						mDebugMessages[i].mColor,
+						0.05f, y, false, false);
+				y -= 0.03f;
+			}
+			if(i == mNextDebugMessageIndex)
+				break;
 		}
 	}
 }

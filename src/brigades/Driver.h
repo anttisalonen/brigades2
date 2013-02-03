@@ -1,6 +1,8 @@
 #ifndef BRIGADES_DRIVER_H
 #define BRIGADES_DRIVER_H
 
+#include <array>
+
 #include <boost/shared_ptr.hpp>
 
 #include <SDL.h>
@@ -81,6 +83,15 @@ struct DebugSymbolCollection {
 	}
 };
 
+struct DebugMessage {
+	DebugMessage() { }
+	DebugMessage(const Common::Color& c, const char* t)
+		: mColor(c),
+		mText(t) { }
+	Common::Color mColor;
+	std::string mText;
+};
+
 class Driver : public SoldierController, public DebugOutput {
 	public:
 		Driver(WorldPtr w, bool observer, SoldierRank r);
@@ -91,6 +102,7 @@ class Driver : public SoldierController, public DebugOutput {
 		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r) override;
 		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
 		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
+		void addMessage(const Common::Color& c, const char* text);
 
 	private:
 		void loadTextures();
@@ -157,6 +169,8 @@ class Driver : public SoldierController, public DebugOutput {
 		bool mRestarting;
 		bool mDriving;
 		DebugSymbolCollection mDebugSymbols;
+		std::array<DebugMessage, 5> mDebugMessages;
+		unsigned int mNextDebugMessageIndex;
 		SoldierRank mSoldierRank;
 
 		Common::Rectangle mDrawnRectangle;

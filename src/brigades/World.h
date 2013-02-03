@@ -159,10 +159,15 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool giveAttackOrder(const Common::Rectangle& r);
 		const Common::Rectangle& getAttackArea() const;
 
+		// messages from the squad leader and above
+		bool reportSuccessfulAttack();
+
 		// messages for the platoon leader and above
-		bool reportSuccessfulAttack(const Common::Rectangle& r);
+		bool successfulAttackReported(const Common::Rectangle& r);
 
 	private:
+		void say(const char* s);
+
 		boost::shared_ptr<World> mWorld;
 		SidePtr mSide;
 		int mID;

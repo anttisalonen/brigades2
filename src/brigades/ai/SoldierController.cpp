@@ -293,7 +293,7 @@ bool SquadLeaderGoal::process(float time)
 			if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
 				commandDefendPositions();
 				mSoldier->setDefending();
-				if(!mSoldier->getLeader()->reportSuccessfulAttack(mArea)) {
+				if(!mSoldier->reportSuccessfulAttack()) {
 					/* TODO */
 				}
 			} else {
@@ -442,7 +442,7 @@ void PlatoonLeaderGoal::handleAttackFinish()
 {
 	if(!mSoldier->defending()) {
 		mSoldier->setDefending();
-		if(mSoldier->getLeader() && !mSoldier->getLeader()->reportSuccessfulAttack(mTargetRectangle)) {
+		if(mSoldier->getLeader() && !mSoldier->reportSuccessfulAttack()) {
 			assert(0);
 		}
 	}
@@ -597,7 +597,8 @@ SeekAndDestroyGoal::SeekAndDestroyGoal(SoldierPtr s, const Common::Rectangle& r)
 	mRetreat(false),
 	mArea(r),
 	mBoredTimer(Random::uniform() * 30.0f + 10.0f),
-	mEnoughWanderTimer(Random::uniform() * 10.0f + 5.0f)
+	mEnoughWanderTimer(Random::uniform() * 10.0f + 5.0f),
+	mAssaultTimer(Random::uniform() * 5.0f + 5.0f)
 {
 }
 
@@ -671,9 +672,12 @@ void SeekAndDestroyGoal::move(float time)
 				foxhole && foxhole->getDepth() > 0.4f;
 			float dist = mShootTargetPosition.length();
 			float distCoeff = dugIn ? 0.8f : 0.5f;
-			if(!mSoldier->getCurrentWeapon()->speedVariates() ||
+			if((!dugIn && !mAssaultTimer.running()) || !mSoldier->getCurrentWeapon()->speedVariates() ||
 					dist * distCoeff > mSoldier->getCurrentWeapon()->getRange()) {
 				vel = steering->pursuit(*mTargetSoldier);
+			} else {
+				mAssaultTimer.doCountdown(time);
+				mAssaultTimer.check();
 			}
 		} else {
 			vel = steering->evade(*mTargetSoldier);
@@ -790,7 +794,7 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 				float bestscore = 0.0f;
 				float rangeToTgt = Entity::distanceBetween(*mSoldier, *s);
 				for(auto w : mSoldier->getWeapons()) {
-					if(w->getRange() < rangeToTgt)
+					if(w->getRange() < rangeToTgt && bestscore > 0.0f)
 						continue;
 
 					float thisscore = s->damageFactorFromWeapon(w) * w->getVelocity() / std::max(0.01f, w->getLoadTime());
@@ -817,10 +821,14 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 			mRetreat = false;
 			mSoldier->switchWeapon(weapontouse);
 		}
-		mTargetSoldier = nearest;
+		if(mTargetSoldier != nearest) {
+			mAssaultTimer.rewind();
+			mTargetSoldier = nearest;
+		}
 	}
 	else {
 		mTargetSoldier = SoldierPtr();
+		mAssaultTimer.rewind();
 	}
 }
 

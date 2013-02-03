@@ -4,6 +4,7 @@
 
 #include "World.h"
 #include "SensorySystem.h"
+#include "DebugOutput.h"
 
 #include "common/Random.h"
 
@@ -603,10 +604,31 @@ const Common::Rectangle& Soldier::getAttackArea() const
 	return mAttackArea;
 }
 
-bool Soldier::reportSuccessfulAttack(const Common::Rectangle& r)
+void Soldier::say(const char* s)
+{
+	if(mSide->isFirst()) {
+		char buf[256];
+		snprintf(buf, 255, "%s %s: %s", rankToString(mRank), mName.c_str(), s);
+		buf[255] = 0;
+		DebugOutput::getInstance()->addMessage(Common::Color::White, buf);
+	}
+}
+
+bool Soldier::reportSuccessfulAttack()
+{
+	char buf[256];
+	buf[255] = 0;
+	snprintf(buf, 255, "I'm reporting a successful attack to %s %s",
+			rankToString(mLeader->getRank()),
+			mLeader->getName().c_str());
+	say(buf);
+	return mLeader->successfulAttackReported(getAttackArea());
+}
+
+bool Soldier::successfulAttackReported(const Common::Rectangle& r)
 {
 	if(!mController->handleAttackSuccess(shared_from_this(), r)) {
-		std::cout << "Warning: controller couldn't handle successful attack\n";
+		std::cerr << "Warning: controller couldn't handle successful attack\n";
 		return false;
 	} else {
 		return true;
