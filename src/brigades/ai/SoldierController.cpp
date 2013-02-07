@@ -613,13 +613,19 @@ void CompanyLeaderGoal::updateSectorMap()
 
 void CompanyLeaderGoal::tryUpdateDefensePosition(SoldierPtr lieu)
 {
-	if(mSectorMap.getValue(sectorMiddlepoint(lieu->getAttackArea())) & SECTOR_ENEMY_PRESENCE)
-		return;
+	auto now = sectorMiddlepoint(lieu->getAttackArea());
+	if(mSectorMap.getValue(now) & SECTOR_ENEMY_PRESENCE) {
+		if(!lieu->hasEnemyContact()) {
+			mSectorMap.clearBit(now, SECTOR_ENEMY_PRESENCE);
+		} else {
+			return;
+		}
+	}
 
 	auto r2 = findNextDefensiveSector();
 	auto vec = sectorMiddlepoint(r2);
 
-	if(mSectorMap.coordinateToSector(sectorMiddlepoint(lieu->getAttackArea())) !=
+	if(mSectorMap.coordinateToSector(now) !=
 		       mSectorMap.coordinateToSector(vec)) {
 		if(!lieu->giveAttackOrder(r2)) {
 			std::cerr << "AI: platoon unable to comply to attack order when updating defense position.\n";
