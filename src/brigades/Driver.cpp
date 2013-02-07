@@ -127,8 +127,12 @@ void Driver::act(float time)
 	}
 
 	if(mDigging) {
-		mSoldier->dig(time);
-		return;
+		if(!mDriving && !mPlayerControlVelocity.null()) {
+			mDigging = false;
+		} else {
+			mSoldier->dig(time);
+			return;
+		}
 	}
 
 	mSoldier->handleEvents();
@@ -136,8 +140,6 @@ void Driver::act(float time)
 	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
 
 	if(!mDriving) {
-		if(!mPlayerControlVelocity.null())
-			mDigging = false;
 		tot = defaultMovement(time);
 		mSteering->accumulate(tot, mPlayerControlVelocity);
 		turnTo(mousedir);
