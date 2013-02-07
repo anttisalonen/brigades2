@@ -1102,7 +1102,7 @@ void World::dig(float time, const Common::Vector3& pos)
 		}
 	}
 	// 4 hours game time for completion
-	foxhole->deepen(time * 14400.0f / TimeCoefficient);
+	foxhole->deepen(time * TimeCoefficient / 14400.0f);
 }
 
 FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
