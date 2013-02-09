@@ -679,6 +679,10 @@ float Bullet::getOriginalSpeed() const
 	return mWeapon->getVelocity();
 }
 
+float Bullet::getFlyTime() const
+{
+	return mTimer.getMaxTime() - mTimer.timeLeft();
+}
 
 Foxhole::Foxhole(const WorldPtr world, const Common::Vector3& pos)
 	: mWorld(world),
@@ -1000,16 +1004,19 @@ void World::update(float time)
 			}
 		}
 
-		for(auto t : getTreesAt((*bit)->getPosition(), (*bit)->getVelocity().length())) {
-			if(Math::segmentCircleIntersect((*bit)->getPosition(),
-						(*bit)->getPosition() + (*bit)->getVelocity() * time,
-						t->getPosition(), t->getRadius())) {
-				(*bit)->setVelocity((*bit)->getVelocity() * 0.8f);
-				float orig = (*bit)->getOriginalSpeed();
-				orig *= 0.5f;
-				orig = orig * orig;
-				if((*bit)->getVelocity().length2() < orig) {
-					erase = true;
+		// have bullets pass through trees for the first 100ms of flight
+		if((*bit)->getFlyTime() > 0.1f) {
+			for(auto t : getTreesAt((*bit)->getPosition(), (*bit)->getVelocity().length())) {
+				if(Math::segmentCircleIntersect((*bit)->getPosition(),
+							(*bit)->getPosition() + (*bit)->getVelocity() * time,
+							t->getPosition(), t->getRadius())) {
+					(*bit)->setVelocity((*bit)->getVelocity() * 0.8f);
+					float orig = (*bit)->getOriginalSpeed();
+					orig *= 0.5f;
+					orig = orig * orig;
+					if((*bit)->getVelocity().length2() < orig) {
+						erase = true;
+					}
 				}
 			}
 		}

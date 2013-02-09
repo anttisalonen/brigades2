@@ -222,6 +222,7 @@ class Bullet : public Common::Entity {
 		SoldierPtr getShooter() const;
 		const WeaponPtr getWeapon() const;
 		float getOriginalSpeed() const;
+		float getFlyTime() const;
 
 	private:
 		SoldierPtr mShooter;
