@@ -49,6 +49,18 @@ typedef boost::shared_ptr<Side> SidePtr;
 
 class Soldier;
 
+struct AttackOrder {
+	AttackOrder() { }
+	AttackOrder(const Common::Vector3& p)
+		: CenterPoint(p) { }
+	AttackOrder(const Common::Vector3& p, const Common::Vector3& d)
+		: CenterPoint(p),
+		DefenseLineToRight(d) { }
+	AttackOrder(const Common::Vector3& p, const Common::Vector3& d, float width);
+	Common::Vector3 CenterPoint;
+	Common::Vector3 DefenseLineToRight;
+};
+
 class SoldierController : public boost::enable_shared_from_this<SoldierController> {
 	public:
 		SoldierController();
@@ -56,8 +68,9 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		virtual ~SoldierController() { }
 		void setSoldier(boost::shared_ptr<Soldier> s);
 		virtual void act(float time) = 0;
-		virtual bool handleAttackOrder(const Common::Rectangle& r) = 0;
-		virtual bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r) = 0;
+		virtual bool handleAttackOrder(const AttackOrder& r) = 0;
+		virtual bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r) = 0;
+		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r) = 0;
 
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
@@ -155,14 +168,15 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		// orders for the group leader and above
 		bool defending() const;
 		void setDefending();
-		bool giveAttackOrder(const Common::Rectangle& r);
-		const Common::Rectangle& getAttackArea() const;
+		bool giveAttackOrder(const AttackOrder& r);
+		const AttackOrder& getAttackOrder() const;
+		const Common::Vector3& getCenterOfAttackArea() const;
 
 		// messages from the squad leader and above
 		bool reportSuccessfulAttack();
 
 		// messages for the platoon leader and above
-		bool successfulAttackReported(const Common::Rectangle& r);
+		bool successfulAttackReported(const AttackOrder& r);
 
 	private:
 		void globalMessage(const char* s);
@@ -190,7 +204,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 
 		// leader status
 		bool mAttacking;
-		Common::Rectangle mAttackArea;
+		AttackOrder mAttackOrder;
 
 		std::string mName;
 		bool mEnemyContact;

@@ -108,8 +108,9 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		void init();
 		void run();
 		void act(float time) override;
-		bool handleAttackOrder(const Common::Rectangle& r) override;
-		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r) override;
+		bool handleAttackOrder(const AttackOrder& r) override;
+		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r) override;
+		void handleAttackFailure(SoldierPtr s, const AttackOrder& r) override;
 		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
 		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
 		void addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text);
@@ -129,9 +130,11 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		void drawTerrain();
 		void drawTexts();
 		void drawOverlays();
+		void drawDefenseLine(const AttackOrder& r, const Common::Color& c, float alpha);
 		void drawRectangle(const Common::Rectangle& r,
 				const Common::Color& c, float alpha, bool onlyframes);
 		void drawLine(const Common::Vector3& p1, const Common::Vector3& p2, const Common::Color& c);
+		void drawArrow(const Common::Vector3& start, const Common::Vector3& end, const Common::Color& c);
 		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p,
 				float& xp, float& yp, float& sxp, float& syp, float& scale);
 		void drawEntities();
@@ -186,9 +189,9 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		unsigned int mNextInfoMessageIndex;
 		SoldierRank mSoldierRank;
 
-		Common::Rectangle mDrawnRectangle;
+		AttackOrder mDrawnAttackOrder;
 		Common::Vector3 mDesignatedDefendPosition;
-		bool mCreatingRectangle;
+		bool mCreatingAttackOrder;
 		bool mRectangleFinished;
 		SoldierPtr mSelectedCommandee;
 		bool mChangeFocus;

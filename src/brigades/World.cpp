@@ -36,6 +36,16 @@ int Side::getSideNum() const
 	return mFirst ? 0 : 1;
 }
 
+AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, float width)
+	: CenterPoint(p)
+{
+	Vector3 v = d - p;
+	v.normalize();
+	v *= width;
+	DefenseLineToRight.x = v.y;
+	DefenseLineToRight.y = -v.x;
+}
+
 SoldierController::SoldierController()
 	: mLeaderStatusTimer(1.0f)
 {
@@ -58,16 +68,6 @@ void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
 	mWorld = mSoldier->getWorld();
 	mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier));
 	mSoldier->setController(shared_from_this());
-}
-
-bool SoldierController::handleAttackOrder(const Common::Rectangle& r)
-{
-	return false;
-}
-
-bool SoldierController::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
-{
-	return false;
 }
 
 Vector3 SoldierController::defaultMovement(float time)
@@ -589,21 +589,30 @@ void Soldier::setDefending()
 	mAttacking = false;
 }
 
-bool Soldier::giveAttackOrder(const Common::Rectangle& r)
+bool Soldier::giveAttackOrder(const AttackOrder& r)
 {
-	mAttackArea = r;
+	// set mAttackOrder for handleAttackOrder(), then set it back in case of failure
 	mAttacking = true;
+	auto old = mAttackOrder;
+	mAttackOrder = r;
 	if(!mController->handleAttackOrder(r)) {
 		std::cout << "Warning: controller couldn't handle attack order\n";
+		mAttacking = false;
+		mAttackOrder = old;
 		return false;
 	} else {
 		return true;
 	}
 }
 
-const Common::Rectangle& Soldier::getAttackArea() const
+const AttackOrder& Soldier::getAttackOrder() const
 {
-	return mAttackArea;
+	return mAttackOrder;
+}
+
+const Common::Vector3& Soldier::getCenterOfAttackArea() const
+{
+	return mAttackOrder.CenterPoint;
 }
 
 void Soldier::globalMessage(const char* s)
@@ -624,10 +633,10 @@ bool Soldier::reportSuccessfulAttack()
 				mLeader->getName().c_str());
 		globalMessage(buf);
 	}
-	return mLeader->successfulAttackReported(getAttackArea());
+	return mLeader->successfulAttackReported(getAttackOrder());
 }
 
-bool Soldier::successfulAttackReported(const Common::Rectangle& r)
+bool Soldier::successfulAttackReported(const AttackOrder& r)
 {
 	if(!mController->handleAttackSuccess(shared_from_this(), r)) {
 		std::cerr << "Warning: controller couldn't handle successful attack\n";
@@ -739,8 +748,8 @@ World::World(float width, float height, float visibility,
 	mHeight(height),
 	mMaxSoldiers(1024),
 	mSoldierCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxSoldiers),
-	mTrees(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
-	mFoxholes(AABB(Point(0, 0), Point(mWidth * 0.5f, mHeight * 0.5f))),
+	mTrees(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
+	mFoxholes(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
 	mVisibilityFactor(visibility),
 	mSoundDistance(sounddistance),
 	mTeamWon(-1),
@@ -773,13 +782,13 @@ void World::create()
 // accessors
 std::vector<TreePtr> World::getTreesAt(const Vector3& v, float radius) const
 {
-	return mTrees.query(AABB(Point(v.x, v.y), Point(radius, radius)));
+	return mTrees.query(AABB(Vector2(v.x, v.y), Vector2(radius, radius)));
 }
 
 std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius)
 {
 	std::vector<SoldierPtr> res;
-	for(auto s = mSoldierCSP.queryBegin(Point(v.x, v.y), radius);
+	for(auto s = mSoldierCSP.queryBegin(Vector2(v.x, v.y), radius);
 			!mSoldierCSP.queryEnd();
 			s = mSoldierCSP.queryNext()) {
 		res.push_back(s);
@@ -796,7 +805,7 @@ std::list<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius)
 
 std::vector<FoxholePtr> World::getFoxholesAt(const Common::Vector3& v, float radius) const
 {
-	return mFoxholes.query(AABB(Point(v.x, v.y), Point(radius, radius)));
+	return mFoxholes.query(AABB(Vector2(v.x, v.y), Vector2(radius, radius)));
 }
 
 float World::getWidth() const
@@ -966,7 +975,7 @@ void World::update(float time)
 			assert(!isnan(s->getPosition().x));
 			checkSoldierPosition(s);
 			assert(!isnan(s->getPosition().x));
-			mSoldierCSP.update(s, Point(oldpos.x, oldpos.y), Point(s->getPosition().x, s->getPosition().y));
+			mSoldierCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
 		}
 	}
 
@@ -1101,7 +1110,7 @@ void World::dig(float time, const Common::Vector3& pos)
 	FoxholePtr foxhole = getFoxholeAt(pos);
 	if(!foxhole) {
 		foxhole = FoxholePtr(new Foxhole(shared_from_this(), pos));
-		bool ret = mFoxholes.insert(foxhole, Point(pos.x, pos.y));
+		bool ret = mFoxholes.insert(foxhole, Vector2(pos.x, pos.y));
 		if(!ret) {
 			std::cerr << "Error: couldn't add foxhole at " << pos << "\n";
 			assert(0);
@@ -1116,7 +1125,7 @@ FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
 {
 	FoxholePtr p;
 	float mindist2 = FLT_MAX;
-	for(auto f : mFoxholes.query(AABB(Point(pos.x, pos.y), Point(1.5f, 1.5f)))) {
+	for(auto f : mFoxholes.query(AABB(Vector2(pos.x, pos.y), Vector2(1.5f, 1.5f)))) {
 		float d2 = f->getPosition().distance2(pos);
 		if(d2 < mindist2) {
 			mindist2 = d2;
@@ -1172,7 +1181,7 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool 
 	}
 
 	s->setPosition(getHomeBasePosition(first));
-	mSoldierCSP.add(s, Point(s->getPosition().x, s->getPosition().y));
+	mSoldierCSP.add(s, Vector2(s->getPosition().x, s->getPosition().y));
 	mSoldierMap.insert(std::make_pair(s->getID(), s));
 	return s;
 }
@@ -1203,7 +1212,7 @@ void World::addTrees()
 				r = Common::clamp(3.0f, r * maxRadius, maxRadius);
 
 				bool tooclose = false;
-				for(auto t : mTrees.query(AABB(Point(x, y), Point(maxRadius * 2.0f, maxRadius * 2.0f)))) {
+				for(auto t : mTrees.query(AABB(Vector2(x, y), Vector2(maxRadius * 2.0f, maxRadius * 2.0f)))) {
 					float maxdist = r + t->getRadius();
 					if(Vector3(x, y, 0.0f).distance2(t->getPosition()) <
 							maxdist * maxdist) {
@@ -1216,7 +1225,7 @@ void World::addTrees()
 				}
 
 				TreePtr tree(new Tree(Vector3(x, y, 0), r));
-				bool ret = mTrees.insert(tree, Point(x, y));
+				bool ret = mTrees.insert(tree, Vector2(x, y));
 				if(!ret) {
 					std::cout << "Error: couldn't add tree at " << x << ", " << y << "\n";
 					assert(0);

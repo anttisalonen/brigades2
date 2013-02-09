@@ -223,14 +223,29 @@ Goal::Goal(SoldierPtr s)
 {
 }
 
-bool Goal::handleAttackOrder(const Common::Rectangle& r)
+bool Goal::handleAttackOrder(const AttackOrder& r)
 {
 	return false;
 }
 
-bool Goal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
+bool Goal::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 {
 	return false;
+}
+
+void Goal::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
+{
+	return;
+}
+
+const Common::Vector3& Goal::getBasePosition() const
+{
+	return mWorld->getHomeBasePosition(mSoldier->getSide()->isFirst());
+}
+
+const Common::Vector3& Goal::getEnemyBasePosition() const
+{
+	return mWorld->getHomeBasePosition(!mSoldier->getSide()->isFirst());
 }
 
 AtomicGoal::AtomicGoal(SoldierPtr s)
@@ -311,7 +326,7 @@ bool PrivateGoal::process(float time)
 	return processSubGoals(time);
 }
 
-bool PrivateGoal::handleAttackOrder(const Rectangle& r)
+bool PrivateGoal::handleAttackOrder(const AttackOrder& r)
 {
 	emptySubGoals();
 	return true;
@@ -325,30 +340,30 @@ SquadLeaderGoal::SquadLeaderGoal(SoldierPtr s)
 void SquadLeaderGoal::activate()
 {
 	if(!mSoldier->getLeader() || !mSoldier->canCommunicateWith(mSoldier->getLeader())) {
-		mSoldier->giveAttackOrder(mWorld->getArea());
+		mSoldier->giveAttackOrder(AttackOrder(getEnemyBasePosition()));
 	}
 }
 
 bool SquadLeaderGoal::process(float time)
 {
-	static const float minDistToTgt = 10.0f;
+	// NOTE: minDistToTgt must be more than the area width of the SeekAndDestroyGoal
+	// of the squad leader. Otherwise he might never report attack success.
+	static const float minDistToTgt = std::max(20.0f, mSoldier->getAttackOrder().DefenseLineToRight.length());
 	activateIfInactive();
 	if(mSubGoals.empty()) {
+		// subgoals is empty at "birth" and after receiving an attack order
 		if(mSoldier->defending()) {
 			mArea.x = mSoldier->getPosition().x - 16;
 			mArea.y = mSoldier->getPosition().y - 16;
-			mArea.w = mArea.h = 32;
-			mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier, mArea)));
 		} else {
-			mArea = mSoldier->getAttackArea();
-			mArea.x += mArea.w * 0.5f - minDistToTgt * 0.5f;
-			mArea.y += mArea.h * 0.5f - minDistToTgt * 0.5f;
-			mArea.w = minDistToTgt * 0.5f;
-			mArea.h = minDistToTgt * 0.5f;
-			mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier, mArea)));
+			auto& v = mSoldier->getCenterOfAttackArea();
+			mArea.x = v.x;
+			mArea.y = v.y;
 		}
+		mArea.w = mArea.h = 16;
+		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier, mArea)));
 	} else if(!mSoldier->defending() && !mSoldier->hasEnemyContact()) {
-		Vector3 tgt = sectorMiddlepoint(mArea);
+		auto& tgt = mSoldier->getCenterOfAttackArea();
 		float distToTgt = mSoldier->getPosition().distance(tgt);
 		if(distToTgt < minDistToTgt && mSoldier->getLeader()) {
 			if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
@@ -356,17 +371,18 @@ bool SquadLeaderGoal::process(float time)
 				mSoldier->setDefending();
 				InfoChannel::getInstance()->say(mSoldier, "Reporting successful attack");
 				if(!mSoldier->reportSuccessfulAttack()) {
-					/* TODO */
+					/* TODO: return to base? or something... */
 					std::cerr << "Unable to report successful attack!\n";
 				}
 			} else {
+				/* TODO: return to base? or something... */
 			}
 		}
 	}
 	return processSubGoals(time);
 }
 
-bool SquadLeaderGoal::handleAttackOrder(const Rectangle& r)
+bool SquadLeaderGoal::handleAttackOrder(const AttackOrder& r)
 {
 	emptySubGoals();
 	return true;
@@ -378,10 +394,9 @@ void SquadLeaderGoal::commandDefendPositions()
 		return;
 	}
 
-	auto& defarea = mSoldier->getAttackArea();
-	Vector3 midp(mSoldier->getPosition());
-	float rad = std::max(defarea.w, defarea.h) * 0.5f;
-	Vector3 towardsopp = mWorld->getHomeBasePosition(!mSoldier->getSide()->isFirst()) - midp;
+	auto& midp = mSoldier->getCenterOfAttackArea();
+	float rad = mSoldier->getAttackOrder().DefenseLineToRight.length();
+	Vector3 towardsopp = getEnemyBasePosition() - midp;
 	towardsopp.normalize();
 	towardsopp *= rad;
 
@@ -425,12 +440,13 @@ bool PlatoonLeaderGoal::process(float time)
 	}
 	if(mSubGoals.empty()) {
 		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier,
-						Rectangle(mSoldier->getPosition().x - 16, mSoldier->getPosition().y - 16, 32, 32))));
+						Rectangle(mSoldier->getPosition().x - 16,
+							mSoldier->getPosition().y - 16, 32, 32))));
 	}
 	return processSubGoals(time);
 }
 
-bool PlatoonLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
+bool PlatoonLeaderGoal::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 {
 	if(!mSoldier->getLeader() || !mSoldier->canCommunicateWith(mSoldier->getLeader()))
 		return false;
@@ -443,56 +459,36 @@ bool PlatoonLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangl
 	return true;
 }
 
-bool PlatoonLeaderGoal::handleAttackOrder(const Common::Rectangle& r)
+bool PlatoonLeaderGoal::handleAttackOrder(const AttackOrder& r)
 {
-	mTargetRectangle = r;
-
 	mSubUnitHandler.updateSubUnitStatus();
-	std::vector<Rectangle> rects = splitTargetRectangle();
-	assert(rects.size() == mSubUnitHandler.getStatus().size());
+	std::vector<AttackOrder> orders = splitAttackOrder();
+	assert(orders.size() == mSubUnitHandler.getStatus().size());
 
 	int i = 0;
 	for(auto p : mSubUnitHandler.getStatus()) {
-		p.first->giveAttackOrder(rects[i++]);
+		p.first->giveAttackOrder(orders[i++]);
 	}
 
 	return true;
 }
 
-std::vector<Common::Rectangle> PlatoonLeaderGoal::splitTargetRectangle() const
+std::vector<AttackOrder> PlatoonLeaderGoal::splitAttackOrder() const
 {
-	std::vector<Common::Rectangle> ret;
+	std::vector<AttackOrder> ret;
 	int numgroups = mSubUnitHandler.getStatus().size();
-	if(numgroups == 1) {
-		ret.push_back(mTargetRectangle);
-	} else if(numgroups == 4 && mTargetRectangle.w * 2.0f > mTargetRectangle.h &&
-			mTargetRectangle.h * 2.0f > mTargetRectangle.w) {
-		Rectangle r1(mTargetRectangle);
-		r1.w *= 0.5f;
-		r1.h *= 0.5f;
-		Rectangle r2(r1);
-		r2.x += r1.w;
-		Rectangle r3(r1);
-		r3.y += r1.h;
-		Rectangle r4(r2);
-		r4.y += r1.h;
-		ret.push_back(r1);
-		ret.push_back(r2);
-		ret.push_back(r3);
-		ret.push_back(r4);
-	} else {
-		for(int i = 0; i < numgroups; i++) {
-			Rectangle r1(mTargetRectangle);
-			if(mTargetRectangle.w >= mTargetRectangle.h) {
-				r1.w *= 1.0f / (float)numgroups;
-				r1.x += i * r1.w;
-				ret.push_back(r1);
-			} else {
-				r1.h *= 1.0f / (float)numgroups;
-				r1.y += i * r1.h;
-				ret.push_back(r1);
-			}
-		}
+
+	if(!numgroups)
+		return ret;
+
+	auto o = mSoldier->getAttackOrder();
+
+	auto rp = o.CenterPoint - o.DefenseLineToRight;
+
+	for(int i = 0; i < numgroups; i++) {
+		Vector3 cont = o.DefenseLineToRight / (float)numgroups;
+		ret.push_back(AttackOrder(rp + cont, cont));
+		rp += cont * 2.0f;
 	}
 
 	return ret;
@@ -516,7 +512,7 @@ CompanyLeaderGoal::CompanyLeaderGoal(SoldierPtr s)
 	mSubUnitHandler(s),
 	mSubTimer(5.0f)
 {
-	mSectorMap.setBit(mWorld->getHomeBasePosition(mSoldier->getSide()->isFirst()),
+	mSectorMap.setBit(getBasePosition(),
 			SECTOR_OWN_PRESENCE);
 }
 
@@ -524,19 +520,18 @@ void CompanyLeaderGoal::activate()
 {
 	updateSectorMap();
 	mSubUnitHandler.updateSubUnitStatus();
+	for(auto c : mSubUnitHandler.getStatus()) {
+		if(c.second == SubUnitStatus::Defending) {
+			tryUpdateDefensePosition(c.first);
+		}
+	}
 }
 
 bool CompanyLeaderGoal::process(float time)
 {
 	activateIfInactive();
 	if(mSubTimer.check(time)) {
-		updateSectorMap();
-		mSubUnitHandler.updateSubUnitStatus();
-		for(auto c : mSubUnitHandler.getStatus()) {
-			if(c.second == SubUnitStatus::Defending) {
-				tryUpdateDefensePosition(c.first);
-			}
-		}
+		activate();
 	}
 	if(mSubGoals.empty()) {
 		mSubGoals.push_front(GoalPtr(new SeekAndDestroyGoal(mSoldier,
@@ -565,10 +560,10 @@ bool CompanyLeaderGoal::process(float time)
 	return processSubGoals(time);
 }
 
-bool CompanyLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
+bool CompanyLeaderGoal::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 {
 	// TODO: need notification when platoon is lost
-	auto v = sectorMiddlepoint(r);
+	auto& v = r.CenterPoint;
 
 	mSectorMap.setBit(v, SECTOR_OWN_PRESENCE);
 	mSectorMap.clearBit(v, SECTOR_ENEMY_PRESENCE);
@@ -581,16 +576,20 @@ bool CompanyLeaderGoal::handleAttackSuccess(SoldierPtr s, const Common::Rectangl
 	return true;
 }
 
+void CompanyLeaderGoal::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
+{
+	/* TODO */
+}
+
 void CompanyLeaderGoal::updateSectorMap()
 {
 	for(auto c : mSubUnitHandler.getStatus()) {
 		if(!mSoldier->canCommunicateWith(c.first))
 			continue;
 
-		auto aa = c.first->getAttackArea();
-		auto v = sectorMiddlepoint(aa);
+		auto v = c.first->getCenterOfAttackArea();
 
-		if(!aa.w)
+		if(v.null())
 			continue;
 
 		if(c.first->hasEnemyContact()) {
@@ -613,7 +612,7 @@ void CompanyLeaderGoal::updateSectorMap()
 
 void CompanyLeaderGoal::tryUpdateDefensePosition(SoldierPtr lieu)
 {
-	auto now = sectorMiddlepoint(lieu->getAttackArea());
+	auto now = lieu->getCenterOfAttackArea();
 	if(mSectorMap.getValue(now) & SECTOR_ENEMY_PRESENCE) {
 		if(!lieu->hasEnemyContact()) {
 			mSectorMap.clearBit(now, SECTOR_ENEMY_PRESENCE);
@@ -627,7 +626,7 @@ void CompanyLeaderGoal::tryUpdateDefensePosition(SoldierPtr lieu)
 
 	if(mSectorMap.coordinateToSector(now) !=
 		       mSectorMap.coordinateToSector(vec)) {
-		if(!lieu->giveAttackOrder(r2)) {
+		if(!lieu->giveAttackOrder(AttackOrder(vec, getEnemyBasePosition(), r2.w * 0.5f))) {
 			std::cerr << "AI: platoon unable to comply to attack order when updating defense position.\n";
 		} else {
 			// TODO: the lieutenant should report failure, in which case this bit should be cleared
@@ -650,7 +649,7 @@ bool CompanyLeaderGoal::isAdjacentToEnemy(const Common::Vector3& pos) const
 
 Common::Rectangle CompanyLeaderGoal::findNextDefensiveSector() const
 {
-	auto homevec = mWorld->getHomeBasePosition(mSoldier->getSide()->isFirst());
+	auto homevec = getBasePosition();
 	auto homesec = mSectorMap.coordinateToSector(homevec);
 	float maxdist = FLT_MAX;
 	std::pair<unsigned int, unsigned int> threatsec;
@@ -687,7 +686,7 @@ Common::Rectangle CompanyLeaderGoal::findNextDefensiveSector() const
 	if(maxdist != INT_MAX) {
 		return mSectorMap.getSector(threatsec);
 	} else {
-		auto enemyvec = mWorld->getHomeBasePosition(!mSoldier->getSide()->isFirst());
+		auto enemyvec = getEnemyBasePosition();
 		return mSectorMap.getSector(enemyvec);
 	}
 }
@@ -985,14 +984,19 @@ void SoldierController::act(float time)
 	mCurrentGoal->process(time);
 }
 
-bool SoldierController::handleAttackOrder(const Rectangle& r)
+bool SoldierController::handleAttackOrder(const AttackOrder& r)
 {
 	return mCurrentGoal->handleAttackOrder(r);
 }
 
-bool SoldierController::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
+bool SoldierController::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 {
 	return mCurrentGoal->handleAttackSuccess(s, r);
+}
+
+void SoldierController::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
+{
+	mCurrentGoal->handleAttackFailure(s, r);
 }
 
 }

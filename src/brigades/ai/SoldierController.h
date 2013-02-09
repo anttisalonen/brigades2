@@ -74,8 +74,11 @@ class Goal {
 		virtual bool process(float time) = 0;
 		virtual void deactivate() { }
 		virtual void addSubGoal(boost::shared_ptr<Goal> g) = 0;
-		virtual bool handleAttackOrder(const Common::Rectangle& r);
-		virtual bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
+		virtual bool handleAttackOrder(const AttackOrder& r);
+		virtual bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
+		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r);
+		const Common::Vector3& getBasePosition() const;
+		const Common::Vector3& getEnemyBasePosition() const;
 
 	protected:
 		SoldierPtr mSoldier;
@@ -110,7 +113,7 @@ class PrivateGoal : public CompositeGoal {
 	public:
 		PrivateGoal(SoldierPtr s);
 		bool process(float time);
-		bool handleAttackOrder(const Common::Rectangle& r);
+		bool handleAttackOrder(const AttackOrder& r);
 
 	private:
 };
@@ -120,7 +123,7 @@ class SquadLeaderGoal : public CompositeGoal {
 		SquadLeaderGoal(SoldierPtr s);
 		void activate();
 		bool process(float time);
-		bool handleAttackOrder(const Common::Rectangle& r);
+		bool handleAttackOrder(const AttackOrder& r);
 
 	private:
 		void commandDefendPositions();
@@ -132,15 +135,14 @@ class PlatoonLeaderGoal : public CompositeGoal {
 		PlatoonLeaderGoal(SoldierPtr s);
 		void activate();
 		bool process(float time);
-		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
-		bool handleAttackOrder(const Common::Rectangle& r);
+		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
+		bool handleAttackOrder(const AttackOrder& r);
 
 	private:
-		std::vector<Common::Rectangle> splitTargetRectangle() const;
+		std::vector<AttackOrder> splitAttackOrder() const;
 		void handleAttackFinish();
 
 		SubUnitHandler mSubUnitHandler;
-		Common::Rectangle mTargetRectangle;
 		Common::SteadyTimer mSubTimer;
 };
 
@@ -149,7 +151,8 @@ class CompanyLeaderGoal : public CompositeGoal {
 		CompanyLeaderGoal(SoldierPtr s);
 		void activate();
 		bool process(float time);
-		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
+		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
+		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r) override;
 
 	private:
 		void updateSectorMap();
@@ -190,8 +193,9 @@ class SoldierController : public Brigades::SoldierController {
 	public:
 		SoldierController(SoldierPtr p);
 		void act(float time);
-		bool handleAttackOrder(const Common::Rectangle& r);
-		bool handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r);
+		bool handleAttackOrder(const AttackOrder& r);
+		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
+		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r) override;
 
 	private:
 		bool checkLeaderStatus();

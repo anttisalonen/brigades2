@@ -49,7 +49,7 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mSpeechBubbleTimer(2.0f),
 	mNextInfoMessageIndex(0),
 	mSoldierRank(r),
-	mCreatingRectangle(false),
+	mCreatingAttackOrder(false),
 	mRectangleFinished(false),
 	mChangeFocus(false),
 	mTimeAcceleration(1.0f),
@@ -123,7 +123,7 @@ void Driver::run()
 void Driver::act(float time)
 {
 	if(handleLeaderCheck(time)) {
-		std::cout << "Rank updated.\n";
+		addMessage(mSoldier, Color::White, "Rank updated");
 	}
 
 	if(mDigging) {
@@ -171,8 +171,8 @@ void Driver::act(float time)
 		mRectangleFinished = false;
 		if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
 				mSelectedCommandee && mSoldier->canCommunicateWith(mSelectedCommandee)) {
-			if(!mSelectedCommandee->giveAttackOrder(mDrawnRectangle)) {
-				std::cout << "Group unable to comply.\n";
+			if(!mSelectedCommandee->giveAttackOrder(mDrawnAttackOrder)) {
+				addMessage(mSelectedCommandee, Color::White, "I'm unable to comply");
 			}
 		}
 	}
@@ -186,16 +186,22 @@ void Driver::act(float time)
 	}
 }
 
-bool Driver::handleAttackOrder(const Rectangle& r)
+bool Driver::handleAttackOrder(const AttackOrder& r)
 {
-	std::cout << "You should attack the area at " << r << "\n";
+	if(mSoldier && mSoldier->getLeader())
+		addMessage(mSoldier->getLeader(), Color::White, "Giving an attack order");
 	return true;
 }
 
-bool Driver::handleAttackSuccess(SoldierPtr s, const Common::Rectangle& r)
+bool Driver::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 {
-	std::cout << "Attack to area " << r << " successful\n";
+	addMessage(s, Color::White, "Attack successful");
 	return true;
+}
+
+void Driver::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
+{
+	addMessage(s, Color::White, "Attack failed");
 }
 
 void Driver::markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes)
@@ -437,13 +443,12 @@ bool Driver::handleInput(float frameTime)
 
 					case SDLK_v:
 						if(!mObserver && mSoldier && !mSoldier->isDead() &&
-								mSoldier->getLeader() && mSoldier->getAttackArea().w &&
-								((mSoldier->getRank() == SoldierRank::Sergeant &&
-								mSoldier->getAttackArea().pointWithin(mSoldier->getPosition().x,
-									mSoldier->getPosition().y)) ||
+								mSoldier->getLeader() && !mSoldier->defending() &&
+								(mSoldier->getRank() == SoldierRank::Sergeant ||
 								(mSoldier->getRank() == SoldierRank::Lieutenant &&
 								allCommandeesDefending()))) {
 							if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
+								InfoChannel::getInstance()->say(mSoldier, "Reporting successful attack");
 								mSoldier->setDefending();
 								if(!mSoldier->reportSuccessfulAttack()) {
 									/* TODO */
@@ -553,12 +558,11 @@ bool Driver::handleInput(float frameTime)
 					case SDL_BUTTON_RIGHT:
 						if(!mObserver) {
 							if(mSoldier->getRank() == SoldierRank::Lieutenant) {
-								mCreatingRectangle = true;
+								mCreatingAttackOrder = true;
 								Common::Vector3 p = getMousePositionOnField();
-								mDrawnRectangle.x = p.x;
-								mDrawnRectangle.y = p.y;
-								mDrawnRectangle.w = 0.0f;
-								mDrawnRectangle.h = 0.0f;
+								mDrawnAttackOrder.CenterPoint.x = p.x;
+								mDrawnAttackOrder.CenterPoint.y = p.y;
+								mDrawnAttackOrder.DefenseLineToRight = Common::Vector3();
 							} else if(mSoldier->getRank() == SoldierRank::Sergeant) {
 								mDesignatedDefendPosition = getMousePositionOnField();
 							}
@@ -581,7 +585,7 @@ bool Driver::handleInput(float frameTime)
 						break;
 
 					case SDL_BUTTON_RIGHT:
-						mCreatingRectangle = false;
+						mCreatingAttackOrder = false;
 						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
 								mSelectedCommandee &&
 								mSoldier->canCommunicateWith(mSelectedCommandee)) {
@@ -595,10 +599,10 @@ bool Driver::handleInput(float frameTime)
 				break;
 
 			case SDL_MOUSEMOTION:
-				if(mCreatingRectangle) {
+				if(mCreatingAttackOrder) {
 					Common::Vector3 p = getMousePositionOnField();
-					mDrawnRectangle.w = p.x - mDrawnRectangle.x;
-					mDrawnRectangle.h = p.y - mDrawnRectangle.y;
+					mDrawnAttackOrder.DefenseLineToRight =
+						Math::rotate2D(p - mDrawnAttackOrder.CenterPoint, -HALF_PI);
 				}
 				mCameraMouseOffset = (getMousePositionOnField() - mSoldier->getPosition()) * 0.45f;
 				break;
@@ -886,25 +890,23 @@ void Driver::drawOverlays()
 
 	{
 		// big picture
-		if(mSoldier->getLeader() && mSoldier->getLeader()->getAttackArea().w) {
-			drawRectangle(mSoldier->getLeader()->getAttackArea(), Common::Color::Yellow, 1.0f, true);
+		if(mSoldier->getLeader()) {
+			drawDefenseLine(mSoldier->getLeader()->getAttackOrder(), Common::Color::Yellow, 1.0f);
 		}
 
 		// group leader
-		if(mSoldier->getAttackArea().w) {
-			drawRectangle(mSoldier->getAttackArea(), Common::Color::White, 1.0f, true);
-		}
+		drawDefenseLine(mSoldier->getAttackOrder(), Common::Color::White, 1.0f);
 	}
 
 	{
 		// platoon leader
-		if(mCreatingRectangle) {
-			drawRectangle(mDrawnRectangle, Common::Color::White, 1.0f, true);
+		if(mCreatingAttackOrder) {
+			drawDefenseLine(mDrawnAttackOrder, Common::Color::White, 1.0f);
 		}
 
 		float bright = 0.8f;
 		for(auto s : mSoldier->getCommandees()) {
-			drawRectangle(s->getAttackArea(), getGroupRectangleColor(s, bright), 1.0f, true);
+			drawDefenseLine(s->getAttackOrder(), getGroupRectangleColor(s, bright), 1.0f);
 			bright -= 0.1f;
 		}
 	}
@@ -916,20 +918,42 @@ void Driver::drawOverlays()
 		}
 
 		for(auto a : mDebugSymbols.arrows) {
-			Vector3 arrow = a.end - a.start;
-			Vector3 v1 = Math::rotate2D(arrow, QUARTER_PI);
-			Vector3 v2 = Math::rotate2D(arrow, -QUARTER_PI);
-			v1 *= -0.3f;
-			v2 *= -0.3f;
-			v1 += a.end;
-			v2 += a.end;
-			drawLine(a.start, a.end, a.c);
-			drawLine(a.end, v1, a.c);
-			drawLine(a.end, v2, a.c);
+			drawArrow(a.start, a.end, a.c);
 		}
 
 		mDebugSymbols.clear();
 	}
+}
+
+void Driver::drawArrow(const Common::Vector3& start, const Common::Vector3& end, const Common::Color& c)
+{
+	Vector3 arrow = end - start;
+	Vector3 v1 = Math::rotate2D(arrow, QUARTER_PI);
+	Vector3 v2 = Math::rotate2D(arrow, -QUARTER_PI);
+	v1 *= -0.3f;
+	v2 *= -0.3f;
+	v1 += end;
+	v2 += end;
+	drawLine(start, end, c);
+	drawLine(end, v1, c);
+	drawLine(end, v2, c);
+}
+
+void Driver::drawDefenseLine(const AttackOrder& r, const Common::Color& c, float alpha)
+{
+	auto start = r.CenterPoint;
+	auto right = start + r.DefenseLineToRight;
+
+	if(right.null())
+		return;
+
+	auto left = start - r.DefenseLineToRight;
+
+	auto forward = start + Math::rotate2D(r.DefenseLineToRight, HALF_PI);
+
+	drawLine(start, right, c);
+	drawLine(start, left, c);
+	drawArrow(start, forward, c);
 }
 
 void Driver::drawRectangle(const Common::Rectangle& r,
