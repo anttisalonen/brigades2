@@ -692,6 +692,15 @@ void Driver::drawTexts()
 	}
 
 	{
+		// coordinates
+		Common::Vector3 p = getMousePositionOnField();
+		char buf[256];
+		snprintf(buf, 255, "(%3.2f, %3.2f)", p.x, p.y);
+		drawOverlayText(buf, 1.0f, Common::Color::White,
+				screenWidth - 300.0f, 10.0f, false, true);
+	}
+
+	{
 		// time
 		drawOverlayText(mWorld->getCurrentTimeAsString().c_str(),
 				1.0f, Common::Color::White,

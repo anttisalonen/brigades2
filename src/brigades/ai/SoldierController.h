@@ -176,6 +176,7 @@ class SeekAndDestroyGoal : public AtomicGoal {
 		void updateShootTarget();
 		void move(float time);
 		void updateTargetSoldier();
+		void updateCoverPosition();
 		void tryToShoot();
 
 		Common::SteadyTimer mTargetUpdateTimer;
@@ -187,6 +188,7 @@ class SeekAndDestroyGoal : public AtomicGoal {
 		Common::Countdown mBoredTimer;
 		Common::Countdown mEnoughWanderTimer;
 		Common::Countdown mAssaultTimer;
+		Common::Vector3 mCoverPosition;
 };
 
 class SoldierController : public Brigades::SoldierController {

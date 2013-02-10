@@ -72,8 +72,9 @@ void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
 
 Vector3 SoldierController::defaultMovement(float time)
 {
+	// add maximum tree radius to query
 	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(),
-			mSoldier->getRadius() * 2.0f + mSoldier->getVelocity().length());
+			8.0f + mSoldier->getRadius() * 2.0f + mSoldier->getVelocity().length());
 	std::vector<Obstacle*> obstacles(trees.size());
 	for(unsigned int i = 0; i < trees.size(); i++)
 		obstacles[i] = trees[i].get();
@@ -1209,7 +1210,7 @@ void World::addTrees()
 				y *= mSquareSide;
 				x += j * mSquareSide;
 				y += k * mSquareSide;
-				r = Common::clamp(3.0f, r * maxRadius, maxRadius);
+				r = Common::clamp(2.0f, r * maxRadius, maxRadius);
 
 				bool tooclose = false;
 				for(auto t : mTrees.query(AABB(Vector2(x, y), Vector2(maxRadius * 2.0f, maxRadius * 2.0f)))) {
