@@ -206,6 +206,11 @@ void Driver::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
 	addMessage(s, Color::White, "Attack failed");
 }
 
+void Driver::handleReinforcement(SoldierPtr s)
+{
+	addMessage(s, Color::White, "Reinforcement received");
+}
+
 void Driver::markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes)
 {
 	mDebugSymbols.areas.push_back(DebugSymbolCollection::Area(c, r, onlyframes));
@@ -698,11 +703,11 @@ void Driver::drawTerrain()
 {
 	float pwidth = mWorld->getWidth();
 	float pheight = mWorld->getHeight();
-	SDL_utils::drawSprite(*mGrassTexture, Rectangle((-mCamera.x - pwidth) * mScaleLevel + screenWidth * 0.5f,
+	SDL_utils::drawSpriteWithColor(*mGrassTexture, Rectangle((-mCamera.x - pwidth) * mScaleLevel + screenWidth * 0.5f,
 				(-mCamera.y - pheight) * mScaleLevel + screenHeight * 0.5f,
 				mScaleLevel * pwidth * 2.0f,
 				mScaleLevel * pheight * 2.0f),
-			Rectangle(0, 0, 20, 20), 0.0f);
+			Rectangle(0, 0, 20, 20), 0.0f, mLight);
 }
 
 void Driver::drawTexts()
@@ -961,6 +966,7 @@ void Driver::drawOverlays()
 
 		mDebugSymbols.clear();
 	}
+	setLight(); // reset glColor
 }
 
 void Driver::drawArrow(const Common::Vector3& start, const Common::Vector3& end, const Common::Color& c)
@@ -1350,11 +1356,12 @@ void Driver::drawEntities()
 				mScaleLevel * s.mScale, mScaleLevel * s.mScale);
 
 		if(s.mSpriteType != SpriteType::Bullet) {
-			SDL_utils::drawSprite(*s.mShadowTexture,
+			SDL_utils::drawSpriteWithColor(*s.mShadowTexture,
 					r,
-					Rectangle(1, 1, -1, -1), 0.0f, s.mAlpha);
+					Rectangle(1, 1, -1, -1), 0.0f, mLight, s.mAlpha);
 		} else {
 			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), s.mScale, Color::Black);
+			setLight(); // reset glColor
 		}
 	}
 
@@ -1372,16 +1379,18 @@ void Driver::drawEntities()
 				mScaleLevel * s.mScale, mScaleLevel * s.mScale);
 
 		if(s.mSpriteType != SpriteType::Bullet) {
-			SDL_utils::drawSprite(*s.mTexture, r,
-					Rectangle(1, 1, -1, -1), 0.0f, s.mAlpha);
+			SDL_utils::drawSpriteWithColor(*s.mTexture, r,
+					Rectangle(1, 1, -1, -1), 0.0f, mLight, s.mAlpha);
 		} else {
 			SDL_utils::drawPoint(Vector3(r.x, r.y, 0.0f), s.mScale, Color::White);
+			setLight(); // reset glColor
 		}
 
 #if 0
 		SDL_utils::drawCircle((-mCamera.x + v.x) * mScaleLevel + screenWidth * 0.5f,
 				(-mCamera.y  + v.y) * mScaleLevel + screenHeight * 0.5f,
 				mScaleLevel * s.mScale / treeScale);
+		setLight(); // reset glColor
 #endif
 	}
 }
@@ -1578,6 +1587,18 @@ bool Driver::allCommandeesDefending() const
 			return false;
 	}
 	return true;
+}
+
+void Driver::setLight()
+{
+	float vis = mWorld->getVisibilityFactor();
+	// set color between 0.5 and 1.0
+	vis *= 0.5f;
+	vis += 0.5f;
+	mLight.r = vis * 255;
+	mLight.g = vis * 255;
+	mLight.b = vis * 255;
+	glColor3f(vis, vis, vis);
 }
 
 }

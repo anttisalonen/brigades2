@@ -77,6 +77,7 @@ class Goal {
 		virtual bool handleAttackOrder(const AttackOrder& r);
 		virtual bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
 		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r);
+		virtual void handleReinforcement(SoldierPtr s);
 		const Common::Vector3& getBasePosition() const;
 		const Common::Vector3& getEnemyBasePosition() const;
 
@@ -137,6 +138,7 @@ class PlatoonLeaderGoal : public CompositeGoal {
 		bool process(float time);
 		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
 		bool handleAttackOrder(const AttackOrder& r);
+		virtual void handleReinforcement(SoldierPtr s) override;
 
 	private:
 		std::vector<AttackOrder> splitAttackOrder() const;
@@ -198,6 +200,7 @@ class SoldierController : public Brigades::SoldierController {
 		bool handleAttackOrder(const AttackOrder& r);
 		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r);
 		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r) override;
+		void handleReinforcement(SoldierPtr s) override;
 
 	private:
 		bool checkLeaderStatus();

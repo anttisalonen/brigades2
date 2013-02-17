@@ -238,6 +238,10 @@ void Goal::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
 	return;
 }
 
+void Goal::handleReinforcement(SoldierPtr s)
+{
+}
+
 const Common::Vector3& Goal::getBasePosition() const
 {
 	return mWorld->getHomeBasePosition(mSoldier->getSide()->isFirst());
@@ -372,10 +376,11 @@ bool SquadLeaderGoal::process(float time)
 				InfoChannel::getInstance()->say(mSoldier, "Reporting successful attack");
 				if(!mSoldier->reportSuccessfulAttack()) {
 					/* TODO: return to base? or something... */
-					std::cerr << "Unable to report successful attack!\n";
+					InfoChannel::getInstance()->say(mSoldier, "Unable to report successful attack!");
 				}
 			} else {
 				/* TODO: return to base? or something... */
+				InfoChannel::getInstance()->say(mSoldier, "Can't communicate with the platoon leader.");
 			}
 		}
 	}
@@ -385,12 +390,14 @@ bool SquadLeaderGoal::process(float time)
 bool SquadLeaderGoal::handleAttackOrder(const AttackOrder& r)
 {
 	emptySubGoals();
+	InfoChannel::getInstance()->say(mSoldier, "Let's go and attack the enemy!");
 	return true;
 }
 
 void SquadLeaderGoal::commandDefendPositions()
 {
-	if(mSoldier->getCommandees().empty()) {
+	auto commandees = mSoldier->getCommandees();
+	if(commandees.empty()) {
 		return;
 	}
 
@@ -400,13 +407,13 @@ void SquadLeaderGoal::commandDefendPositions()
 	towardsopp.normalize();
 	towardsopp *= rad;
 
-	int numCommandees = mSoldier->getCommandees().size();
+	int numCommandees = commandees.size();
 	if(numCommandees == 1) {
-		(*(mSoldier->getCommandees().begin()))->setDefendPosition(midp + towardsopp);
+		(*(commandees.begin()))->setDefendPosition(midp + towardsopp);
 	} else if(numCommandees == 2) {
 		towardsopp = Math::rotate2D(towardsopp, QUARTER_PI * 0.5f);
 		float ang = 0.0f;
-		for(auto c : mSoldier->getCommandees()) {
+		for(auto c : commandees) {
 			c->setDefendPosition(midp + Math::rotate2D(towardsopp, ang));
 			ang -= QUARTER_PI;
 		}
@@ -414,11 +421,12 @@ void SquadLeaderGoal::commandDefendPositions()
 		towardsopp = Math::rotate2D(towardsopp, HALF_PI);
 		float ang = 0.0f;
 
-		for(auto c : mSoldier->getCommandees()) {
+		for(auto c : commandees) {
 			c->setDefendPosition(midp + Math::rotate2D(towardsopp, ang));
 			ang -= PI / (numCommandees - 1);
 		}
 	}
+	InfoChannel::getInstance()->say(mSoldier, "Here are your defensive positions");
 }
 
 PlatoonLeaderGoal::PlatoonLeaderGoal(SoldierPtr s)
@@ -504,6 +512,11 @@ void PlatoonLeaderGoal::handleAttackFinish()
 	}
 }
 
+void PlatoonLeaderGoal::handleReinforcement(SoldierPtr s)
+{
+	handleAttackOrder(mSoldier->getAttackOrder());
+}
+
 
 CompanyLeaderGoal::CompanyLeaderGoal(SoldierPtr s)
 	: CompositeGoal(s),
@@ -567,8 +580,8 @@ bool CompanyLeaderGoal::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 
 	mSectorMap.setBit(v, SECTOR_OWN_PRESENCE);
 	mSectorMap.clearBit(v, SECTOR_ENEMY_PRESENCE);
-	for(auto& s : mSectorMap.getAdjacentSectors(v)) {
-		mSectorMap.clearBit(mSectorMap.sectorToCoordinate(s),
+	for(auto& sector : mSectorMap.getAdjacentSectors(v)) {
+		mSectorMap.clearBit(mSectorMap.sectorToCoordinate(sector),
 				SECTOR_ENEMY_PRESENCE);
 	}
 	mSectorMap.clearBit(v, SECTOR_PLANNED_ATTACK);
@@ -694,7 +707,7 @@ Common::Rectangle CompanyLeaderGoal::findNextDefensiveSector() const
 
 SeekAndDestroyGoal::SeekAndDestroyGoal(SoldierPtr s, const Common::Rectangle& r)
 	: AtomicGoal(s),
-	mTargetUpdateTimer(0.75f),
+	mTargetUpdateTimer(2.0f),
 	mCommandTimer(1.0f),
 	mRetreat(false),
 	mArea(r),
@@ -844,7 +857,7 @@ void SeekAndDestroyGoal::move(float time)
 		bool beingLead = false;
 
 		for(auto n : mSoldier->getSensorySystem()->getSoldiers()) {
-			if(n->getSideNum() == mSoldier->getSideNum()) {
+			if(n->isAlive() && n->getSideNum() == mSoldier->getSideNum()) {
 				neighbours.push_back(n.get());
 			}
 		}
@@ -871,8 +884,10 @@ void SeekAndDestroyGoal::move(float time)
 				if(dist2 > 2.0f) {
 					Vector3 arr = steering->arrive(mSoldier->getDefendPosition());
 					steering->accumulate(tot, arr);
-				} else if(mShootTargetPosition.null()) {
+				} else if(mShootTargetPosition.null() &&
+						mSoldier->getWarriorType() == WarriorType::Soldier) {
 					mSoldier->dig(time);
+					InfoChannel::getInstance()->say(mSoldier, "Digging a foxhole");
 					digging = true;
 				}
 			}
@@ -899,8 +914,10 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 		auto ss = mSoldier->getLeader()->getSensorySystem()->getSoldiers();
 		soldiers.insert(ss.begin(), ss.end());
 		for(auto s : mSoldier->getLeader()->getCommandees()) {
-			auto ss = s->getSensorySystem()->getSoldiers();
-			soldiers.insert(ss.begin(), ss.end());
+			if(s->isAlive()) {
+				auto sensored = s->getSensorySystem()->getSoldiers();
+				soldiers.insert(sensored.begin(), sensored.end());
+			}
 		}
 	}
 	float distToNearest = FLT_MAX;
@@ -966,7 +983,7 @@ void SeekAndDestroyGoal::updateCoverPosition()
 	if(mSoldier->getWarriorType() == WarriorType::Soldier) {
 		auto foxholes = mWorld->getFoxholesAt(mSoldier->getPosition(), 200.0f);
 		float mindist = FLT_MAX;
-		FoxholePtr minfox;
+		Foxhole* minfox = nullptr;
 		for(auto& f : foxholes) {
 			if(f->getDepth() > 0.2f) {
 				float thisdist = mSoldier->getPosition().distance2(f->getPosition());
@@ -994,8 +1011,8 @@ void SeekAndDestroyGoal::updateCoverPosition()
 
 	}
 
-	auto trees = mWorld->getTreesAt(mSoldier->getPosition(), 150.0f);
-	TreePtr mintree;
+	auto trees = mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getMaxSpeed() * 2.0f);
+	Tree* mintree = nullptr;
 	float mindist = FLT_MAX;
 	// Just pick the nearest tree that's not very small.
 	for(auto& t : trees) {
@@ -1098,6 +1115,11 @@ bool SoldierController::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
 void SoldierController::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
 {
 	mCurrentGoal->handleAttackFailure(s, r);
+}
+
+void SoldierController::handleReinforcement(SoldierPtr s)
+{
+	mCurrentGoal->handleReinforcement(s);
 }
 
 }

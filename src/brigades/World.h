@@ -4,6 +4,7 @@
 #include <vector>
 #include <map>
 #include <list>
+#include <set>
 
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
@@ -71,6 +72,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		virtual bool handleAttackOrder(const AttackOrder& r) = 0;
 		virtual bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r) = 0;
 		virtual void handleAttackFailure(SoldierPtr s, const AttackOrder& r) = 0;
+		virtual void handleReinforcement(SoldierPtr s) = 0;
 
 		Common::Vector3 defaultMovement(float time);
 		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
@@ -90,6 +92,10 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 
 	private:
 		bool checkLeaderStatus();
+		void updateObstacleCache();
+
+		std::vector<Common::Obstacle*> mObstacleCache;
+		Common::SteadyTimer mObstacleCacheTimer;
 };
 
 typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;
@@ -122,6 +128,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		SoldierControllerPtr getController();
 		void die();
 		bool isDead() const;
+		bool isAlive() const;
 		void dig(float time);
 		void clearWeapons();
 		void addWeapon(WeaponPtr w);
@@ -129,8 +136,10 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void switchWeapon(unsigned int index);
 		const std::vector<WeaponPtr>& getWeapons() const;
 		const WorldPtr getWorld() const;
+		Common::Vector3 getUnitPosition() const;
 		WorldPtr getWorld();
 		boost::shared_ptr<SensorySystem> getSensorySystem();
+		std::set<SoldierPtr> getKnownEnemySoldiers() const;
 		void addEvent(EventPtr e);
 		std::vector<EventPtr>& getEvents();
 		bool handleEvents();
@@ -286,21 +295,22 @@ class World : public boost::enable_shared_from_this<World> {
 		void create();
 
 		// accessors
-		std::vector<TreePtr> getTreesAt(const Common::Vector3& v, float radius) const;
+		std::vector<Tree*> getTreesAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius);
 		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
-		std::vector<FoxholePtr> getFoxholesAt(const Common::Vector3& v, float radius) const;
-		FoxholePtr getFoxholeAt(const Common::Vector3& pos);
+		std::vector<Foxhole*> getFoxholesAt(const Common::Vector3& v, float radius) const;
+		Foxhole* getFoxholeAt(const Common::Vector3& pos);
 		float getWidth() const;
 		float getHeight() const;
 		SidePtr getSide(bool first) const;
 		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p);
-		std::vector<FoxholePtr> getFoxholesInFOV(const SoldierPtr p);
+		std::vector<Foxhole*> getFoxholesInFOV(const SoldierPtr p);
 		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
 		int soldiersAlive(int t) const;
 		const TriggerSystem& getTriggerSystem() const;
 		const Common::Vector3& getHomeBasePosition(bool first) const;
+		float getVisibility() const;
 		float getVisibilityFactor() const;
 		float getShootSoundHearingDistance() const;
 		Armory& getArmory() const;
@@ -316,7 +326,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 	private:
 		void setupSides();
-		SoldierPtr addUnit(UnitSize u, unsigned int side);
+		SoldierPtr addUnit(UnitSize u, unsigned int side, bool reuseLeader = false);
 		SoldierPtr addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator);
 		void addTrees();
 		void addWalls();
@@ -324,9 +334,10 @@ class World : public boost::enable_shared_from_this<World> {
 		void checkForWin();
 		void killSoldier(SoldierPtr s);
 		void updateTriggerSystem(float time);
-		SoldierPtr addCompany(int side);
-		SoldierPtr addPlatoon(int side);
-		SoldierPtr addSquad(int side);
+		void updateVisibility();
+		SoldierPtr addCompany(int side, bool reuseLeader);
+		SoldierPtr addPlatoon(int side, bool reuseLeader);
+		SoldierPtr addSquad(int side, bool reuseLeader);
 		void addDictator(int side);
 		void setHomeBasePositions();
 
@@ -336,10 +347,11 @@ class World : public boost::enable_shared_from_this<World> {
 		SidePtr mSides[NUM_SIDES];
 		Common::CellSpacePartition<SoldierPtr> mSoldierCSP;
 		std::map<int, SoldierPtr> mSoldierMap;
-		Common::QuadTree<TreePtr> mTrees;
-		Common::QuadTree<FoxholePtr> mFoxholes;
+		Common::QuadTree<Tree*> mTrees;
+		Common::QuadTree<Foxhole*> mFoxholes;
 		std::vector<WallPtr> mWalls;
-		float mVisibilityFactor;
+		float mVisibility;
+		float mMaxVisibility;
 		float mSoundDistance;
 		std::list<BulletPtr> mBullets;
 		int mTeamWon;

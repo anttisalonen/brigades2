@@ -15,18 +15,19 @@ class SensorySystem {
 	public:
 		SensorySystem(SoldierPtr s);
 		bool update(float time);
-		const std::vector<SoldierPtr>& getSoldiers() const;
-		const std::vector<FoxholePtr>& getFoxholes() const;
+		std::vector<SoldierPtr> getSoldiers() const;
+		const std::vector<Foxhole*>& getFoxholes() const;
 		void addSound(SoldierPtr s);
+		void clear();
 
 	private:
 		void updateFOV();
 
 		SoldierPtr mSoldier;
 		Common::SteadyTimer mVisionUpdater;
-		std::vector<SoldierPtr> mSoldiers;
+		std::map<SoldierPtr, float> mSoldiers;
 
-		mutable std::vector<FoxholePtr> mFoxholes;
+		mutable std::vector<Foxhole*> mFoxholes;
 		mutable bool mFoxholesUpdated;
 };
 

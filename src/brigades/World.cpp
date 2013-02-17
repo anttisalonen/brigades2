@@ -46,8 +46,11 @@ AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, flo
 	DefenseLineToRight.y = -v.x;
 }
 
+#define SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME 1.0
+
 SoldierController::SoldierController()
-	: mLeaderStatusTimer(1.0f)
+	: mLeaderStatusTimer(1.0f),
+	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME)
 {
 }
 
@@ -55,7 +58,8 @@ SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	: mWorld(s->getWorld()),
 	mSoldier(s),
 	mSteering(boost::shared_ptr<Steering>(new Steering(*s))),
-	mLeaderStatusTimer(1.0f)
+	mLeaderStatusTimer(1.0f),
+	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME)
 {
 }
 
@@ -70,21 +74,28 @@ void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
 	mSoldier->setController(shared_from_this());
 }
 
+void SoldierController::updateObstacleCache()
+{
+	mObstacleCache.clear();
+	// get trees from 1.5 * max distance we can travel between cache updates
+	std::vector<Tree*> trees = mWorld->getTreesAt(mSoldier->getPosition(),
+			mSoldier->getMaxSpeed() * SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME * 1.5f);
+	for(unsigned int i = 0; i < trees.size(); i++)
+		mObstacleCache.push_back(trees[i]);
+}
+
 Vector3 SoldierController::defaultMovement(float time)
 {
-	// add maximum tree radius to query
-	std::vector<boost::shared_ptr<Tree>> trees = mWorld->getTreesAt(mSoldier->getPosition(),
-			8.0f + mSoldier->getRadius() * 2.0f + mSoldier->getVelocity().length());
-	std::vector<Obstacle*> obstacles(trees.size());
-	for(unsigned int i = 0; i < trees.size(); i++)
-		obstacles[i] = trees[i].get();
+	if(mObstacleCacheTimer.check(time)) {
+		updateObstacleCache();
+	}
 
 	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
 	std::vector<Wall*> walls(wallptrs.size());
 	for(unsigned int i = 0; i < wallptrs.size(); i++)
 		walls[i] = wallptrs[i].get();
 
-	Vector3 obs = mSteering->obstacleAvoidance(obstacles) * 100.0f;
+	Vector3 obs = mSteering->obstacleAvoidance(mObstacleCache) * 100.0f;
 	Vector3 wal = mSteering->wallAvoidance(walls) * 100.0f;
 
 	Vector3 tot;
@@ -272,8 +283,8 @@ void Soldier::update(float time)
 		for(auto s : mSensorySystem->getSoldiers()) {
 			if(!s->isDead() && s->getSideNum() != getSideNum() &&
 					mPosition.distance2(s->getPosition()) <
-					mWorld->getVisibilityFactor() *
-					mWorld->getVisibilityFactor()) {
+					mWorld->getVisibility() *
+					mWorld->getVisibility()) {
 				mEnemyContact = true;
 				break;
 			}
@@ -314,11 +325,17 @@ SoldierControllerPtr Soldier::getController()
 void Soldier::die()
 {
 	mAlive = false;
+	mSensorySystem->clear();
 }
 
 bool Soldier::isDead() const
 {
 	return !mAlive;
+}
+
+bool Soldier::isAlive() const
+{
+	return mAlive;
 }
 
 void Soldier::dig(float time)
@@ -364,9 +381,35 @@ WorldPtr Soldier::getWorld()
 	return mWorld;
 }
 
+Common::Vector3 Soldier::getUnitPosition() const
+{
+	if(mCommandees.size() == 0) {
+		return getPosition();
+	} else {
+		Vector3 midp;
+		for(auto& c : mCommandees) {
+			midp += c->getUnitPosition();
+		}
+		midp /= mCommandees.size();
+		return midp;
+	}
+}
+
 SensorySystemPtr Soldier::getSensorySystem()
 {
 	return mSensorySystem;
+}
+
+std::set<SoldierPtr> Soldier::getKnownEnemySoldiers() const
+{
+	std::set<SoldierPtr> ret;
+	std::vector<SoldierPtr> mySeen = mSensorySystem->getSoldiers();
+	ret.insert(mySeen.begin(), mySeen.end());
+	for(auto& c : mCommandees) {
+		auto res = c->getKnownEnemySoldiers();
+		ret.insert(res.begin(), res.end());
+	}
+	return ret;
 }
 
 void Soldier::addEvent(EventPtr e)
@@ -751,7 +794,7 @@ World::World(float width, float height, float visibility,
 	mSoldierCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxSoldiers),
 	mTrees(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
 	mFoxholes(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
-	mVisibilityFactor(visibility),
+	mMaxVisibility(visibility),
 	mSoundDistance(sounddistance),
 	mTeamWon(-1),
 	mSoldiersAtStart(0),
@@ -763,6 +806,8 @@ World::World(float width, float height, float visibility,
 	mReinforcementTimer{3600.0f / TimeCoefficient, 3600.0f / TimeCoefficient}
 {
 	memset(mSoldiersAlive, 0, sizeof(mSoldiersAlive));
+
+	updateVisibility();
 
 	for(int i = 0; i < NUM_SIDES; i++) {
 		mSides[i] = SidePtr(new Side(i == 0));
@@ -781,7 +826,7 @@ void World::create()
 }
 
 // accessors
-std::vector<TreePtr> World::getTreesAt(const Vector3& v, float radius) const
+std::vector<Tree*> World::getTreesAt(const Vector3& v, float radius) const
 {
 	return mTrees.query(AABB(Vector2(v.x, v.y), Vector2(radius, radius)));
 }
@@ -804,7 +849,7 @@ std::list<BulletPtr> World::getBulletsAt(const Common::Vector3& v, float radius)
 	return mBullets;
 }
 
-std::vector<FoxholePtr> World::getFoxholesAt(const Common::Vector3& v, float radius) const
+std::vector<Foxhole*> World::getFoxholesAt(const Common::Vector3& v, float radius) const
 {
 	return mFoxholes.query(AABB(Vector2(v.x, v.y), Vector2(radius, radius)));
 }
@@ -830,11 +875,11 @@ std::vector<WallPtr> World::getWallsAt(const Common::Vector3& v, float radius) c
 	return mWalls;
 }
 
-std::vector<FoxholePtr> World::getFoxholesInFOV(const SoldierPtr p)
+std::vector<Foxhole*> World::getFoxholesInFOV(const SoldierPtr p)
 {
-	std::vector<FoxholePtr> nearbytgts = getFoxholesAt(p->getPosition(), mVisibilityFactor);
-	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibilityFactor);
-	std::vector<FoxholePtr> ret;
+	std::vector<Foxhole*> nearbytgts = getFoxholesAt(p->getPosition(), mVisibility);
+	std::vector<Tree*> nearbytrees = getTreesAt(p->getPosition(), mVisibility);
+	std::vector<Foxhole*> ret;
 
 	for(auto s : nearbytgts) {
 		float distToMe = s->getPosition().distance(p->getPosition());
@@ -844,7 +889,7 @@ std::vector<FoxholePtr> World::getFoxholesInFOV(const SoldierPtr p)
 			continue;
 		}
 
-		if(distToMe > mVisibilityFactor * 4.0f) {
+		if(distToMe > mVisibility * 4.0f) {
 			continue;
 		}
 
@@ -868,8 +913,9 @@ std::vector<FoxholePtr> World::getFoxholesInFOV(const SoldierPtr p)
 
 std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 {
-	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibilityFactor);
-	std::vector<TreePtr> nearbytrees = getTreesAt(p->getPosition(), mVisibilityFactor);
+	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibility);
+	std::vector<Tree*> nearbytrees;
+	bool haveTrees = false;
 	std::vector<SoldierPtr> ret;
 
 	for(auto s : nearbysoldiers) {
@@ -886,13 +932,13 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 			continue;
 		}
 
-		if(distToMe < mVisibilityFactor * 2.0f * s->getRadius() && s->getSideNum() == p->getSideNum()) {
+		if(distToMe < mVisibility * 2.0f * s->getRadius() && s->getSideNum() == p->getSideNum()) {
 			// "see" any nearby friendly soldiers
 			ret.push_back(s);
 			continue;
 		}
 
-		if(distToMe > mVisibilityFactor * 2.0f * s->getRadius()) {
+		if(distToMe > mVisibility * 2.0f * s->getRadius()) {
 			continue;
 		}
 
@@ -902,6 +948,11 @@ std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 		}
 
 		bool treeblocks = false;
+		if(!haveTrees) {
+			nearbytrees = getTreesAt(p->getPosition(), mVisibility);
+			haveTrees = true;
+		}
+
 		for(auto t : nearbytrees) {
 			if(Math::segmentCircleIntersect(p->getPosition(), s->getPosition(),
 						t->getPosition(), t->getRadius())) {
@@ -942,9 +993,14 @@ const Vector3& World::getHomeBasePosition(bool first) const
 	return mHomeBasePositions[first ? 0 : 1];
 }
 
+float World::getVisibility() const
+{
+	return mVisibility;
+}
+
 float World::getVisibilityFactor() const
 {
-	return mVisibilityFactor;
+	return mVisibility / mMaxVisibility;
 }
 
 float World::getShootSoundHearingDistance() const
@@ -1060,9 +1116,14 @@ void World::update(float time)
 			c.doCountdown(time);
 			if(c.check()) {
 				if(mSoldiersAlive[i] * 2 < mSoldiersAtStart) {
-					// TODO: need to do something about all those idle lieutenants.
-					auto s = addUnit(UnitSize(int(mUnitSize) - 1), i);
-					mRootLeader[i]->addCommandee(s);
+					auto s = addUnit(UnitSize(int(mUnitSize) - 1), i, true);
+					auto rootCommandees = mRootLeader[i]->getCommandees();
+
+					if(std::find(rootCommandees.begin(), rootCommandees.end(), s) == rootCommandees.end()) {
+						// new commandee for the root leader
+						mRootLeader[i]->addCommandee(s);
+						mRootLeader[i]->getController()->handleReinforcement(s);
+					}
 					float oldTime = mReinforcementTimer[i].getMaxTime();
 					float newTime = oldTime + 3600.0f / TimeCoefficient;
 					mReinforcementTimer[i] = Common::Countdown(newTime);
@@ -1080,6 +1141,15 @@ void World::update(float time)
 	}
 
 	mTime.addMilliseconds(time * TimeCoefficient * 1000);
+	updateVisibility();
+}
+
+void World::updateVisibility()
+{
+	// visibility calculation based on time of day
+	float t = - 2.0f * cos(PI / 12 * (mTime.Hour + mTime.Minute / 60.0f));
+	t = Common::clamp(0.0f, t, 1.0f);
+	mVisibility = t * mMaxVisibility;
 }
 
 const Timestamp& World::getCurrentTime() const
@@ -1108,9 +1178,10 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 
 void World::dig(float time, const Common::Vector3& pos)
 {
-	FoxholePtr foxhole = getFoxholeAt(pos);
+	Foxhole* foxhole = getFoxholeAt(pos);
 	if(!foxhole) {
-		foxhole = FoxholePtr(new Foxhole(shared_from_this(), pos));
+		// we're leaking the foxholes for now.
+		foxhole = new Foxhole(shared_from_this(), pos);
 		bool ret = mFoxholes.insert(foxhole, Vector2(pos.x, pos.y));
 		if(!ret) {
 			std::cerr << "Error: couldn't add foxhole at " << pos << "\n";
@@ -1122,9 +1193,9 @@ void World::dig(float time, const Common::Vector3& pos)
 	foxhole->deepen(time * TimeCoefficient / 14400.0f);
 }
 
-FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
+Foxhole* World::getFoxholeAt(const Common::Vector3& pos)
 {
-	FoxholePtr p;
+	Foxhole* p = nullptr;
 	float mindist2 = FLT_MAX;
 	for(auto f : mFoxholes.query(AABB(Vector2(pos.x, pos.y), Vector2(1.5f, 1.5f)))) {
 		float d2 = f->getPosition().distance2(pos);
@@ -1136,17 +1207,18 @@ FoxholePtr World::getFoxholeAt(const Common::Vector3& pos)
 	return p;
 }
 
-SoldierPtr World::addUnit(UnitSize u, unsigned int side)
+// reuseLeader is a hint to try to avoid creating a new leader if possible.
+SoldierPtr World::addUnit(UnitSize u, unsigned int side, bool reuseLeader)
 {
 	switch(u) {
 		case UnitSize::Squad:
-			return addSquad(side);
+			return addSquad(side, reuseLeader);
 
 		case UnitSize::Platoon:
-			return addPlatoon(side);
+			return addPlatoon(side, reuseLeader);
 
 		case UnitSize::Company:
-			return addCompany(side);
+			return addCompany(side, reuseLeader);
 	}
 }
 
@@ -1225,7 +1297,8 @@ void World::addTrees()
 					continue;
 				}
 
-				TreePtr tree(new Tree(Vector3(x, y, 0), r));
+				// we're leaking the trees for now.
+				Tree* tree = new Tree(Vector3(x, y, 0), r);
 				bool ret = mTrees.insert(tree, Vector2(x, y));
 				if(!ret) {
 					std::cout << "Error: couldn't add tree at " << x << ", " << y << "\n";
@@ -1345,11 +1418,14 @@ void World::updateTriggerSystem(float time)
 	mTriggerSystem.update(soldiers, time);
 }
 
-SoldierPtr World::addCompany(int side)
+SoldierPtr World::addCompany(int side, bool reuseLeader)
 {
-	SoldierPtr companyleader = addSoldier(side == 0, SoldierRank::Captain, WarriorType::Soldier, false);
+	SoldierPtr companyleader;
+
+	companyleader = addSoldier(side == 0, SoldierRank::Captain, WarriorType::Soldier, false);
+
 	for(int k = 0; k < 3; k++) {
-		auto s = addPlatoon(side);
+		auto s = addPlatoon(side, reuseLeader);
 		assert(s);
 		companyleader->addCommandee(s);
 	}
@@ -1357,19 +1433,43 @@ SoldierPtr World::addCompany(int side)
 	return companyleader;
 }
 
-SoldierPtr World::addPlatoon(int side)
+SoldierPtr World::addPlatoon(int side, bool reuseLeader)
 {
-	SoldierPtr platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, WarriorType::Soldier, false);
+	SoldierPtr platoonleader;
+	bool reusing = false;
+
+	if(reuseLeader) {
+		auto root = mRootLeader[side];
+		if(root && root->getRank() == SoldierRank::Captain) {
+			int least = INT_MAX;
+			for(auto& n : root->getCommandees()) {
+				if(n->getCommandees().size() < least) {
+					platoonleader = n;
+					least = n->getCommandees().size();
+					reusing = true;
+				}
+			}
+		}
+	}
+
+	if(!platoonleader) {
+		platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, WarriorType::Soldier, false);
+	}
+
 	for(int k = 0; k < 3; k++) {
-		auto s = addSquad(side);
+		auto s = addSquad(side, reuseLeader);
 		assert(s);
 		platoonleader->addCommandee(s);
+		if(reusing) {
+			// new commandee for an own leader - notify controller
+			platoonleader->getController()->handleReinforcement(s);
+		}
 	}
 
 	return platoonleader;
 }
 
-SoldierPtr World::addSquad(int side)
+SoldierPtr World::addSquad(int side, bool reuseLeader)
 {
 	SoldierPtr squadleader;
 	for(int j = 0; j < 8; j++) {

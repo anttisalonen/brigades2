@@ -152,6 +152,7 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		bool handleAttackOrder(const AttackOrder& r) override;
 		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r) override;
 		void handleAttackFailure(SoldierPtr s, const AttackOrder& r) override;
+		void handleReinforcement(SoldierPtr s) override;
 		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
 		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
 		void addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text);
@@ -196,6 +197,7 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
 		void includeUnitIcon(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
 		bool allCommandeesDefending() const;
+		void setLight();
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
