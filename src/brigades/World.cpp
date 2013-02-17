@@ -867,6 +867,7 @@ void World::reapDeadSoldiers()
 	auto it = mSoldierMap.begin();
 	while(it != mSoldierMap.end()) {
 		if(it->second->isDead()) {
+			mSoldierCSP.remove(it->second, Vector2(it->second->getPosition().x, it->second->getPosition().y));
 			it = mSoldierMap.erase(it);
 		} else {
 			++it;
