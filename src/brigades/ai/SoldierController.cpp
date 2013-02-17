@@ -713,7 +713,7 @@ SeekAndDestroyGoal::SeekAndDestroyGoal(SoldierPtr s, const Common::Rectangle& r)
 	mArea(r),
 	mBoredTimer(Random::uniform() * 30.0f + 10.0f),
 	mEnoughWanderTimer(Random::uniform() * 10.0f + 5.0f),
-	mAssaultTimer(Random::uniform() * 5.0f + 5.0f)
+	mAssaultTimer(Random::uniform() * 2.0f + 2.0f)
 {
 }
 
@@ -783,37 +783,45 @@ void SeekAndDestroyGoal::move(float time)
 	if(mTargetSoldier) {
 		if(!mRetreat) {
 			// decide whether to shoot or advance here
-			if(!mCoverPosition.null()) {
+			if(!mCoverPosition.null() && (mAssaultPosition.null() || mAssaultTimer.running())) {
 				// NOTE: this distance must be kept small due to foxholes
 				// being potential cover positions.
 				// TODO: query this constant from world.
 				if(mSoldier->getPosition().distance(mCoverPosition) > 1.5f) {
-					InfoChannel::getInstance()->say(mSoldier, "Going for cover");
-					vel = steering->arrive(mCoverPosition);
-					DebugOutput::getInstance()->addArrow(mSoldier->getSideNum() == 0 ?
-							Common::Color::Red : Common::Color::Blue,
+					DebugOutput::getInstance()->addArrow(mSoldier->getSideNum() == 0
+							? Common::Color::Red : Common::Color::Blue,
 							mSoldier->getPosition(), mCoverPosition);
-				} else {
-					if(mWorld->getFoxholeAt(mSoldier->getPosition())) {
-						InfoChannel::getInstance()->say(mSoldier, "Dug in");
-					} else {
-						InfoChannel::getInstance()->say(mSoldier, "In cover");
-					}
-				}
-			} else {
-				auto foxhole = mWorld->getFoxholeAt(mSoldier->getPosition());
-				bool dugIn = mSoldier->getWarriorType() == WarriorType::Soldier &&
-					foxhole && foxhole->getDepth() > 0.4f;
-				float dist = mShootTargetPosition.length();
-				float distCoeff = dugIn ? 0.8f : 0.5f;
-				if((!dugIn && !mAssaultTimer.running()) || !mSoldier->getCurrentWeapon()->speedVariates() ||
-						dist * distCoeff > mSoldier->getCurrentWeapon()->getRange()) {
-					InfoChannel::getInstance()->say(mSoldier, "Assaulting enemy");
-					vel = steering->pursuit(*mTargetSoldier);
-				} else {
+					vel = steering->arrive(mCoverPosition);
+					InfoChannel::getInstance()->say(mSoldier, "Running for cover");
+				} else if(!mAssaultPosition.null()) {
 					mAssaultTimer.doCountdown(time);
 					mAssaultTimer.check();
-					InfoChannel::getInstance()->say(mSoldier, "Attacking from clear");
+					InfoChannel::getInstance()->say(mSoldier, "Preparing assault");
+				} else {
+					InfoChannel::getInstance()->say(mSoldier, "In cover");
+				}
+			} else {
+				// mAssaultPosition will be null either when no assault position found
+				// or when ordered to defend.
+				if(!mAssaultPosition.null()) {
+					if(mSoldier->getPosition().distance(mAssaultPosition) > 1.5f) {
+						InfoChannel::getInstance()->say(mSoldier, "Assaulting enemy");
+						DebugOutput::getInstance()->addArrow(mSoldier->getSideNum() == 0
+								? Common::Color::Red : Common::Color::Blue,
+								mSoldier->getPosition(), mAssaultPosition);
+						vel = steering->arrive(mAssaultPosition);
+					} else {
+						InfoChannel::getInstance()->say(mSoldier, "In assault position");
+						mAssaultTimer.rewind();
+					}
+				} else {
+					Vector3 formationPoint = getFormationPoint();
+					if(!formationPoint.null()) {
+						InfoChannel::getInstance()->say(mSoldier, "Attacking with the leader");
+						vel = steering->arrive(formationPoint);
+					} else {
+						InfoChannel::getInstance()->say(mSoldier, "Panicking");
+					}
 				}
 			}
 		} else {
@@ -845,6 +853,7 @@ void SeekAndDestroyGoal::move(float time)
 				vel = steering->arrive(p);
 			}
 		}
+		InfoChannel::getInstance()->say(mSoldier, "In formation");
 	}
 	vel.truncate(10.0f);
 
@@ -910,7 +919,7 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 	auto soldiervec = mSoldier->getSensorySystem()->getSoldiers();
 	std::set<SoldierPtr> soldiers;
 	soldiers.insert(soldiervec.begin(), soldiervec.end());
-	if(mSoldier->getLeader()) {
+	if(mSoldier->getRank() == SoldierRank::Private && mSoldier->getLeader()) {
 		auto ss = mSoldier->getLeader()->getSensorySystem()->getSoldiers();
 		soldiers.insert(ss.begin(), ss.end());
 		for(auto s : mSoldier->getLeader()->getCommandees()) {
@@ -920,6 +929,7 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 			}
 		}
 	}
+
 	float distToNearest = FLT_MAX;
 	SoldierPtr nearest;
 	unsigned int weapontouse = INT_MAX;
@@ -961,7 +971,6 @@ void SeekAndDestroyGoal::updateTargetSoldier()
 			mSoldier->switchWeapon(weapontouse);
 		}
 		if(mTargetSoldier != nearest) {
-			mAssaultTimer.rewind();
 			mTargetSoldier = nearest;
 		}
 	}
@@ -975,19 +984,30 @@ void SeekAndDestroyGoal::updateCoverPosition()
 {
 	// calculate a cover position only when a threat is there
 	if(!mTargetSoldier) {
+		mCoverPosition = Vector3();
+		mAssaultPosition = Vector3();
 		return;
 	}
+
+	Foxhole* minfox = nullptr;
+	Foxhole* assaultfox = nullptr;
+
+	static const float maxDistToFormationPoint2 = 100.0f * 100.0f;
+	Vector3 formationPoint = getFormationPoint();
 
 	// Prefer foxhole to being behind a tree, with the rationale that
 	// the foxhole was probably dug in a good defense position.
 	if(mSoldier->getWarriorType() == WarriorType::Soldier) {
-		auto foxholes = mWorld->getFoxholesAt(mSoldier->getPosition(), 200.0f);
+		auto foxholes = mWorld->getFoxholesAt(mSoldier->getPosition(), mSoldier->getMaxSpeed() * 10.0f);
 		float mindist = FLT_MAX;
-		Foxhole* minfox = nullptr;
+		float minAssaultdist = FLT_MAX;
 		for(auto& f : foxholes) {
 			if(f->getDepth() > 0.2f) {
 				float thisdist = mSoldier->getPosition().distance2(f->getPosition());
-				if(thisdist < mindist) {
+				float disttoenemy = mTargetSoldier->getPosition().distance(f->getPosition());
+				float distToFP2 = formationPoint.null() ? 0.0f : formationPoint.distance2(f->getPosition());
+				if(distToFP2 < maxDistToFormationPoint2 &&
+						((!mSoldier->getDefendPosition().null() && disttoenemy < minAssaultdist) || thisdist < mindist)) {
 					auto soldiers = mWorld->getSoldiersAt(f->getPosition(), 10.0f);
 					bool occupied = false;
 					for(auto& s : soldiers) {
@@ -997,8 +1017,14 @@ void SeekAndDestroyGoal::updateCoverPosition()
 						}
 					}
 					if(!occupied) {
-						minfox = f;
-						mindist = thisdist;
+						if(thisdist < mindist) {
+							minfox = f;
+							mindist = thisdist;
+						}
+						if(!mSoldier->getDefendPosition().null() && disttoenemy < minAssaultdist) {
+							assaultfox = f;
+							minAssaultdist = disttoenemy;
+						}
 					}
 				}
 			}
@@ -1006,20 +1032,34 @@ void SeekAndDestroyGoal::updateCoverPosition()
 
 		if(minfox) {
 			mCoverPosition = minfox->getPosition();
+		}
+		if(assaultfox) {
+			mAssaultPosition = assaultfox->getPosition();
+		}
+		if(minfox && (assaultfox || !mSoldier->getDefendPosition().null())) {
+			if(!mSoldier->getDefendPosition().null())
+				mAssaultPosition = Vector3();
 			return;
 		}
-
 	}
 
-	auto trees = mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getMaxSpeed() * 2.0f);
+	// search for trees in a wide radius for assault
+	auto trees = formationPoint.null()
+		? mWorld->getTreesAt(mSoldier->getPosition(), mSoldier->getMaxSpeed() * 20.0f)
+		: mWorld->getTreesAt(formationPoint, mSoldier->getMaxSpeed() * 20.0f);
 	Tree* mintree = nullptr;
-	float mindist = FLT_MAX;
+	Tree* assaulttree = nullptr;
+	float mindist = minfox ? -1.0f : FLT_MAX;
+	float minAssaultdist = assaultfox ? -1.0f : FLT_MAX;
 	// Just pick the nearest tree that's not very small.
 	for(auto& t : trees) {
-		if(t->getRadius() > 3.5f) {
+		if(t->getRadius() >= 2.0f) {
 			float thisdist = mSoldier->getPosition().distance2(t->getPosition());
-			if(thisdist < mindist) {
-				auto soldiers = mWorld->getSoldiersAt(t->getPosition(), 10.0f);
+			float disttoenemy = mTargetSoldier->getPosition().distance(t->getPosition());
+			float distToFP2 = formationPoint.null() ? 0.0f : formationPoint.distance2(t->getPosition());
+			if(distToFP2 < maxDistToFormationPoint2 &&
+					((!mSoldier->getDefendPosition().null() && disttoenemy < minAssaultdist) || thisdist < mindist)) {
+				auto soldiers = mWorld->getSoldiersAt(t->getPosition(), 5.0f);
 				bool occupied = false;
 				for(auto& s : soldiers) {
 					if(s != mSoldier && s->getPosition().distance2(t->getPosition()) < 100.0f) {
@@ -1028,29 +1068,72 @@ void SeekAndDestroyGoal::updateCoverPosition()
 					}
 				}
 				if(!occupied) {
-					mintree = t;
-					mindist = thisdist;
+					if(thisdist < mindist) {
+						mintree = t;
+						mindist = thisdist;
+					}
+					if(mSoldier->getDefendPosition().null() && disttoenemy < minAssaultdist) {
+						assaulttree = t;
+						minAssaultdist = disttoenemy;
+					}
 				}
 			}
 		}
 	}
 
-	if(!mintree) {
-		// don't have a cover position if no foxhole and no obstacle nearby.
+	if(mintree && !minfox) {
+		Vector3 possibleCover = getCoverPositionAt(mintree, mTargetSoldier->getPosition());
+		if(possibleCover.distance(mCoverPosition) > 3.0f) {
+			// update cover position only when there's a significant update
+			// in order to prevent running back and forth all the time
+			mCoverPosition = possibleCover;
+		}
+	} else if(!minfox) {
 		mCoverPosition = Vector3();
-		return;
 	}
 
-	Vector3 fromEnemyToCover = mintree->getPosition() - mTargetSoldier->getPosition();
+	if(assaulttree && !assaultfox) {
+		Vector3 possibleCover = getCoverPositionAt(assaulttree, mTargetSoldier->getPosition());
+		if(possibleCover.distance(mAssaultPosition) > 3.0f) {
+			mAssaultPosition = possibleCover;
+		}
+	} else if(!assaultfox) {
+		mAssaultPosition = Vector3();
+	}
+}
+
+Common::Vector3 SeekAndDestroyGoal::getCoverPositionAt(const Tree* t,
+		const Common::Vector3& tgtpos)
+{
+	Vector3 fromEnemyToCover = t->getPosition() - mTargetSoldier->getPosition();
 	fromEnemyToCover.normalize();
-	fromEnemyToCover *= mintree->getRadius() + 5.0f;
+	fromEnemyToCover *= t->getRadius() + 5.0f;
+	Vector3 possibleCover = t->getPosition() + fromEnemyToCover;
+	return possibleCover;
+}
 
-	Vector3 possibleCover = mintree->getPosition() + fromEnemyToCover;
-	if(possibleCover.distance(mCoverPosition) > 3.0f) {
-		// update cover position only when there's a significant update
-		// in order to prevent running back and forth all the time
-		mCoverPosition = possibleCover;
+Common::Vector3 SeekAndDestroyGoal::getFormationPoint() const
+{
+	if(mSoldier->getRank() != SoldierRank::Private)
+		return Vector3();
+
+	auto leader = mSoldier->getLeader();
+	bool leaderVisible = leader && mSoldier->canCommunicateWith(leader);
+	bool beingLead = mSoldier->getRank() < SoldierRank::Sergeant &&
+		leaderVisible && (!mSoldier->getFormationOffset().null() ||
+				!mSoldier->getDefendPosition().null());
+	bool defending = beingLead && !mSoldier->getDefendPosition().null();
+	Vector3 formationPoint;
+	if(defending)
+		formationPoint = mSoldier->getDefendPosition();
+	else if(beingLead) {
+		const auto& offset = mSoldier->getFormationOffset();
+		if(!offset.null()) {
+			Vector3 rotatedOffset = Math::rotate2D(offset, leader->getXYRotation());
+			formationPoint = rotatedOffset + leader->getPosition();
+		}
 	}
+	return formationPoint;
 }
 
 void SeekAndDestroyGoal::tryToShoot()

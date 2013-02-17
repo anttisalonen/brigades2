@@ -180,6 +180,9 @@ class SeekAndDestroyGoal : public AtomicGoal {
 		void updateTargetSoldier();
 		void updateCoverPosition();
 		void tryToShoot();
+		Common::Vector3 getCoverPositionAt(const Tree* t,
+				const Common::Vector3& tgtpos);
+		Common::Vector3 getFormationPoint() const;
 
 		Common::SteadyTimer mTargetUpdateTimer;
 		SoldierPtr mTargetSoldier;
@@ -191,6 +194,7 @@ class SeekAndDestroyGoal : public AtomicGoal {
 		Common::Countdown mEnoughWanderTimer;
 		Common::Countdown mAssaultTimer;
 		Common::Vector3 mCoverPosition;
+		Common::Vector3 mAssaultPosition;
 };
 
 class SoldierController : public Brigades::SoldierController {
