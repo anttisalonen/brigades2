@@ -31,12 +31,13 @@ Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel,
 	assert(mWeapon);
 
 	// build cache of trees that may be in the flight line for collision detection
-	mObstacleCache = shooter->getWorld()->getTreesAt(mPosition, 5.0f + mVelocity.length() * timeleft * 1.2f);
+	mObstacleCache = shooter->getWorld()->getTreesAt(mPosition + mVelocity * timeleft * 0.5f,
+			5.0f + mVelocity.length() * timeleft * 0.6f);
 	Vector3 endpos = mPosition + mVelocity * timeleft * 1.2f;
 
 	for(auto it = mObstacleCache.begin(); it != mObstacleCache.end(); ) {
 		if(!Math::segmentCircleIntersect(mPosition, endpos,
-					(*it)->getPosition(), (*it)->getRadius() * 3.0f)) {
+					(*it)->getPosition(), (*it)->getRadius() * 2.0f)) {
 			it = mObstacleCache.erase(it);
 		} else {
 			++it;
