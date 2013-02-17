@@ -153,7 +153,11 @@ bool SoldierController::checkLeaderStatus()
 				} else {
 					mSoldier->setLeader(newleader);
 				}
-				mSoldier->setDefending();
+				if(deceased->defending()) {
+					mSoldier->setDefending();
+				} else {
+					mSoldier->giveAttackOrder(deceased->getAttackOrder());
+				}
 				return true;
 			}
 			break;
