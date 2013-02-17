@@ -48,21 +48,21 @@ class SimulationArmory : public Armory {
 SimulationArmory::SimulationArmory()
 {
 	mAssaultRifle = boost::shared_ptr<WeaponType>(new WeaponType("Assault Rifle",
-				250.0f, 200.0f, 0.1f,
-				Math::degreesToRadians(5.0f), true));
+				170.0f, 200.0f, 0.1f,
+				Math::degreesToRadians(1.0f), true));
 	mMachineGun = boost::shared_ptr<WeaponType>(new WeaponType("Machine Gun",
-				350.0f, 200.0f, 0.04f,
-				Math::degreesToRadians(5.0f), true));
+				180.0f, 200.0f, 0.04f,
+				Math::degreesToRadians(2.0f), true));
 	mBazooka = boost::shared_ptr<WeaponType>(new WeaponType("Bazooka",
-				300.0f, 160.0f, 4.0f,
-				Math::degreesToRadians(5.0f), true,
+				150.0f, 160.0f, 4.0f,
+				Math::degreesToRadians(0.5f), true,
 				1.0f, 1.0f, 1.0f));
 	mPistol = boost::shared_ptr<WeaponType>(new WeaponType("Pistol",
-				150.0f, 180.0f, 0.5f,
-				Math::degreesToRadians(5.0f), true));
+				100.0f, 180.0f, 0.5f,
+				Math::degreesToRadians(2.0f), true));
 	mAutoCannon = boost::shared_ptr<WeaponType>(new WeaponType("Automatic Cannon",
-				400.0f, 200.0f, 0.25f,
-				Math::degreesToRadians(5.0f), false, 1.0f, 1.0f, 0.0f));
+				200.0f, 200.0f, 0.25f,
+				Math::degreesToRadians(1.0f), false, 1.0f, 1.0f, 0.0f));
 }
 
 ArcadeArmory::ArcadeArmory()
@@ -138,8 +138,8 @@ int main(int argc, char** argv)
 		}
 	} else {
 		a = new SimulationArmory();
-		visibility = 300.0f;
-		sounddistance = 500.0f;
+		visibility = 200.0f;
+		sounddistance = 300.0f;
 		if(skirmish) {
 			width = 512.0f;
 			height = 512.0f;
