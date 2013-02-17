@@ -41,7 +41,6 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mScaleLevel(7.5f),
 	mScaleLevelVelocity(0.0f),
 	mFreeCamera(false),
-	mSoldierVisible(false),
 	mObserver(observer),
 	mShooting(false),
 	mRestarting(false),
@@ -130,7 +129,7 @@ void Driver::act(float time)
 	}
 
 	if(mDigging) {
-		if(!mDriving && !mPlayerControlVelocity.null()) {
+		if(!mDriving && (!mPlayerControlVelocity.null() || mShooting)) {
 			mDigging = false;
 		} else {
 			mSoldier->dig(time);
@@ -658,11 +657,8 @@ void Driver::handleInputState(float frameTime)
 		static const float scalechangevelocity = 0.9f;
 		static const float scalecoefficient = 1.5f;
 		float n;
-		if(mSoldier->getCurrentWeapon())
-			n = std::min(mSoldier->getCurrentWeapon()->getRange(), 0.5f * float(std::min(screenWidth, screenHeight)));
-		else
-			n = 50.0f;
-		float d = clamp(std::min(n, 30.0f), mCameraMouseOffset.length() * mScaleLevel, n);
+		n = 0.5f * std::max(mWorld->getVisibility(), mWorld->getShootSoundHearingDistance());
+		float d = clamp(std::min(n, 10.0f), mCameraMouseOffset.length() * mScaleLevel, n);
 		float newScaleLevel = std::max(scalecoefficient * n / d, 300.0f * (1.0f / n));
 		mScaleLevel = mScaleLevel * scalechangevelocity + newScaleLevel * (1.0f - scalechangevelocity);
 	}
@@ -719,7 +715,8 @@ void Driver::drawTexts()
 		// coordinates
 		Common::Vector3 p = getMousePositionOnField();
 		char buf[256];
-		snprintf(buf, 255, "(%3.2f, %3.2f)", p.x, p.y);
+		float dist = mSoldier->getPosition().distance(p);
+		snprintf(buf, 255, "(%3.2f, %3.2f) %3.1fm", p.x, p.y, dist);
 		drawOverlayText(buf, 1.0f, Common::Color::White,
 				screenWidth - 300.0f, 10.0f, false, true);
 	}
@@ -758,7 +755,15 @@ void Driver::drawTexts()
 		snprintf(buf, 127, "%s %s", Soldier::rankToString(mSoldier->getRank()), mSoldier->getName().c_str());
 		buf[127] = 0;
 		drawOverlayText(buf, 1.0f, getGroupRectangleColor(mSoldier, 1.0f),
-				40.0f, screenHeight - 145.0f, false, true);
+				40.0f, screenHeight - 160.0f, false, true);
+
+		auto l = mSoldier->getLeader();
+		if(l) {
+			snprintf(buf, 127, "%s %s", Soldier::rankToString(l->getRank()), l->getName().c_str());
+			buf[127] = 0;
+			drawOverlayText(buf, 1.0f, getGroupRectangleColor(l, 1.0f),
+					40.0f, screenHeight - 145.0f, false, true);
+		}
 	}
 
 	{
@@ -878,9 +883,9 @@ void Driver::drawTexts()
 							s->hasWeaponType("Machine Gun") ? " (MG)" : "");
 				}
 			} else {
-				int numprivates = getNumberOfAvailableCommandees(s);
+				int numcommandees = getNumberOfAvailableCommandees(s);
 				snprintf(buf, 127, "%s %s (%d)", Soldier::rankToString(s->getRank()),
-						s->getName().c_str(), numprivates + 1);
+						s->getName().c_str(), numcommandees);
 			}
 			drawOverlayText(buf, 1.0f, c, 0.8f, yp, false);
 			yp -= 0.04f;
@@ -1356,8 +1361,10 @@ void Driver::drawEntities()
 	std::sort(sprites.begin(), sprites.end());
 
 	for(auto s : sprites) {
-		if(!s.mTexture && s.mSpriteType != SpriteType::Bullet)
+		if(!s.mTexture && s.mSpriteType != SpriteType::Bullet) {
+			std::cout << "texture missing.\n";
 			continue;
+		}
 
 		const Vector3& v(s.mPosition);
 		Rectangle r = Rectangle((-mCamera.x + v.x + s.mXP * s.mScale) * mScaleLevel + screenWidth * 0.5f,
@@ -1450,10 +1457,10 @@ void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
 		// speech bubble
 		auto it = mSpeechBubbles.find(s);
 		if(it != mSpeechBubbles.end()) {
-			auto& s = it->second.mText;
-			auto pos(it->first->getPosition());
-			pos.y += 3.0f;
-			drawText(s.c_str(), 0.4f, Common::Color::White, pos, true);
+			auto& sbubble = it->second.mText;
+			auto sbpos(it->first->getPosition());
+			sbpos.y += 3.0f;
+			drawText(sbubble.c_str(), 0.4f, Common::Color::White, sbpos, true);
 		}
 	}
 
@@ -1519,7 +1526,6 @@ Common::Color Driver::getGroupRectangleColor(const SoldierPtr commandee, float b
 int Driver::getNumberOfAvailableCommandees(const SoldierPtr p)
 {
 	int num = 0;
-	auto vis = p->getSensorySystem()->getSoldiers();
 
 	for(auto s : p->getCommandees()) {
 		if(p->canCommunicateWith(s)) {

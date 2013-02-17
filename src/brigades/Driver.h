@@ -223,7 +223,6 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		boost::shared_ptr<Common::Texture> mUnitIconShadowTexture;
 		Common::TextMap mTextMap;
 		SoldierPtr mSoldier;
-		bool mSoldierVisible;
 		bool mObserver;
 		bool mShooting;
 		bool mRestarting;
