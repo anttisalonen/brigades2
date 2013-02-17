@@ -1,7 +1,7 @@
 CXX      ?= g++
 AR       ?= ar
 CXXFLAGS ?= -O2 -g3 -Werror
-CXXFLAGS += -std=c++11 -Wall
+CXXFLAGS += -std=c++11 -Wall -Wshadow
 
 CXXFLAGS += $(shell sdl-config --cflags)
 
