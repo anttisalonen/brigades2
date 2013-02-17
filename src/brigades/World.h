@@ -154,6 +154,7 @@ class World : public boost::enable_shared_from_this<World> {
 		SoldierPtr addSquad(int side, bool reuseLeader);
 		void addDictator(int side);
 		void setHomeBasePositions();
+		void reapDeadSoldiers();
 
 		float mWidth;
 		float mHeight;
@@ -173,6 +174,7 @@ class World : public boost::enable_shared_from_this<World> {
 		int mSoldiersAtStart;
 		SoldierPtr mRootLeader[NUM_SIDES];
 		Common::SteadyTimer mWinTimer;
+		Common::SteadyTimer mReapTimer;
 		TriggerSystem mTriggerSystem;
 		Common::Vector3 mHomeBasePositions[NUM_SIDES];
 		int mSquareSide;

@@ -2,6 +2,7 @@
 
 #include "Event.h"
 #include "World.h"
+#include "InfoChannel.h"
 #include "SensorySystem.h"
 
 namespace Brigades {

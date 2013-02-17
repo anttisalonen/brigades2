@@ -1096,6 +1096,7 @@ void SoldierController::resetRootGoal()
 
 void SoldierController::act(float time)
 {
+	mSoldier->handleEvents();
 	if(handleLeaderCheck(time)) {
 		resetRootGoal();
 	}

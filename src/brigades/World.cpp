@@ -128,6 +128,7 @@ World::World(float width, float height, float visibility,
 	mTeamWon(-1),
 	mSoldiersAtStart(0),
 	mWinTimer(1.0f),
+	mReapTimer(30.0f),
 	mSquareSide(64),
 	mArmory(armory),
 	mUnitSize(unitsize),
@@ -433,6 +434,9 @@ void World::update(float time)
 	if(mWinTimer.check(time)) {
 		checkForWin();
 	}
+	if(mReapTimer.check(time)) {
+		reapDeadSoldiers();
+	}
 
 	updateTriggerSystem(time);
 
@@ -477,7 +481,7 @@ void World::updateVisibility()
 {
 	// visibility calculation based on time of day
 	float t = - 2.0f * cos(PI / 12 * (mTime.Hour + mTime.Minute / 60.0f));
-	t = Common::clamp(0.0f, t, 1.0f);
+	t = Common::clamp(0.1f, t, 1.0f);
 	mVisibility = t * mMaxVisibility;
 }
 
@@ -502,7 +506,9 @@ void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 				s->getPosition(),
 				dir.normalized() * w->getVelocity(),
 				time)));
-	mTriggerSystem.add(SoundTriggerPtr(new SoundTrigger(s, getShootSoundHearingDistance())));
+	auto nearbySoldiers = getSoldiersAt(s->getPosition(), getShootSoundHearingDistance());
+	SoundTrigger trigger(s, getShootSoundHearingDistance());
+	mTriggerSystem.tryOneShotTrigger(trigger, nearbySoldiers);
 }
 
 void World::dig(float time, const Common::Vector3& pos)
@@ -835,6 +841,18 @@ void World::setHomeBasePositions()
 	float y = mHeight * 0.5f - mSquareSide * 0.5f;
 	mHomeBasePositions[0] = Vector3(-x, -y, 0);
 	mHomeBasePositions[1] = Vector3(x, y, 0);
+}
+
+void World::reapDeadSoldiers()
+{
+	auto it = mSoldierMap.begin();
+	while(it != mSoldierMap.end()) {
+		if(it->second->isDead()) {
+			it = mSoldierMap.erase(it);
+		} else {
+			++it;
+		}
+	}
 }
 
 }

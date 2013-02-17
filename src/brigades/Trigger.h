@@ -93,8 +93,9 @@ class TriggerSystem {
 	public:
 		TriggerSystem();
 		void add(TriggerPtr t);
-		void update(std::vector<SoldierPtr> soldiers, float time);
+		void update(const std::vector<SoldierPtr>& soldiers, float time);
 		const std::list<TriggerPtr> getTriggers() const;
+		void tryOneShotTrigger(Trigger& t, const std::vector<SoldierPtr>& soldiers);
 
 	private:
 		std::list<TriggerPtr> mTriggers;

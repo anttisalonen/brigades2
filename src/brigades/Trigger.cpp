@@ -106,7 +106,7 @@ void TriggerSystem::add(TriggerPtr t)
 	mTriggers.push_back(t);
 }
 
-void TriggerSystem::update(std::vector<SoldierPtr> soldiers, float time)
+void TriggerSystem::update(const std::vector<SoldierPtr>& soldiers, float time)
 {
 	auto it = mTriggers.begin();
 	while(it != mTriggers.end()) {
@@ -121,6 +121,13 @@ void TriggerSystem::update(std::vector<SoldierPtr> soldiers, float time)
 		}
 	}
 
+}
+
+void TriggerSystem::tryOneShotTrigger(Trigger& t, const std::vector<SoldierPtr>& soldiers)
+{
+	for(auto s : soldiers) {
+		t.tryTrigger(s);
+	}
 }
 
 const std::list<TriggerPtr> TriggerSystem::getTriggers() const
