@@ -38,7 +38,7 @@ bool SpeechBubble::expired(float t)
 Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	: mWorld(w),
 	mPaused(false),
-	mScaleLevel(11.5f),
+	mScaleLevel(7.5f),
 	mScaleLevelVelocity(0.0f),
 	mFreeCamera(false),
 	mSoldierVisible(false),
@@ -53,13 +53,16 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mRectangleFinished(false),
 	mChangeFocus(false),
 	mTimeAcceleration(1.0f),
-	mDigging(false)
+	mDigging(false),
+	mMapLevel(MapLevel::Normal)
 {
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
 	loadTextures();
 	loadFont();
 	SDL_utils::setupOrthoScreen(screenWidth, screenHeight);
+	if(mSoldier)
+		mCameraMouseOffset = (getMousePositionOnField() - mSoldier->getPosition()) * 0.45f;
 }
 
 void Driver::init()
@@ -279,6 +282,7 @@ void Driver::loadTextures()
 	mFoxholeTexture = boost::shared_ptr<Texture>(new Texture("share/foxhole.png", 0, 0));
 	mTreeShadowTexture = mSoldierShadowTexture;
 	mBrightSpot = boost::shared_ptr<Texture>(new Texture("share/spot.png", 0, 0));
+	mUnitIconShadowTexture = boost::shared_ptr<Texture>(new Texture("share/iconshadow.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::Unknown)]      = boost::shared_ptr<Texture>(new Texture("share/question.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::AssaultRifle)] = boost::shared_ptr<Texture>(new Texture("share/assaultrifle.png", 0, 0));
 	mWeaponPickupTextures[int(WeaponPickupTexture::MachineGun)]   = boost::shared_ptr<Texture>(new Texture("share/machinegun.png", 0, 0));
@@ -292,6 +296,17 @@ void Driver::loadFont()
 		fprintf(stderr, "Could not open font: %s\n", TTF_GetError());
 		throw std::runtime_error("Loading font");
 	}
+}
+
+Common::Color Driver::mapUnitIconColor(bool first, const Common::Color& c)
+{
+	Common::Color r(c);
+	if(first) {
+		r.g = r.b = 0;
+	} else {
+		r.r = r.g = 0;
+	}
+	return r;
 }
 
 Common::Color Driver::mapSideColor(bool first, const Common::Color& c)
@@ -420,6 +435,8 @@ bool Driver::handleInput(float frameTime)
 
 					case SDLK_f:
 						mFreeCamera = !mFreeCamera;
+						if(!mFreeCamera)
+							mMapLevel = MapLevel::Normal;
 						break;
 
 					case SDLK_x:
@@ -575,10 +592,10 @@ bool Driver::handleInput(float frameTime)
 				switch(event.button.button) {
 					case SDL_BUTTON_WHEELUP:
 						if(mFreeCamera)
-							mScaleLevel += 0.5f; break;
+							mScaleLevel *= 1.1f; break;
 					case SDL_BUTTON_WHEELDOWN:
 						if(mFreeCamera)
-							mScaleLevel -= 0.5f; break;
+							mScaleLevel /= 1.1f; break;
 
 					case SDL_BUTTON_LEFT:
 						mShooting = false;
@@ -623,7 +640,12 @@ void Driver::handleInputState(float frameTime)
 	if(mFreeCamera) {
 		mCamera -= mCameraVelocity * frameTime * 50.0f;
 		mScaleLevel += mScaleLevelVelocity * frameTime * 10.0f;
-		mScaleLevel = clamp(1.0f, mScaleLevel, 10.0f);
+		mScaleLevel = clamp(0.5f, mScaleLevel, 10.0f);
+		if(mScaleLevel < 1.0f) {
+			mMapLevel = MapLevel::Tactic;
+		} else {
+			mMapLevel = MapLevel::Normal;
+		}
 	}
 	else if(mSoldier) {
 		if(mObserver && mSoldier->isDead()) {
@@ -667,6 +689,8 @@ void Driver::startFrame()
 
 	mCamera.x = restrictCameraCoordinate(mCamera.x, mWorld->getWidth(), screenWidth);
 	mCamera.y = restrictCameraCoordinate(mCamera.y, mWorld->getHeight(), screenHeight);
+
+	setLight();
 }
 
 void Driver::finishFrame()
@@ -714,7 +738,7 @@ void Driver::drawTexts()
 		drawOverlayText(buf, 1.0f, Common::Color::White, screenWidth - 100.0f, 24.0f, false, true);
 	}
 
-	{
+	if(mMapLevel == MapLevel::Normal) {
 		// weapons
 		int i = 0;
 		for(auto w : mSoldier->getWeapons()) {
@@ -750,7 +774,7 @@ void Driver::drawTexts()
 		}
 	}
 
-	{
+	if(mMapLevel == MapLevel::Normal) {
 		// soldier names
 		if(mObserver) {
 			for(auto s : mWorld->getSoldiersAt(mCamera, getDrawRadius())) {
@@ -1036,32 +1060,239 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, floa
 	}
 }
 
+const boost::shared_ptr<Common::Texture> Driver::getUnitIconTexture(const UnitIconDescriptor& d)
+{
+	auto it = mUnitIconTextures.find(d);
+	if(it != mUnitIconTextures.end())
+		return it->second;
+
+	const char* rankfile = NULL;
+	const char* branchfile = NULL;
+	switch(d.rank) {
+		default:
+			std::cerr << "Warning: can't create unit icon texture for " << Soldier::rankToString(d.rank) << "\n";
+			// fall through
+		case SoldierRank::Private:
+			rankfile = "share/question.png";
+			break;
+
+		case SoldierRank::Sergeant:
+			rankfile = "share/squad.png";
+			break;
+
+		case SoldierRank::Lieutenant:
+			rankfile = "share/platoon.png";
+			break;
+
+		case SoldierRank::Captain:
+			rankfile = "share/company.png";
+			break;
+	}
+
+	branchfile = "share/infantry.png";
+
+	SDLSurface rank(rankfile);
+	SDLSurface branch(branchfile);
+
+	branch.blitOnTop(rank);
+	branch.mapPixelColor( [&] (const Color& c) { return mapUnitIconColor(!d.blue, c); } );
+
+	auto t = boost::shared_ptr<Texture>(new Texture(branch));
+	mUnitIconTextures[d] = t;
+	return t;
+}
+
+const boost::shared_ptr<Texture> Driver::unitIconTexture(const SoldierPtr p, float& scale)
+{
+	auto r = p->getRank();
+
+	switch(r) {
+		case SoldierRank::Sergeant:
+			scale = 1.0f;
+			break;
+
+		case SoldierRank::Lieutenant:
+			scale = 2.0f;
+			break;
+
+		case SoldierRank::Captain:
+			scale = 4.0f;
+			break;
+
+		case SoldierRank::Private:
+			scale = 0.5f;
+			break;
+
+		default:
+			scale = 8.0f;
+			break;
+	}
+
+	scale *= 32.0f;
+	UnitIconDescriptor d(MilitaryBranch::MechInf, r, p->getSideNum() == 1);
+	return getUnitIconTexture(d);
+}
+
 void Driver::drawEntities()
 {
 	static const float treeScale = 3.0f;
 	const auto soldiervec = mObserver || mSoldier->isDead() ?
 		mWorld->getSoldiersAt(mCamera, getDrawRadius()) :
 		mSoldier->getSensorySystem()->getSoldiers();
+	std::vector<Sprite> sprites;
 
-	std::set<Sprite> soldiers;
-	includeSoldierSprite(soldiers, mSoldier);
+	if(mMapLevel == MapLevel::Normal) {
+		std::set<Sprite> soldiers;
+		includeSoldierSprite(soldiers, mSoldier);
 
-	if(!mObserver) {
+		if(!mObserver) {
+			for(auto s : mSoldier->getCommandees()) {
+				if(mSoldier->canCommunicateWith(s)) {
+					bool addbrightspot = s == mSelectedCommandee;
+					includeSoldierSprite(soldiers, s, addbrightspot);
+
+					for(auto p : s->getSensorySystem()->getSoldiers()) {
+						includeSoldierSprite(soldiers, p);
+					}
+
+					for(auto c : s->getCommandees()) {
+						if(s->canCommunicateWith(c)) {
+							includeSoldierSprite(soldiers, c, addbrightspot);
+
+							for(auto p : c->getSensorySystem()->getSoldiers()) {
+								includeSoldierSprite(soldiers, p);
+							}
+						}
+					}
+				}
+			}
+
+			auto l = mSoldier->getLeader();
+			if(l && mSoldier->canCommunicateWith(l)) {
+				includeSoldierSprite(soldiers, l);
+				for(auto s : l->getCommandees()) {
+					if(mSoldier->canCommunicateWith(s)) {
+						includeSoldierSprite(soldiers, s);
+					}
+				}
+			}
+		}
+
+		for(auto s : soldiervec) {
+			includeSoldierSprite(soldiers, s);
+		}
+
+		std::function<bool (const Vector3&)> observefunc;
+		std::set<SoldierPtr> comrades;
+
+		if(mObserver) {
+			const Vector3& observerpos = mCamera;
+			float observerdist = getDrawRadius();
+			float observerdist2 = observerdist * observerdist;
+			observefunc = [&](const Vector3& v) -> bool {
+				return observerpos.distance2(v) <= observerdist2;
+			};
+		} else {
+			float observerdist = mWorld->getShootSoundHearingDistance();
+			float observerdist2 = observerdist * observerdist;
+
+			comrades.insert(mSoldier);
+
+			for(auto s : mSoldier->getCommandees()) {
+
+				if(mSoldier->canCommunicateWith(s)) {
+					comrades.insert(s);
+
+					for(auto c : s->getCommandees()) {
+						if(s->canCommunicateWith(c)) {
+							comrades.insert(c);
+						}
+					}
+				}
+			}
+
+			observefunc = [&](const Vector3& v) -> bool {
+				for(auto s : comrades) {
+					if(s->getPosition().distance2(v) <= observerdist2)
+						return true;
+				}
+
+				return false;
+			};
+		}
+
+		for(auto s : soldiers) {
+			sprites.push_back(s);
+		}
+
+		auto foxholes = mObserver ? mWorld->getFoxholesAt(mCamera, getDrawRadius()) :
+			mSoldier->getSensorySystem()->getFoxholes();
+
+		for(auto f : foxholes) {
+			sprites.push_back(Sprite(f->getPosition(), SpriteType::Foxhole,
+						4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
+						-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f->getDepth(), 1.0f)));
+		}
+
+		auto trees = mWorld->getTreesAt(mCamera, getDrawRadius());
+
+		for(auto t : trees) {
+			sprites.push_back(Sprite(t->getPosition(), SpriteType::Tree,
+						t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
+						-0.5f, -0.8f));
+		}
+
+		for(auto b : mWorld->getBulletsAt(mCamera, getDrawRadius())) {
+			if(!observefunc(b->getPosition())) {
+				continue;
+			}
+
+			float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
+			sprites.push_back(Sprite(b->getPosition(), SpriteType::Bullet,
+						scale,
+						boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
+						0.0f, 0.5f / scale,
+						-0.8f / scale, -1.0f / scale));
+		}
+
+		auto triggers = mWorld->getTriggerSystem().getTriggers();
+		for(auto t : triggers) {
+			if(!observefunc(t->getPosition())) {
+				continue;
+			}
+
+			const char* tn = t->getName();
+			WeaponPickupTexture tex = WeaponPickupTexture::Unknown;
+			if(!strncmp(tn, "WeaponPickup", sizeof("WeaponPickup") - 1)) {
+				tn += sizeof("WeaponPickup") - 1;
+				if(!strcmp(tn, "Assault Rifle")) {
+					tex = WeaponPickupTexture::AssaultRifle;
+				}
+				else if(!strcmp(tn, "Machine Gun")) {
+					tex = WeaponPickupTexture::MachineGun;
+				}
+				else if(!strcmp(tn, "Bazooka")) {
+					tex = WeaponPickupTexture::Bazooka;
+				}
+				sprites.push_back(Sprite(t->getPosition(), SpriteType::WeaponPickup,
+							2.0f,
+							mWeaponPickupTextures[int(tex)], boost::shared_ptr<Texture>(),
+							-0.5f, -0.5f,
+							0.0f, 0.0f));
+			}
+		}
+	} else {
+		// tactical map
+		std::set<Sprite> soldiers;
 		for(auto s : mSoldier->getCommandees()) {
 			if(mSoldier->canCommunicateWith(s)) {
 				bool addbrightspot = s == mSelectedCommandee;
-				includeSoldierSprite(soldiers, s, addbrightspot);
-
-				for(auto p : s->getSensorySystem()->getSoldiers()) {
-					includeSoldierSprite(soldiers, p);
-				}
-
-				for(auto c : s->getCommandees()) {
-					if(s->canCommunicateWith(c)) {
-						includeSoldierSprite(soldiers, c, addbrightspot);
-
-						for(auto p : c->getSensorySystem()->getSoldiers()) {
-							includeSoldierSprite(soldiers, p);
+				if(s->getRank() == SoldierRank::Sergeant) {
+					includeUnitIcon(soldiers, s, addbrightspot);
+				} else {
+					for(auto c : s->getCommandees()) {
+						if(s->canCommunicateWith(c)) {
+							includeUnitIcon(soldiers, c, addbrightspot);
 						}
 					}
 				}
@@ -1070,120 +1301,40 @@ void Driver::drawEntities()
 
 		auto l = mSoldier->getLeader();
 		if(l && mSoldier->canCommunicateWith(l)) {
-			includeSoldierSprite(soldiers, l);
 			for(auto s : l->getCommandees()) {
 				if(mSoldier->canCommunicateWith(s)) {
-					includeSoldierSprite(soldiers, s);
-				}
-			}
-		}
-	}
-
-	for(auto s : soldiervec) {
-		includeSoldierSprite(soldiers, s);
-	}
-
-	std::function<bool (const Vector3&)> observefunc;
-	std::set<SoldierPtr> comrades;
-
-	if(mObserver) {
-		const Vector3& observerpos = mCamera;
-		float observerdist = getDrawRadius();
-		float observerdist2 = observerdist * observerdist;
-		observefunc = [&](const Vector3& v) -> bool {
-			return observerpos.distance2(v) <= observerdist2;
-		};
-	} else {
-		float observerdist = mWorld->getShootSoundHearingDistance();
-		float observerdist2 = observerdist * observerdist;
-
-		comrades.insert(mSoldier);
-
-		for(auto s : mSoldier->getCommandees()) {
-
-			if(mSoldier->canCommunicateWith(s)) {
-				comrades.insert(s);
-
-				for(auto c : s->getCommandees()) {
-					if(s->canCommunicateWith(c)) {
-						comrades.insert(c);
+					includeUnitIcon(soldiers, s);
+					if(s->getRank() > SoldierRank::Sergeant) {
+						for(auto c : s->getCommandees()) {
+							if(s->canCommunicateWith(c)) {
+								includeUnitIcon(soldiers, c, false);
+							}
+						}
 					}
 				}
 			}
 		}
 
-		observefunc = [&](const Vector3& v) -> bool {
-			for(auto s : comrades) {
-				if(s->getPosition().distance2(v) <= observerdist2)
-					return true;
+		std::set<SoldierPtr> enemysoldiers;
+		if(l)
+			enemysoldiers = l->getKnownEnemySoldiers();
+		else
+			enemysoldiers = mSoldier->getKnownEnemySoldiers();
+
+		for(auto s : enemysoldiers) {
+			if(s->isAlive() && (s->getRank() == SoldierRank::Sergeant ||
+					(s->getRank() == SoldierRank::Private &&
+						enemysoldiers.find(s->getLeader()) == enemysoldiers.end()))) {
+				includeUnitIcon(soldiers, s, false);
 			}
-
-			return false;
-		};
-	}
-
-	std::vector<Sprite> sprites;
-	for(auto s : soldiers) {
-		sprites.push_back(s);
-	}
-
-	auto foxholes = mObserver ? mWorld->getFoxholesAt(mCamera, getDrawRadius()) :
-		mSoldier->getSensorySystem()->getFoxholes();
-
-	for(auto f : foxholes) {
-		sprites.push_back(Sprite(f->getPosition(), SpriteType::Foxhole,
-					4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
-					-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f->getDepth(), 1.0f)));
-	}
-
-	auto trees = mWorld->getTreesAt(mCamera, getDrawRadius());
-
-	for(auto t : trees) {
-		sprites.push_back(Sprite(t->getPosition(), SpriteType::Tree,
-					t->getRadius() * treeScale, mTreeTexture, mTreeShadowTexture, -0.5f, -0.5f,
-					-0.5f, -0.8f));
-	}
-
-	for(auto b : mWorld->getBulletsAt(mCamera, getDrawRadius())) {
-		if(!observefunc(b->getPosition())) {
-			continue;
 		}
 
-		float scale = b->getWeapon()->getDamageAgainstLightArmor() > 0.0f ? 5.0f : 1.0f;
-		sprites.push_back(Sprite(b->getPosition(), SpriteType::Bullet,
-					scale,
-					boost::shared_ptr<Texture>(), boost::shared_ptr<Texture>(),
-					0.0f, 0.5f / scale,
-					-0.8f / scale, -1.0f / scale));
-	}
-
-	auto triggers = mWorld->getTriggerSystem().getTriggers();
-	for(auto t : triggers) {
-		if(!observefunc(t->getPosition())) {
-			continue;
-		}
-
-		const char* tn = t->getName();
-		WeaponPickupTexture tex = WeaponPickupTexture::Unknown;
-		if(!strncmp(tn, "WeaponPickup", sizeof("WeaponPickup") - 1)) {
-			tn += sizeof("WeaponPickup") - 1;
-			if(!strcmp(tn, "Assault Rifle")) {
-				tex = WeaponPickupTexture::AssaultRifle;
-			}
-			else if(!strcmp(tn, "Machine Gun")) {
-				tex = WeaponPickupTexture::MachineGun;
-			}
-			else if(!strcmp(tn, "Bazooka")) {
-				tex = WeaponPickupTexture::Bazooka;
-			}
-			sprites.push_back(Sprite(t->getPosition(), SpriteType::WeaponPickup,
-						2.0f,
-						mWeaponPickupTextures[int(tex)], boost::shared_ptr<Texture>(),
-						-0.5f, -0.5f,
-						0.0f, 0.0f));
+		for(auto s : soldiers) {
+			sprites.push_back(s);
 		}
 	}
 
+	// draw shadows
 	for(auto s : sprites) {
 		if(!s.mShadowTexture && s.mSpriteType != SpriteType::Bullet)
 			continue;
@@ -1395,10 +1546,29 @@ void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s,
 	}
 }
 
+void Driver::includeUnitIcon(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot)
+{
+	float scale = 0.0f;
+	boost::shared_ptr<Texture> t = unitIconTexture(s, scale);
+	auto pos = s->getUnitPosition();
+	sprites.insert(Sprite(pos, SpriteType::Icon, scale, t,
+				mUnitIconShadowTexture, 0.0f, 0.0f,
+				0.0f, 0.0f));
+
+	if(addbrightspot) {
+		Vector3 p = pos;
+		p.x += 0.001f;
+		p.y -= 0.001f;
+		sprites.insert(Sprite(p, SpriteType::BrightSpot, scale, mBrightSpot,
+					boost::shared_ptr<Common::Texture>(), 0.0f, 0.0f,
+					0.0f, 0.0f, 0.5f));
+	}
+}
+
 bool Driver::allCommandeesDefending() const
 {
 	for(auto s : mSoldier->getCommandees()) {
-		if(!s->defending())
+		if(s->isAlive() && !s->defending())
 			return false;
 	}
 	return true;
