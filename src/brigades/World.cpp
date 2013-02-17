@@ -29,6 +29,24 @@ Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel,
 	mVelocity = vel + shooter->getVelocity();
 	mWeapon = shooter->getCurrentWeapon();
 	assert(mWeapon);
+
+	// build cache of trees that may be in the flight line for collision detection
+	mObstacleCache = shooter->getWorld()->getTreesAt(mPosition, 5.0f + mVelocity.length() * timeleft * 1.2f);
+	Vector3 endpos = mPosition + mVelocity * timeleft * 1.2f;
+
+	for(auto it = mObstacleCache.begin(); it != mObstacleCache.end(); ) {
+		if(!Math::segmentCircleIntersect(mPosition, endpos,
+					(*it)->getPosition(), (*it)->getRadius() * 3.0f)) {
+			it = mObstacleCache.erase(it);
+		} else {
+			++it;
+		}
+	}
+}
+
+const std::vector<Tree*>& Bullet::getObstacleCache() const
+{
+	return mObstacleCache;
 }
 
 void Bullet::update(float time)
@@ -402,7 +420,7 @@ void World::update(float time)
 
 		// have bullets pass through trees for the first 100ms of flight
 		if((*bit)->getFlyTime() > 0.1f) {
-			for(auto t : getTreesAt((*bit)->getPosition(), (*bit)->getVelocity().length())) {
+			for(auto t : (*bit)->getObstacleCache()) {
 				if(Math::segmentCircleIntersect((*bit)->getPosition(),
 							(*bit)->getPosition() + (*bit)->getVelocity() * time,
 							t->getPosition(), t->getRadius())) {

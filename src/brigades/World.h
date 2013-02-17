@@ -60,11 +60,13 @@ class Bullet : public Common::Entity {
 		const WeaponPtr getWeapon() const;
 		float getOriginalSpeed() const;
 		float getFlyTime() const;
+		const std::vector<Tree*>& getObstacleCache() const;
 
 	private:
 		SoldierPtr mShooter;
 		Common::Countdown mTimer;
 		WeaponPtr mWeapon;
+		std::vector<Tree*> mObstacleCache;
 };
 
 typedef boost::shared_ptr<Bullet> BulletPtr;
