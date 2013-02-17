@@ -20,7 +20,8 @@ AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, flo
 
 SoldierController::SoldierController()
 	: mLeaderStatusTimer(1.0f),
-	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME)
+	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME),
+	mMovementSoundTimer(1.0f)
 {
 }
 
@@ -29,7 +30,8 @@ SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	mSoldier(s),
 	mSteering(boost::shared_ptr<Steering>(new Steering(*s))),
 	mLeaderStatusTimer(1.0f),
-	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME)
+	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME),
+	mMovementSoundTimer(1.0f)
 {
 }
 
@@ -94,6 +96,11 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 	mSoldier->Vehicle::update(time);
 	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
 		mSoldier->setAutomaticHeading();
+
+	mMovementSoundTimer.doCountdown(time);
+	if(mMovementSoundTimer.checkAndRewind()) {
+		mWorld->createMovementSound(mSoldier);
+	}
 }
 
 void SoldierController::turnTo(const Common::Vector3& dir)

@@ -139,6 +139,7 @@ class World : public boost::enable_shared_from_this<World> {
 		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
 		void addBullet(const WeaponPtr w, const SoldierPtr s, const Common::Vector3& dir);
 		void dig(float time, const Common::Vector3& pos);
+		void createMovementSound(const SoldierPtr s);
 
 	private:
 		void setupSides();

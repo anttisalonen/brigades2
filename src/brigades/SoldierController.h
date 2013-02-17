@@ -59,6 +59,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 
 		std::vector<Common::Obstacle*> mObstacleCache;
 		Common::SteadyTimer mObstacleCacheTimer;
+		Common::Countdown mMovementSoundTimer;
 };
 
 typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;

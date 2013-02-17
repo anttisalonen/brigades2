@@ -547,6 +547,16 @@ void World::dig(float time, const Common::Vector3& pos)
 	foxhole->deepen(time * TimeCoefficient / 14400.0f);
 }
 
+void World::createMovementSound(const SoldierPtr s)
+{
+	float dist = getShootSoundHearingDistance() * 0.3f;
+	if(s->getWarriorType() == WarriorType::Vehicle)
+		dist *= 3.0f;
+	auto nearbySoldiers = getSoldiersAt(s->getPosition(), dist);
+	SoundTrigger trigger(s, dist);
+	mTriggerSystem.tryOneShotTrigger(trigger, nearbySoldiers);
+}
+
 Foxhole* World::getFoxholeAt(const Common::Vector3& pos)
 {
 	Foxhole* p = nullptr;
