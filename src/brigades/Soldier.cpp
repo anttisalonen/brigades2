@@ -512,13 +512,13 @@ bool Soldier::isDictator() const
 
 bool Soldier::canCommunicateWith(const SoldierPtr p) const
 {
-	return !isDead() && !p->isDead() && ((hasRadio() && p->hasRadio()) ||
-			(Entity::distanceBetween(*this, *p) < 10.0f));
+	return !isDead() && !p->isDead() && ((hasRadio() && p->hasRadio() && Entity::distanceBetween(*this, *p) < 1000.0f) ||
+			(Entity::distanceBetween(*this, *p) < 100.0f));
 }
 
 bool Soldier::hasRadio() const
 {
-	return true;
+	return mRank > SoldierRank::Private;
 }
 
 bool Soldier::hasEnemyContact() const
