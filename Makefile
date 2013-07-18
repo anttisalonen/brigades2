@@ -47,7 +47,7 @@ $(BRIGADESBIN): $(COMMONLIB) $(BRIGADESOBJS) $(BINDIR)
 
 %.dep: %.cpp
 	@rm -f $@
-	@$(CC) -MM $(CXXFLAGS) $< > $@.P
+	@$(CXX) -MM $(CXXFLAGS) $< > $@.P
 	@sed 's,\($(notdir $*)\)\.o[ :]*,$(dir $*)\1.o $@ : ,g' < $@.P > $@
 	@rm -f $@.P
 
