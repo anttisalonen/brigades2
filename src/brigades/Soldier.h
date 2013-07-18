@@ -91,6 +91,15 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		const std::string& getName() const;
 		static const char* rankToString(SoldierRank r);
 
+		bool sleeping() const;
+		bool eating() const;
+		void startSleeping();
+		void startEating();
+		void stopSleeping();
+		void stopEating();
+		float getFatigueLevel() const; // >1.0 => should sleep
+		float getHungerLevel() const;  // >1.0 => should eat
+
 		// orders for the privates
 		void setFormationOffset(const Common::Vector3& v);
 		void setDefendPosition(const Common::Vector3& v);
@@ -112,6 +121,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 
 	private:
 		void globalMessage(const char* s);
+		void handleSleep(float time);
+		void handleEating(float time);
 
 		boost::shared_ptr<World> mWorld;
 		SidePtr mSide;
@@ -129,6 +140,11 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		WarriorType mWarriorType;
 		float mHealth;
 		bool mDictator;
+		float mFatigue = 0.0f;
+		float mHunger = 0.0f;
+		int mFoodPacks = 3;
+		float mSleepTime = 0.0f; // time spent sleeping, 0 => awake
+		float mEatTime = 0.0f;   // time spent eating, 0 => not eating
 
 		// crew status
 		Common::Vector3 mFormationOffset;

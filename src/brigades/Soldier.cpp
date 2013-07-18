@@ -84,10 +84,107 @@ std::string Soldier::generateName()
 	return s;
 }
 
+bool Soldier::sleeping() const
+{
+	return mSleepTime > 0.0f;
+}
+
+bool Soldier::eating() const
+{
+	return mEatTime > 0.0f;
+}
+
+void Soldier::startSleeping()
+{
+	if(mSleepTime)
+		return;
+
+	mSleepTime = 0.001f;
+}
+
+void Soldier::startEating()
+{
+	if(mEatTime)
+		return;
+
+	mFoodPacks--;
+	mEatTime = 0.001f;
+}
+
+float Soldier::getFatigueLevel() const
+{
+	return mFatigue / 96.0f;
+}
+
+float Soldier::getHungerLevel() const
+{
+	return mHunger / 48.0f;
+}
+
+void Soldier::handleSleep(float time)
+{
+	mSleepTime += time;
+	mFatigue -= mSleepTime;
+	if(mFatigue < 0.0f)
+		mFatigue = 0.0f;
+	if(mSleepTime > 28800.0f || (mFatigue == 0.0f && mSleepTime > 14400.0f)) {
+		stopSleeping();
+	}
+}
+
+void Soldier::handleEating(float time)
+{
+	mEatTime += time;
+	mHunger -= mEatTime;
+	if(mHunger < 0.0f) {
+		mHunger = 0.0f;
+		stopEating();
+	} else if(mEatTime > 45.0f) {
+		stopEating();
+	}
+}
+
+void Soldier::stopEating()
+{
+	mEatTime = 0.0f;
+}
+
+void Soldier::stopSleeping()
+{
+	mSleepTime = 0.0f;
+}
+
 void Soldier::update(float time)
 {
 	if(!time)
 		return;
+
+	float worldTime = time / mWorld->getTimeCoefficient();
+
+	if(!sleeping())
+		mFatigue += worldTime;
+	if(!eating())
+		mHunger  += worldTime;
+
+	if(sleeping()) {
+		handleSleep(worldTime);
+		InfoChannel::getInstance()->say(shared_from_this(), "Sleeping");
+		return;
+	}
+
+	if(!sleeping() && getFatigueLevel() > 3.0f) {
+		startSleeping();
+		return;
+	}
+
+	if(!sleeping() && !eating() && getHungerLevel() > 3.0f) {
+		if(mFoodPacks > 0) {
+			startEating();
+		} else {
+			die();
+		}
+		return;
+	}
 
 	mSensorySystem->update(time);
 	if(mCurrentWeaponIndex < mWeapons.size())
@@ -119,6 +216,11 @@ void Soldier::update(float time)
 		}
 	}
 
+	if(eating()) {
+		handleEating(time);
+		InfoChannel::getInstance()->say(shared_from_this(), "Eating");
+		return;
+	}
 }
 
 float Soldier::getFOV() const
@@ -159,7 +261,8 @@ bool Soldier::isAlive() const
 
 void Soldier::dig(float time)
 {
-	mWorld->dig(time, mPosition);
+	if(!eating() && !sleeping())
+		mWorld->dig(time, mPosition);
 }
 
 void Soldier::clearWeapons()

@@ -775,6 +775,7 @@ void SeekAndDestroyGoal::move(float time)
 {
 	Vector3 vel;
 	bool digging = false;
+	bool idling = false;
 
 	auto controller = mSoldier->getController();
 	auto steering = controller->getSteering();
@@ -893,11 +894,13 @@ void SeekAndDestroyGoal::move(float time)
 				if(dist2 > 2.0f) {
 					Vector3 arr = steering->arrive(mSoldier->getDefendPosition());
 					steering->accumulate(tot, arr);
-				} else if(mShootTargetPosition.null() &&
-						mSoldier->getWarriorType() == WarriorType::Soldier) {
-					mSoldier->dig(time);
-					InfoChannel::getInstance()->say(mSoldier, "Digging a foxhole");
-					digging = true;
+				} else if(mShootTargetPosition.null()) {
+					idling = true;
+					if(mSoldier->getWarriorType() == WarriorType::Soldier) {
+						mSoldier->dig(time);
+						InfoChannel::getInstance()->say(mSoldier, "Digging a foxhole");
+						digging = true;
+					}
 				}
 			}
 		}
@@ -910,6 +913,15 @@ void SeekAndDestroyGoal::move(float time)
 
 		if(!mShootTargetPosition.null()) {
 			controller->turnTo(mShootTargetPosition);
+		}
+	}
+	
+	if(idling) {
+		if(mSoldier->getHungerLevel() > 1.0f) {
+			mSoldier->startEating();
+		}
+		else if(mSoldier->getFatigueLevel() > 1.0f) {
+			mSoldier->startSleeping();
 		}
 	}
 }

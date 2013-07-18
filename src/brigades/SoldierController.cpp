@@ -58,6 +58,9 @@ void SoldierController::updateObstacleCache()
 
 Vector3 SoldierController::defaultMovement(float time)
 {
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return Vector3();
+
 	if(mObstacleCacheTimer.check(time)) {
 		updateObstacleCache();
 	}
@@ -79,6 +82,10 @@ Vector3 SoldierController::defaultMovement(float time)
 
 void SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
+	if(mSoldier->sleeping() || mSoldier->eating()) {
+		return;
+	}
+
 	if(isnan(dir.x) || isnan(dir.y)) {
 		std::cout << "moveTo: warning: dir: " << dir << "\n";
 		return;
@@ -105,16 +112,25 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 
 void SoldierController::turnTo(const Common::Vector3& dir)
 {
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return;
+
 	mSoldier->setXYRotation(atan2(dir.y, dir.x));
 }
 
 void SoldierController::turnBy(float rad)
 {
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return;
+
 	mSoldier->addXYRotation(rad);
 }
 
 void SoldierController::setVelocityToHeading()
 {
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return;
+
 	mSoldier->setVelocityToHeading();
 }
 
@@ -134,6 +150,9 @@ bool SoldierController::handleLeaderCheck(float time)
 
 bool SoldierController::checkLeaderStatus()
 {
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return false;
+
 	if(mSoldier->getWarriorType() != WarriorType::Soldier)
 		return false;
 

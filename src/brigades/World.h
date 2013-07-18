@@ -133,6 +133,7 @@ class World : public boost::enable_shared_from_this<World> {
 		Common::Rectangle getArea() const;
 		const Timestamp& getCurrentTime() const;
 		std::string getCurrentTimeAsString() const;
+		float getTimeCoefficient() const; // world time = frame time * time coefficient
 
 		// modifiers
 		void update(float time);

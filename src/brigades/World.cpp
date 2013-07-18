@@ -518,6 +518,11 @@ std::string World::getCurrentTimeAsString() const
 	return std::string(buf);
 }
 
+float World::getTimeCoefficient() const
+{
+	return TimeCoefficient;
+}
+
 void World::addBullet(const WeaponPtr w, const SoldierPtr s, const Vector3& dir)
 {
 	float time = w->getRange() / w->getVelocity();
