@@ -241,7 +241,6 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		bool mCreatingAttackOrder;
 		bool mRectangleFinished;
 		SoldierPtr mSelectedCommandee;
-		bool mChangeFocus;
 		float mTimeAcceleration;
 		bool mDigging;
 		MapLevel mMapLevel;

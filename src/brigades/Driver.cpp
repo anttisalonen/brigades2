@@ -50,7 +50,6 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mSoldierRank(r),
 	mCreatingAttackOrder(false),
 	mRectangleFinished(false),
-	mChangeFocus(false),
 	mTimeAcceleration(1.0f),
 	mDigging(false),
 	mMapLevel(MapLevel::Normal)
