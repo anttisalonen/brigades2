@@ -21,6 +21,8 @@ class SoldierAgent : public Brigades::SoldierAgent {
 		virtual void newCommunication(const SoldierCommunication& comm) override;
 
 	private:
+		std::vector<SoldierAction> mPendingActions;
+		Common::Vector3 mMoveTarget;
 };
 
 }

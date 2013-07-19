@@ -34,13 +34,47 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 {
 	std::vector<SoldierAction> actions;
 
+	actions.insert(actions.end(), mPendingActions.begin(), mPendingActions.end());
+	mPendingActions.clear();
+
+	auto soldier = getControlledSoldier();
+	if(!mMoveTarget.null()) {
+		Vector3 moveDiff = mMoveTarget - soldier.getPosition();
+		if(moveDiff.length2() > 1.0f) {
+			Vector3 tot = createMovement(true, moveDiff);
+			actions.push_back(SoldierAction(SAType::Move, tot));
+			actions.push_back(SoldierAction(SAType::Turn, moveDiff));
+		}
+	}
+
 	return actions;
 }
 
 void SoldierAgent::newCommunication(const SoldierCommunication& comm)
 {
 	// TODO
+	auto soldier = getControlledSoldier();
+	assert(comm.from == soldier.getLeader());
 	printf("Received communication!\n");
+	switch(comm.comm) {
+		case CommunicationType::Order:
+			switch(comm.order) {
+				case OrderType::GotoPosition:
+					{
+						Vector3* pos = (Vector3*)comm.data;
+						mMoveTarget = *pos;
+						delete pos;
+					}
+					break;
+			}
+			break;
+		case CommunicationType::Acknowledgement:
+			break;
+		case CommunicationType::ReportSuccess:
+			break;
+		case CommunicationType::ReportFail:
+			break;
+	}
 	return;
 }
 
