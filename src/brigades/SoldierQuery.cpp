@@ -143,6 +143,24 @@ std::set<FoxholeQuery> SoldierQuery::getSensedFoxholes() const
 	return ret;
 }
 
+std::set<ArmorQuery> SoldierQuery::getSensedVehicles() const
+{
+	soldier_query_check();
+	std::set<ArmorQuery> ret;
+	auto sps = mSoldier->getSensorySystem()->getVehicles();
+	for(auto s : sps)
+		ret.insert(ArmorQuery(s));
+	return ret;
+}
+
+ArmorQuery SoldierQuery::getMountPoint() const
+{
+	soldier_query_check();
+	auto wp = mSoldier->getMountPoint();
+	assert(wp);
+	return ArmorQuery(wp);
+}
+
 std::vector<SoldierQuery> SoldierQuery::getCommandees() const
 {
 	soldier_query_check();

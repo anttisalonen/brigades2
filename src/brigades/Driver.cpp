@@ -113,13 +113,21 @@ void Driver::applyPendingActions()
 		return;
 
 	auto it = mAgentDirectory.getAgents().find(mFocusSoldier);
-	assert(it != mAgentDirectory.getAgents().end());
+
+	if(it == mAgentDirectory.getAgents().end()) {
+		// dead
+		mPendingActions.clear();
+		setFocusSoldier();
+		return;
+	}
 
 	auto controller = it->second.first;
 
 	for(auto& a : mPendingActions) {
 		bool succ = a.execute(mFocusSoldier, controller, 0.0f);
-		assert(succ);
+		if(!succ) {
+			fprintf(stderr, "Warning: action %d failed.\n", (int)a.getType());
+		}
 	}
 	mPendingActions.clear();
 }
@@ -485,6 +493,16 @@ bool Driver::handleInput(float frameTime)
 							} else {
 								mPendingActions.push_back(SoldierAction(SAType::StartDigging));
 								InfoChannel::getInstance()->say(*mSoldier, "Digging a foxhole");
+							}
+						}
+						break;
+
+					case SDLK_m:
+						if(!mObserver) {
+							if(!mSoldier->mounted()) {
+								mPendingActions.push_back(SoldierAction(SAType::Mount));
+							} else {
+								mPendingActions.push_back(SoldierAction(SAType::Unmount));
 							}
 						}
 						break;
@@ -1200,9 +1218,15 @@ void Driver::drawEntities()
 			for(auto s : mWorld->getSoldiersAt(mCamera, getDrawRadius())) {
 				includeSoldierSprite(soldiers, s);
 			}
+			for(auto s : mWorld->getArmorsAt(mCamera, getDrawRadius())) {
+				includeArmorSprite(soldiers, s);
+			}
 		} else {
 			for(auto s : mSoldier->getSensedSoldiers()) {
 				includeSoldierSprite(soldiers, s);
+			}
+			for(auto s : mSoldier->getSensedVehicles()) {
+				includeArmorSprite(soldiers, s);
 			}
 		}
 
@@ -1452,8 +1476,8 @@ void Driver::setFocusSoldier()
 		// detach our agent from old soldier
 		{
 			if(mPlayerAgent) {
-				auto succ = mAgentDirectory.removeAgent(olds, mPlayerAgent);
-				assert(succ);
+				mAgentDirectory.removeAgent(olds, mPlayerAgent);
+				// failure => already dead
 				handleOld = true;
 			}
 		}
@@ -1482,7 +1506,6 @@ void Driver::setFocusSoldier()
 			}
 		}
 
-		mInputState->setDriving(mSoldier->mounted());
 		if(mSoldier->getRank() == SoldierRank::Lieutenant && mSoldier->getCommandees().size() > 0) {
 			mSelectedCommandee = SoldierQueryPtr(new SoldierQuery(*mSoldier->getCommandees().begin()));
 		}
@@ -1616,10 +1639,15 @@ void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery&
 {
 	float xp, yp, sxp, syp;
 	float scale;
+
+	if(s.mounted())
+		return;
+
 	boost::shared_ptr<Texture> t = soldierTexture(true, s.isDead(), s.getXYRotation(), s.getSideNum() == 0,
 			sxp, syp, xp, yp, scale);
 	sprites.insert(Sprite(s.getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
 				sxp, syp));
+
 	if(addbrightspot) {
 		Vector3 p = s.getPosition();
 		p.y -= 0.001f;
@@ -1627,6 +1655,16 @@ void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery&
 					boost::shared_ptr<Common::Texture>(), xp, yp,
 					0.0f, 0.0f, 0.5f));
 	}
+}
+
+void Driver::includeArmorSprite(std::set<Sprite>& sprites, const ArmorQuery& s)
+{
+	float xp, yp, sxp, syp;
+	float scale;
+	boost::shared_ptr<Texture> t = soldierTexture(false, s.isDestroyed(), s.getXYRotation(), s.getSideNum() == 0,
+			sxp, syp, xp, yp, scale);
+	sprites.insert(Sprite(s.getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
+				sxp, syp));
 }
 
 void Driver::includeUnitIcon(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot)
@@ -1668,6 +1706,7 @@ void Driver::setLight()
 	mLight.b = vis * 255;
 	glColor3f(vis, vis, vis);
 }
+
 
 }
 

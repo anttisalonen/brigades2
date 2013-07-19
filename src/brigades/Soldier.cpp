@@ -38,6 +38,7 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank)
 {
 	mName = generateName();
 	addWeapon(mWorld->getArmory().getAssaultRifle());
+	mRotation = 0.1f;
 }
 
 void Soldier::init()
@@ -253,12 +254,24 @@ void Soldier::clearWeapons()
 
 void Soldier::mount(ArmorPtr a)
 {
+	assert(a);
 	mMountPoint = a;
 	mBackupWeapons = mWeapons;
 	mWeapons.clear();
 	addWeapon(mWorld->getArmory().getAutomaticCannon());
 	addWeapon(mWorld->getArmory().getMachineGun());
+	mRotation = a->getXYRotation();
 	mFOV = TWO_PI;
+}
+
+ArmorPtr Soldier::getMountPoint()
+{
+	return mMountPoint;
+}
+
+const ArmorPtr Soldier::getMountPoint() const
+{
+	return mMountPoint;
 }
 
 void Soldier::unmount()

@@ -274,60 +274,72 @@ std::vector<Foxhole*> World::getFoxholesInFOV(const SoldierPtr p)
 	return ret;
 }
 
+bool World::vehicleVisible(const SoldierPtr p, const Vehicle& s, const std::vector<Tree*>& nearbytrees) const
+{
+	float distToMe = Entity::distanceBetween(*p, s);
+
+	if(distToMe < 2.0f) {
+		// "see" anyone just behind my back
+		return true;
+	}
+
+#if 0
+	if(distToMe < mVisibility * 2.0f * s.getRadius() && s.getSideNum() == p->getSideNum()) {
+		// "see" any nearby friendly soldiers
+		return true;
+	}
+#endif
+
+	if(distToMe > mVisibility * 2.0f * s.getRadius()) {
+		return false;
+	}
+
+	float dot = p->getHeadingVector().normalized().dot((s.getPosition() - p->getPosition()).normalized());
+	if(acos(dot) > p->getFOV() * 0.5f) {
+		return false;
+	}
+
+	bool treeblocks = false;
+
+	for(auto t : nearbytrees) {
+		if(Math::segmentCircleIntersect(p->getPosition(), s.getPosition(),
+					t->getPosition(), t->getRadius())) {
+			// blocked by tree
+			return false;
+		}
+	}
+	if(treeblocks) {
+		return false;
+	}
+
+	return true;
+}
+
 std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 {
 	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibility);
-	std::vector<Tree*> nearbytrees;
-	bool haveTrees = false;
+	std::vector<Tree*> nearbytrees = getTreesAt(p->getPosition(), mVisibility);
 	std::vector<SoldierPtr> ret;
 
 	for(auto s : nearbysoldiers) {
-		if(s.get() == p.get()) {
+		if(s.get() == p.get() || vehicleVisible(p, *s, nearbytrees)) {
 			ret.push_back(s);
-			continue;
 		}
+	}
 
-		float distToMe = Entity::distanceBetween(*p, *s);
+	return ret;
+}
 
-		if(distToMe < 2.0f) {
-			// "see" anyone just behind my back
+std::vector<ArmorPtr> World::getArmorsInFOV(const SoldierPtr p)
+{
+	std::vector<ArmorPtr> nearbyarmors = getArmorsAt(p->getPosition(), mVisibility);
+	std::vector<Tree*> nearbytrees = getTreesAt(p->getPosition(), mVisibility);
+	std::vector<ArmorPtr> ret;
+
+	for(auto s : nearbyarmors) {
+		if(vehicleVisible(p, *s, nearbytrees)) {
 			ret.push_back(s);
-			continue;
 		}
-
-		if(distToMe < mVisibility * 2.0f * s->getRadius() && s->getSideNum() == p->getSideNum()) {
-			// "see" any nearby friendly soldiers
-			ret.push_back(s);
-			continue;
-		}
-
-		if(distToMe > mVisibility * 2.0f * s->getRadius()) {
-			continue;
-		}
-
-		float dot = p->getHeadingVector().normalized().dot((s->getPosition() - p->getPosition()).normalized());
-		if(acos(dot) > p->getFOV() * 0.5f) {
-			continue;
-		}
-
-		bool treeblocks = false;
-		if(!haveTrees) {
-			nearbytrees = getTreesAt(p->getPosition(), mVisibility);
-			haveTrees = true;
-		}
-
-		for(auto t : nearbytrees) {
-			if(Math::segmentCircleIntersect(p->getPosition(), s->getPosition(),
-						t->getPosition(), t->getRadius())) {
-				treeblocks = true;
-				break;
-			}
-		}
-		if(treeblocks) {
-			continue;
-		}
-
-		ret.push_back(s);
 	}
 
 	return ret;

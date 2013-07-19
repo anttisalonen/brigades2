@@ -197,6 +197,7 @@ class Driver : public DebugOutput, public InfoChannel {
 		int getNumberOfAvailableCommandees(const SoldierQuery& p);
 		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
 		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot = false);
+		void includeArmorSprite(std::set<Sprite>& sprites, const ArmorQuery& s);
 		void includeUnitIcon(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot = false);
 		bool allCommandeesDefending() const;
 		void setLight();

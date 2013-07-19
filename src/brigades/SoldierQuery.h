@@ -45,6 +45,8 @@ class SoldierQuery {
 		bool seesSoldier(const SoldierQuery& s) const;
 		std::set<SoldierQuery> getSensedSoldiers() const;
 		std::set<FoxholeQuery> getSensedFoxholes() const;
+		std::set<ArmorQuery> getSensedVehicles() const;
+		ArmorQuery getMountPoint() const;
 
 		bool hasWeaponType(const char* wname) const;
 		bool isDictator() const;

@@ -13,11 +13,6 @@ bool InputState::isDigging() const
 	return mDigging;
 }
 
-bool InputState::isDriving() const
-{
-	return mDriving;
-}
-
 bool InputState::isShooting() const
 {
 	return mShooting;
@@ -38,11 +33,6 @@ Common::Vector3 InputState::getMousePositionOnField() const
 void InputState::setDigging(bool v)
 {
 	mDigging = v;
-}
-
-void InputState::setDriving(bool v)
-{
-	mDriving = v;
 }
 
 void InputState::setShooting(bool v)

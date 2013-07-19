@@ -116,6 +116,7 @@ class World : public boost::enable_shared_from_this<World> {
 		SidePtr getSide(bool first) const;
 		std::vector<WallPtr> getWallsAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersInFOV(const SoldierPtr p);
+		std::vector<ArmorPtr> getArmorsInFOV(const SoldierPtr p);
 		std::vector<Foxhole*> getFoxholesInFOV(const SoldierPtr p);
 		int teamWon() const; // -1 => no one has won yet, -2 => no teams alive
 		int soldiersAlive(int t) const;
@@ -156,6 +157,8 @@ class World : public boost::enable_shared_from_this<World> {
 		void addDictator(int side);
 		void setHomeBasePositions();
 		void reapDeadSoldiers();
+		bool vehicleVisible(const SoldierPtr p, const Common::Vehicle& s,
+				const std::vector<Tree*>& nearbytrees) const;
 
 		float mWidth;
 		float mHeight;

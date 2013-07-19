@@ -62,6 +62,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 
 		bool checkLeaderStatus();
 		void updateObstacleCache();
+		void syncWithVehicle();
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;
@@ -72,6 +73,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		Common::SteadyTimer mObstacleCacheTimer;
 		Common::Countdown mMovementSoundTimer;
 		std::vector<SoldierCommunication> mCommunications;
+
+		bool mMountedSteering = false;
 
 		friend class SoldierAction;
 };

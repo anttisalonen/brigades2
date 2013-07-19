@@ -23,13 +23,33 @@ class Armor : public Common::Vehicle {
 	private:
 		static int getNextID();
 
-		bool mDestroyed;
 		int mID;
 		int mSide;
 		float mHealth = 1.0f;
 };
 
 typedef boost::shared_ptr<Armor> ArmorPtr;
+
+class ArmorQuery {
+	public:
+		ArmorQuery(const ArmorPtr p);
+		bool queryIsValid() const;
+		const Common::Vector3& getPosition() const;
+		int getSideNum() const;
+		bool isDestroyed() const;
+		float getHealth() const;
+		float damageFactorFromWeapon(const WeaponPtr w) const;
+		float getXYRotation() const;
+		Common::Vector3 getHeadingVector() const;
+		Common::Vector3 getVelocity() const;
+
+		bool operator<(const ArmorQuery& f) const;
+
+	private:
+		const ArmorPtr mArmor;
+		friend ArmorQuery;
+		friend class SoldierAction;
+};
 
 }
 

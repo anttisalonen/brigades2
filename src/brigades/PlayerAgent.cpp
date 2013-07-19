@@ -25,7 +25,7 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 #endif
 
 	if(mInputState->isDigging()) {
-		if(!mInputState->isDriving() && (!pcv.null() || mInputState->isShooting())) {
+		if(!soldier.mounted() && (!pcv.null() || mInputState->isShooting())) {
 			actions.push_back(SoldierAction(SAType::StopDigging));
 		} else {
 			return actions;
@@ -35,17 +35,17 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 	Vector3 tot;
 	Vector3 mousedir = mInputState->getMousePositionOnField() - soldier.getPosition();
 
-	if(!mInputState->isDriving()) {
+	if(!soldier.mounted()) {
 		actions.push_back(SoldierAction(SAType::Turn, mousedir));
 		tot = createMovement(true, pcv);
 		actions.push_back(SoldierAction(SAType::Move, tot));
 	} else {
-		actions.push_back(SoldierAction(SAType::Move, soldier.getHeadingVector() * pcv.y));
+		actions.push_back(SoldierAction(SAType::Move, soldier.getMountPoint().getHeadingVector() * pcv.y));
 		if(pcv.x) {
 			float rot(pcv.x);
 			rot *= -0.05f;
 			actions.push_back(SoldierAction(SAType::TurnBy, rot));
-			if(soldier.getHeadingVector().dot(soldier.getVelocity()) > 0.0f) {
+			if(soldier.getMountPoint().getHeadingVector().dot(soldier.getMountPoint().getVelocity()) > 0.0f) {
 				actions.push_back(SoldierAction(SAType::SetVelocityToHeading));
 			} else {
 				actions.push_back(SoldierAction(SAType::SetVelocityToNegativeHeading));

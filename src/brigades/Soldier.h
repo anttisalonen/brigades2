@@ -60,6 +60,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void clearWeapons();
 		void addWeapon(WeaponPtr w);
 		void mount(ArmorPtr a);
+		const ArmorPtr getMountPoint() const;
+		ArmorPtr getMountPoint();
 		void unmount();
 		WeaponPtr getCurrentWeapon();
 		const WeaponPtr getCurrentWeapon() const;

@@ -26,6 +26,9 @@ SoundEvent::SoundEvent(SoldierPtr soundmaker)
 void SoundEvent::handleEvent(SoldierPtr p)
 {
 	p->getSensorySystem()->addSound(mSoundMaker);
+	if(p->mounted()) {
+		p->getSensorySystem()->addSound(p->getMountPoint());
+	}
 }
 
 WeaponPickupEvent::WeaponPickupEvent(WeaponPtr w)

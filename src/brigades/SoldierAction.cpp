@@ -1,6 +1,7 @@
 #include <stdio.h>
 
 #include "SoldierAction.h"
+#include "SensorySystem.h"
 
 namespace Brigades {
 
@@ -12,6 +13,8 @@ SoldierAction::SoldierAction(SAType type)
 	switch(mType) {
 		case SAType::SetVelocityToHeading:
 		case SAType::SetVelocityToNegativeHeading:
+		case SAType::Mount:
+		case SAType::Unmount:
 			break;
 		default:
 			fprintf(stderr, "Error: action %d without data\n", (int)mType);
@@ -122,6 +125,12 @@ bool SoldierAction::execute(SoldierPtr s, boost::shared_ptr<SoldierController>& 
 
 		case SAType::Communication:
 			return doCommunication(s, controller);
+
+		case SAType::Mount:
+			return tryMount(s, controller);
+
+		case SAType::Unmount:
+			return tryUnmount(s, controller);
 	}
 	return false;
 }
@@ -161,6 +170,42 @@ bool SoldierAction::doCommunication(SoldierPtr s, boost::shared_ptr<SoldierContr
 void SoldierAction::setAgentDirectory(AgentDirectory* dir)
 {
 	AgentDir = dir;
+}
+
+bool SoldierAction::tryMount(SoldierPtr s, boost::shared_ptr<SoldierController>& controller)
+{
+	auto allseen = s->getSensorySystem()->getVehicles();
+	float mindist = 100.0f;
+	ArmorPtr found = nullptr;
+	for(auto& a : allseen) {
+		float dist = s->getPosition().distance(a->getPosition());
+		if(dist < mindist && dist < 5.0f) {
+			found = a;
+			mindist = dist;
+		}
+	}
+
+	if(!found) {
+		return false;
+	}
+
+	s->mount(found);
+	return true;
+}
+
+bool SoldierAction::tryUnmount(SoldierPtr s, boost::shared_ptr<SoldierController>& controller)
+{
+	if(!s->mounted())
+		return false;
+
+	s->unmount();
+
+	return true;
+}
+
+SAType SoldierAction::getType() const
+{
+	return mType;
 }
 
 }

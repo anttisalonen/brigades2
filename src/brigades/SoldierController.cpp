@@ -36,6 +36,17 @@ void SoldierController::update(float time)
 	if(mObstacleCacheTimer.check(time)) {
 		updateObstacleCache();
 	}
+
+	if(mSoldier->mounted() != mMountedSteering) {
+		mMountedSteering = mSoldier->mounted();
+		if(mSoldier->mounted()) {
+			mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier->getMountPoint()));
+		}
+		else {
+			mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier));
+		}
+	}
+
 }
 
 Vector3 SoldierController::defaultMovement() const
@@ -60,6 +71,10 @@ Vector3 SoldierController::defaultMovement() const
 
 bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
+	boost::shared_ptr<Vehicle> veh = mSoldier;
+	if(mSoldier->mounted())
+		veh = mSoldier->getMountPoint();
+
 	if(mSoldier->sleeping() || mSoldier->eating()) {
 		return false;
 	}
@@ -69,24 +84,27 @@ bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 		return false;
 	}
 
-	if(dir.null() && !mSoldier->getVelocity().null()) {
-		assert(!isnan(mSoldier->getVelocity().x));
-		assert(!isnan(mSoldier->getVelocity().y));
-		mSoldier->setAcceleration(mSoldier->getVelocity() * -10.0f);
+	if(dir.null() && !veh->getVelocity().null()) {
+		assert(!isnan(veh->getVelocity().x));
+		assert(!isnan(veh->getVelocity().y));
+		veh->setAcceleration(veh->getVelocity() * -10.0f);
 	}
 	else {
 		assert(time);
-		mSoldier->setAcceleration(dir * (10.0f / time));
+		veh->setAcceleration(dir * (10.0f / time));
 	}
-	mSoldier->Vehicle::update(time);
-	if(autorotate && mSoldier->getVelocity().length() > 0.3f)
-		mSoldier->setAutomaticHeading();
+	veh->Vehicle::update(time);
+	if(autorotate && veh->getVelocity().length() > 0.3f)
+		veh->setAutomaticHeading();
 
 	mMovementSoundTimer.doCountdown(time);
 	if(mMovementSoundTimer.checkAndRewind()) {
 		mWorld->createMovementSound(mSoldier);
 	}
 
+	if(mSoldier->mounted()) {
+		syncWithVehicle();
+	}
 	return true;
 }
 
@@ -95,7 +113,11 @@ bool SoldierController::turnTo(const Common::Vector3& dir)
 	if(mSoldier->sleeping() || mSoldier->eating())
 		return false;
 
+	if(mSoldier->mounted())
+		mSoldier->getMountPoint()->setXYRotation(atan2(dir.y, dir.x));
+
 	mSoldier->setXYRotation(atan2(dir.y, dir.x));
+
 	return true;
 }
 
@@ -104,7 +126,11 @@ bool SoldierController::turnBy(float rad)
 	if(mSoldier->sleeping() || mSoldier->eating())
 		return false;
 
+	if(mSoldier->mounted())
+		mSoldier->getMountPoint()->addXYRotation(rad);
+
 	mSoldier->addXYRotation(rad);
+
 	return true;
 }
 
@@ -113,7 +139,11 @@ bool SoldierController::setVelocityToHeading()
 	if(mSoldier->sleeping() || mSoldier->eating())
 		return false;
 
+	if(mSoldier->mounted())
+		mSoldier->getMountPoint()->setVelocityToHeading();
+
 	mSoldier->setVelocityToHeading();
+
 	return true;
 }
 
@@ -122,7 +152,11 @@ bool SoldierController::setVelocityToNegativeHeading()
 	if(mSoldier->sleeping() || mSoldier->eating())
 		return false;
 
+	if(mSoldier->mounted())
+		mSoldier->getMountPoint()->setVelocityToNegativeHeading();
+
 	mSoldier->setVelocityToNegativeHeading();
+
 	return true;
 }
 
@@ -236,6 +270,16 @@ std::vector<SoldierCommunication> SoldierController::fetchCommunications()
 	auto ret = mCommunications;
 	mCommunications.clear();
 	return ret;
+}
+
+void SoldierController::syncWithVehicle()
+{
+	if(mSoldier->mounted()) {
+		auto armor = mSoldier->getMountPoint();
+		assert(armor);
+		mSoldier->setPosition(armor->getPosition());
+		mSoldier->setXYRotation(armor->getXYRotation());
+	}
 }
 
 }

@@ -30,6 +30,15 @@ std::vector<SoldierPtr> SensorySystem::getSoldiers() const
 	return ret;
 }
 
+std::vector<ArmorPtr> SensorySystem::getVehicles() const
+{
+	std::vector<ArmorPtr> ret;
+	for(auto& s : mArmors) {
+		ret.push_back(s.first);
+	}
+	return ret;
+}
+
 const std::vector<Foxhole*>& SensorySystem::getFoxholes() const
 {
 	if(!mFoxholesUpdated) {
@@ -41,24 +50,43 @@ const std::vector<Foxhole*>& SensorySystem::getFoxholes() const
 
 void SensorySystem::updateFOV()
 {
-	auto currentSoldiers = mSoldier->getWorld()->getSoldiersInFOV(mSoldier);
+	{
+		auto currentSoldiers = mSoldier->getWorld()->getSoldiersInFOV(mSoldier);
 
-	// add new soldiers and reset time for previous ones
-	// NOTE: as we store (and eventually return) SoldierPtrs,
-	// it means that the soldier actually knows where the enemy is
-	// for a while even when out of sight.
-	for(auto& s : currentSoldiers) {
-		mSoldiers[s] = 0.0f;
+		// add new soldiers and reset time for previous ones
+		for(auto& s : currentSoldiers) {
+			mSoldiers[s] = 0.0f;
+		}
+
+		for(auto it = mSoldiers.begin(); it != mSoldiers.end(); ) {
+			it->second += VISION_UPDATE_TIME;
+			if(it->second > RECOLLECTION_TIME) {
+				// erase entry
+				it = mSoldiers.erase(it);
+			} else {
+				// continue
+				++it;
+			}
+		}
 	}
 
-	for(auto it = mSoldiers.begin(); it != mSoldiers.end(); ) {
-		it->second += VISION_UPDATE_TIME;
-		if(it->second > RECOLLECTION_TIME) {
-			// erase entry
-			it = mSoldiers.erase(it);
-		} else {
-			// continue
-			++it;
+	{
+		auto currentArmors = mSoldier->getWorld()->getArmorsInFOV(mSoldier);
+
+		// add new soldiers and reset time for previous ones
+		for(auto& s : currentArmors) {
+			mArmors[s] = 0.0f;
+		}
+
+		for(auto it = mArmors.begin(); it != mArmors.end(); ) {
+			it->second += VISION_UPDATE_TIME;
+			if(it->second > RECOLLECTION_TIME) {
+				// erase entry
+				it = mArmors.erase(it);
+			} else {
+				// continue
+				++it;
+			}
 		}
 	}
 
@@ -71,9 +99,15 @@ void SensorySystem::addSound(SoldierPtr s)
 	mSoldiers[s] = 0.0f;
 }
 
+void SensorySystem::addSound(ArmorPtr s)
+{
+	mArmors[s] = 0.0f;
+}
+
 void SensorySystem::clear()
 {
 	mSoldiers.clear();
+	mArmors.clear();
 	mFoxholes.clear();
 	mFoxholesUpdated = false;
 }

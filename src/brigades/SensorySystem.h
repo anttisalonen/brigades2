@@ -8,6 +8,7 @@
 #include "common/Clock.h"
 
 #include "World.h"
+#include "Armor.h"
 
 namespace Brigades {
 
@@ -17,7 +18,9 @@ class SensorySystem {
 		bool update(float time);
 		std::vector<SoldierPtr> getSoldiers() const;
 		const std::vector<Foxhole*>& getFoxholes() const;
+		std::vector<ArmorPtr> getVehicles() const;
 		void addSound(SoldierPtr s);
+		void addSound(ArmorPtr p);
 		void clear();
 
 	private:
@@ -26,6 +29,7 @@ class SensorySystem {
 		SoldierPtr mSoldier;
 		Common::SteadyTimer mVisionUpdater;
 		std::map<SoldierPtr, float> mSoldiers;
+		std::map<ArmorPtr, float> mArmors;
 
 		mutable std::vector<Foxhole*> mFoxholes;
 		mutable bool mFoxholesUpdated;

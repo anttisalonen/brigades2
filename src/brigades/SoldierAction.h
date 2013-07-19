@@ -27,6 +27,8 @@ enum class SAType {
 	LineFormation,
 	ColumnFormation,
 	Communication,
+	Mount,
+	Unmount,
 };
 
 class SoldierAction {
@@ -37,12 +39,15 @@ class SoldierAction {
 		SoldierAction(SAType type, float val);
 		SoldierAction(const SoldierQuery& s, OrderType order, const Common::Vector3& pos);
 		bool execute(SoldierPtr s, boost::shared_ptr<SoldierController>& controller, float time);
+		SAType getType() const;
 
 		static void setAgentDirectory(AgentDirectory* dir);
 
 
 	private:
 		bool doCommunication(SoldierPtr s, boost::shared_ptr<SoldierController>& controller);
+		bool tryMount(SoldierPtr s, boost::shared_ptr<SoldierController>& controller);
+		bool tryUnmount(SoldierPtr s, boost::shared_ptr<SoldierController>& controller);
 
 		SAType mType;
 		Common::Vector3 mVec;
