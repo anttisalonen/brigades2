@@ -139,7 +139,9 @@ World::World(float width, float height, float visibility,
 	: mWidth(width),
 	mHeight(height),
 	mMaxSoldiers(1024),
+	mMaxArmors(256),
 	mSoldierCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxSoldiers),
+	mArmorCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxArmors),
 	mTrees(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
 	mFoxholes(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
 	mMaxVisibility(visibility),
@@ -186,6 +188,18 @@ std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius)
 	for(auto s = mSoldierCSP.queryBegin(Vector2(v.x, v.y), radius);
 			!mSoldierCSP.queryEnd();
 			s = mSoldierCSP.queryNext()) {
+		res.push_back(s);
+	}
+
+	return res;
+}
+
+std::vector<ArmorPtr> World::getArmorsAt(const Vector3& v, float radius)
+{
+	std::vector<ArmorPtr> res;
+	for(auto s = mArmorCSP.queryBegin(Vector2(v.x, v.y), radius);
+			!mArmorCSP.queryEnd();
+			s = mArmorCSP.queryNext()) {
 		res.push_back(s);
 	}
 
@@ -379,9 +393,23 @@ void World::update(float time)
 			s->update(time);
 
 			assert(!isnan(s->getPosition().x));
-			checkSoldierPosition(s);
+			checkVehiclePosition(*s);
 			assert(!isnan(s->getPosition().x));
 			mSoldierCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
+		}
+	}
+
+	for(auto sit : mArmorMap) {
+		auto s = sit.second;
+		if(!s->isDestroyed()) {
+			auto oldpos = s->getPosition();
+			assert(!isnan(s->getPosition().x));
+			s->update(time);
+
+			assert(!isnan(s->getPosition().x));
+			checkVehiclePosition(*s);
+			assert(!isnan(s->getPosition().x));
+			mArmorCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
 		}
 	}
 
@@ -410,9 +438,31 @@ void World::update(float time)
 				s->reduceHealth(s->damageFactorFromWeapon((*bit)->getWeapon()));
 				if(s->getHealth() <= 0.0f) {
 					killSoldier(s);
-					if(s->isDictator()) {
-						mTeamWon = (*bit)->getShooter()->getSideNum();
-					}
+				}
+				erase = true;
+				break;
+			}
+		}
+
+		auto armors = getArmorsAt((*bit)->getPosition(), (*bit)->getVelocity().length());
+		for(auto s : armors) {
+			if(mTeamWon != -1)
+				continue;
+
+			if(s->getSideNum() == (*bit)->getShooter()->getSideNum())
+				continue;
+
+			if(s->isDestroyed())
+				continue;
+
+			float wdth = s->getRadius();
+
+			if(Math::segmentCircleIntersect((*bit)->getPosition(),
+						(*bit)->getPosition() + (*bit)->getVelocity() * time,
+						s->getPosition(), wdth)) {
+				s->reduceHealth(s->damageFactorFromWeapon((*bit)->getWeapon()));
+				if(s->getHealth() <= 0.0f) {
+					destroyArmor(s);
 				}
 				erase = true;
 				break;
@@ -557,7 +607,7 @@ void World::dig(float time, const Common::Vector3& pos)
 void World::createMovementSound(const SoldierPtr s)
 {
 	float dist = getShootSoundHearingDistance() * 0.3f;
-	if(s->getWarriorType() == WarriorType::Vehicle)
+	if(s->mounted())
 		dist *= 3.0f;
 	auto nearbySoldiers = getSoldiersAt(s->getPosition(), dist);
 	SoundTrigger trigger(s, dist);
@@ -610,14 +660,14 @@ void World::setupSides()
 	mSoldiersAtStart = mSoldiersAlive[0];
 }
 
-SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator)
+SoldierPtr World::addSoldier(bool first, SoldierRank rank, bool dictator)
 {
 	if(mSoldierMap.size() >= mMaxSoldiers) {
 		assert(0);
 		throw std::runtime_error("Too many soldiers in the world");
 	}
 
-	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank, wt));
+	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank));
 	s->init();
 	if(mSoldierListener)
 		mSoldierListener->soldierAdded(s);
@@ -634,6 +684,21 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool 
 	s->setPosition(getHomeBasePosition(first));
 	mSoldierCSP.add(s, Vector2(s->getPosition().x, s->getPosition().y));
 	mSoldierMap.insert(std::make_pair(s->getID(), s));
+	return s;
+}
+
+ArmorPtr World::addArmor(bool first)
+{
+	if(mArmorMap.size() >= mMaxArmors) {
+		assert(0);
+		throw std::runtime_error("Too many soldiers in the world");
+	}
+
+	ArmorPtr s = ArmorPtr(new Armor(first ? 0 : 1));
+
+	s->setPosition(getHomeBasePosition(first));
+	mArmorCSP.add(s, Vector2(s->getPosition().x, s->getPosition().y));
+	mArmorMap.insert(std::make_pair(s->getID(), s));
 	return s;
 }
 
@@ -702,43 +767,43 @@ void World::addWalls()
 	mWalls.push_back(WallPtr(new Wall(c, d)));
 }
 
-void World::checkSoldierPosition(SoldierPtr s)
+void World::checkVehiclePosition(Common::Vehicle& s)
 {
-	for(auto t : getTreesAt(s->getPosition(), s->getRadius() * 2.0f)) {
-		Vector3 diff = s->getPosition() - t->getPosition();
+	for(auto t : getTreesAt(s.getPosition(), s.getRadius() * 2.0f)) {
+		Vector3 diff = s.getPosition() - t->getPosition();
 		float dist2 = diff.length2();
-		float mindist = t->getRadius() + s->getRadius();
+		float mindist = t->getRadius() + s.getRadius();
 		if(dist2 < mindist * mindist) {
 			if(dist2 == 0.0f)
 				diff = Vector3(1, 0, 0);
 			Vector3 shouldpos = t->getPosition() + diff.normalized() * mindist;
-			s->setPosition(shouldpos);
-			s->setVelocity(diff * 0.3f);
+			s.setPosition(shouldpos);
+			s.setVelocity(diff * 0.3f);
 		}
 	}
 
-	if(fabs(s->getPosition().x) > mWidth * 0.5f) {
+	if(fabs(s.getPosition().x) > mWidth * 0.5f) {
 		float nx = mWidth * 0.5f - 1.0f;
-		Vector3 p = s->getPosition();
-		if(s->getPosition().x < 0.0f) {
+		Vector3 p = s.getPosition();
+		if(s.getPosition().x < 0.0f) {
 			p.x = -nx;
 		} else {
 			p.x = nx;
 		}
-		s->setPosition(p);
-		s->setVelocity(Vector3());
+		s.setPosition(p);
+		s.setVelocity(Vector3());
 	}
 
-	if(fabs(s->getPosition().y) > mHeight * 0.5f) {
+	if(fabs(s.getPosition().y) > mHeight * 0.5f) {
 		float ny = mHeight * 0.5f - 1.0f;
-		Vector3 p = s->getPosition();
-		if(s->getPosition().y < 0.0f) {
+		Vector3 p = s.getPosition();
+		if(s.getPosition().y < 0.0f) {
 			p.y = -ny;
 		} else {
 			p.y = ny;
 		}
-		s->setPosition(p);
-		s->setVelocity(Vector3());
+		s.setPosition(p);
+		s.setVelocity(Vector3());
 	}
 }
 
@@ -775,7 +840,7 @@ void World::killSoldier(SoldierPtr s)
 	s->die();
 	if(mSoldierListener)
 		mSoldierListener->soldierRemoved(s);
-	if(s->getWarriorType() == WarriorType::Soldier) {
+	if(!s->mounted()) {
 		for(auto w : s->getWeapons()) {
 			Vector3 offset = Vector3(1.0f * Random::clamped(), 1.0f * Random::clamped(), 0.0f);
 			mTriggerSystem.add(WeaponPickupTriggerPtr(new WeaponPickupTrigger(w, s->getPosition() + offset)));
@@ -786,6 +851,18 @@ void World::killSoldier(SoldierPtr s)
 		assert(s->getSideNum() < NUM_SIDES);
 		assert(mSoldiersAlive[s->getSideNum()] > 0);
 		mSoldiersAlive[s->getSideNum()]--;
+		mTeamWon = s->getSideNum() == 1 ? 0 : 1;
+	}
+}
+
+void World::destroyArmor(ArmorPtr a)
+{
+	auto nearbysoldiers = getSoldiersAt(a->getPosition(), 20.0f);
+	for(auto s : nearbysoldiers) {
+		float dist = Entity::distanceBetween(*a, *s);
+		if(dist < 20.0f) {
+			killSoldier(s);
+		}
 	}
 }
 
@@ -802,7 +879,7 @@ SoldierPtr World::addCompany(int side, bool reuseLeader)
 {
 	SoldierPtr companyleader;
 
-	companyleader = addSoldier(side == 0, SoldierRank::Captain, WarriorType::Soldier, false);
+	companyleader = addSoldier(side == 0, SoldierRank::Captain, false);
 
 	for(int k = 0; k < 3; k++) {
 		auto s = addPlatoon(side, reuseLeader);
@@ -833,7 +910,7 @@ SoldierPtr World::addPlatoon(int side, bool reuseLeader)
 	}
 
 	if(!platoonleader) {
-		platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, WarriorType::Soldier, false);
+		platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, false);
 	}
 
 	for(int k = 0; k < 3; k++) {
@@ -855,11 +932,7 @@ SoldierPtr World::addSquad(int side, bool reuseLeader)
 {
 	SoldierPtr squadleader;
 	for(int j = 0; j < 8; j++) {
-		WarriorType wt = WarriorType::Soldier;
-		if(j == 7)
-			wt = WarriorType::Vehicle;
-
-		auto s = addSoldier(side == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, wt, false);
+		auto s = addSoldier(side == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, false);
 		if(j == 0) {
 			squadleader = s;
 		}
@@ -874,12 +947,15 @@ SoldierPtr World::addSquad(int side, bool reuseLeader)
 			squadleader->addCommandee(s);
 		}
 	}
+
+	addArmor(side == 0);
+
 	return squadleader;
 }
 
 void World::addDictator(int side)
 {
-	addSoldier(side == 0, SoldierRank::Private, WarriorType::Soldier, true);
+	addSoldier(side == 0, SoldierRank::Private, true);
 }
 
 void World::setHomeBasePositions()
@@ -892,13 +968,27 @@ void World::setHomeBasePositions()
 
 void World::reapDeadSoldiers()
 {
-	auto it = mSoldierMap.begin();
-	while(it != mSoldierMap.end()) {
-		if(it->second->isDead()) {
-			mSoldierCSP.remove(it->second, Vector2(it->second->getPosition().x, it->second->getPosition().y));
-			it = mSoldierMap.erase(it);
-		} else {
-			++it;
+	{
+		auto it = mSoldierMap.begin();
+		while(it != mSoldierMap.end()) {
+			if(it->second->isDead()) {
+				mSoldierCSP.remove(it->second, Vector2(it->second->getPosition().x, it->second->getPosition().y));
+				it = mSoldierMap.erase(it);
+			} else {
+				++it;
+			}
+		}
+	}
+
+	{
+		auto it = mArmorMap.begin();
+		while(it != mArmorMap.end()) {
+			if(it->second->isDestroyed()) {
+				mArmorCSP.remove(it->second, Vector2(it->second->getPosition().x, it->second->getPosition().y));
+				it = mArmorMap.erase(it);
+			} else {
+				++it;
+			}
 		}
 	}
 }

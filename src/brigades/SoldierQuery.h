@@ -46,7 +46,6 @@ class SoldierQuery {
 		std::set<SoldierQuery> getSensedSoldiers() const;
 		std::set<FoxholeQuery> getSensedFoxholes() const;
 
-		WarriorType getWarriorType() const;
 		bool hasWeaponType(const char* wname) const;
 		bool isDictator() const;
 		bool canCommunicateWith(const SoldierQuery& p) const;
@@ -58,6 +57,7 @@ class SoldierQuery {
 		bool eating() const;
 		float getFatigueLevel() const; // >1.0 => should sleep
 		float getHungerLevel() const;  // >1.0 => should eat
+		bool mounted() const;
 
 		Common::Vector3 getFormationOffset() const;
 		Common::Vector3 getDefendPosition() const;

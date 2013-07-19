@@ -14,6 +14,7 @@
 #include "Side.h"
 #include "Armory.h"
 #include "Event.h"
+#include "Armor.h"
 
 namespace Brigades {
 
@@ -22,11 +23,6 @@ enum class SoldierRank {
 	Sergeant,
 	Lieutenant,
 	Captain,
-};
-
-enum class WarriorType {
-	Soldier,
-	Vehicle
 };
 
 class World;
@@ -50,7 +46,7 @@ struct AttackOrder {
 
 class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<Soldier> {
 	public:
-		Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt = WarriorType::Soldier);
+		Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank);
 		void init();
 		SidePtr getSide() const;
 		int getID() const;
@@ -63,6 +59,8 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void dig(float time);
 		void clearWeapons();
 		void addWeapon(WeaponPtr w);
+		void mount(ArmorPtr a);
+		void unmount();
 		WeaponPtr getCurrentWeapon();
 		const WeaponPtr getCurrentWeapon() const;
 		void switchWeapon(unsigned int index);
@@ -90,7 +88,6 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void setLineFormation(float dist);
 		void setColumnFormation(float dist);
 		void pruneCommandees();
-		WarriorType getWarriorType() const;
 		void reduceHealth(float n);
 		float getHealth() const;
 		float damageFactorFromWeapon(const WeaponPtr w) const;
@@ -111,6 +108,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void stopEating();
 		float getFatigueLevel() const; // >1.0 => should sleep
 		float getHungerLevel() const;  // >1.0 => should eat
+		bool mounted() const;
 
 		// orders for the privates
 		void setFormationOffset(const Common::Vector3& v);
@@ -142,13 +140,13 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		float mFOV;
 		bool mAlive;
 		std::vector<WeaponPtr> mWeapons;
+		std::vector<WeaponPtr> mBackupWeapons;
 		unsigned int mCurrentWeaponIndex;
 		boost::shared_ptr<SensorySystem> mSensorySystem;
 		std::vector<EventPtr> mEvents;
 		SoldierRank mRank;
 		std::list<SoldierPtr> mCommandees;
 		SoldierPtr mLeader;
-		WarriorType mWarriorType;
 		float mHealth;
 		bool mDictator;
 		float mFatigue = 0.0f;
@@ -168,6 +166,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		std::string mName;
 		bool mEnemyContact;
 		Common::Countdown mEnemyContactTimer;
+		ArmorPtr mMountPoint;
 
 		static int getNextID();
 		static std::string generateName();

@@ -73,7 +73,7 @@ WeaponPickupTrigger::WeaponPickupTrigger(WeaponPtr w, const Vector3& pos)
 void WeaponPickupTrigger::tryTrigger(SoldierPtr s)
 {
 	if(!s->isDead() &&
-			s->getWarriorType() == WarriorType::Soldier &&
+			!s->mounted() &&
 			mRegion.isIn(s->getPosition()) &&
 			!s->hasWeaponType(mWeapon->getName()) &&
 			!mPickedUp) {

@@ -179,10 +179,10 @@ bool SoldierQuery::seesSoldier(const SoldierQuery& s) const
 	return false;
 }
 
-WarriorType SoldierQuery::getWarriorType() const
+bool SoldierQuery::mounted() const
 {
 	soldier_query_check();
-	return mSoldier->getWarriorType();
+	return mSoldier->mounted();
 }
 
 bool SoldierQuery::hasWeaponType(const char* wname) const

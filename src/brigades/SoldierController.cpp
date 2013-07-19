@@ -145,9 +145,6 @@ bool SoldierController::checkLeaderStatus()
 	if(mSoldier->sleeping() || mSoldier->eating())
 		return false;
 
-	if(mSoldier->getWarriorType() != WarriorType::Soldier)
-		return false;
-
 	switch(mSoldier->getRank()) {
 		case SoldierRank::Private:
 			if(mSoldier->getLeader() &&

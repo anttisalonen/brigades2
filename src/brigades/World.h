@@ -107,6 +107,7 @@ class World : public boost::enable_shared_from_this<World> {
 		// accessors
 		std::vector<Tree*> getTreesAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius);
+		std::vector<ArmorPtr> getArmorsAt(const Common::Vector3& v, float radius);
 		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
 		std::vector<Foxhole*> getFoxholesAt(const Common::Vector3& v, float radius) const;
 		Foxhole* getFoxholeAt(const Common::Vector3& pos);
@@ -139,12 +140,14 @@ class World : public boost::enable_shared_from_this<World> {
 	private:
 		void setupSides();
 		SoldierPtr addUnit(UnitSize u, unsigned int side, bool reuseLeader = false);
-		SoldierPtr addSoldier(bool first, SoldierRank rank, WarriorType wt, bool dictator);
+		SoldierPtr addSoldier(bool first, SoldierRank rank, bool dictator);
+		ArmorPtr addArmor(bool first);
 		void addTrees();
 		void addWalls();
-		void checkSoldierPosition(SoldierPtr s);
+		void checkVehiclePosition(Common::Vehicle& s);
 		void checkForWin();
 		void killSoldier(SoldierPtr s);
+		void destroyArmor(ArmorPtr a);
 		void updateTriggerSystem(float time);
 		void updateVisibility();
 		SoldierPtr addCompany(int side, bool reuseLeader);
@@ -157,9 +160,12 @@ class World : public boost::enable_shared_from_this<World> {
 		float mWidth;
 		float mHeight;
 		const unsigned int mMaxSoldiers;
+		const unsigned int mMaxArmors;
 		SidePtr mSides[NUM_SIDES];
 		Common::CellSpacePartition<SoldierPtr> mSoldierCSP;
+		Common::CellSpacePartition<ArmorPtr> mArmorCSP;
 		std::map<int, SoldierPtr> mSoldierMap;
+		std::map<int, ArmorPtr> mArmorMap;
 		Common::QuadTree<Tree*> mTrees;
 		Common::QuadTree<Foxhole*> mFoxholes;
 		std::vector<WallPtr> mWalls;

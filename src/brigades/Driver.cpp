@@ -479,7 +479,7 @@ bool Driver::handleInput(float frameTime)
 						break;
 
 					case SDLK_b:
-						if(!mObserver && mSoldier->getWarriorType() == WarriorType::Soldier) {
+						if(!mObserver && !mSoldier->mounted()) {
 							if(mInputState->isDigging()) {
 								mPendingActions.push_back(SoldierAction(SAType::StopDigging));
 							} else {
@@ -892,14 +892,10 @@ void Driver::drawTexts()
 			char buf[128];
 			buf[127] = 0;
 			if(mSoldier->getRank() == SoldierRank::Sergeant) {
-				if(s.getWarriorType() == WarriorType::Vehicle) {
-					snprintf(buf, 127, "Vehicle %s", s.getName().c_str());
-				} else {
-					snprintf(buf, 127, "%s %s%s%s", Soldier::rankToString(s.getRank()),
-							s.getName().c_str(),
-							s.hasWeaponType("Bazooka") ? " (B)" : "",
-							s.hasWeaponType("Machine Gun") ? " (MG)" : "");
-				}
+				snprintf(buf, 127, "%s %s%s%s", Soldier::rankToString(s.getRank()),
+						s.getName().c_str(),
+						s.hasWeaponType("Bazooka") ? " (B)" : "",
+						s.hasWeaponType("Machine Gun") ? " (MG)" : "");
 			} else {
 				int numcommandees = getNumberOfAvailableCommandees(s);
 				snprintf(buf, 127, "%s %s (%d)", Soldier::rankToString(s.getRank()),
@@ -1034,12 +1030,11 @@ void Driver::drawLine(const Common::Vector3& p1, const Common::Vector3& p2, cons
 	SDL_utils::drawLine(v1, v2, c, 1.0f);
 }
 
-const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierQuery& p, float& sxp, float& syp,
+const boost::shared_ptr<Texture> Driver::soldierTexture(bool soldier, bool dead, float xyrot,
+		bool firstSide, float& sxp, float& syp,
 		float& xp, float& yp, float& scale)
 {
-	int sideIndex = p.getSideNum() == 0 ? 0 : 1;
-	bool dead = p.isDead();
-	bool soldier = p.getWarriorType() == WarriorType::Soldier;
+	int sideIndex = firstSide ? 0 : 1;
 
 	if(soldier) {
 		scale = 2.0f;
@@ -1061,7 +1056,7 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierQuery& p, f
 		return mFallenSoldierTexture[sideIndex];
 	}
 
-	float r = p.getXYRotation();
+	float r = xyrot;
 	int dir = 3; // west
 	if(r < QUARTER_PI && r >= -QUARTER_PI) {
 		dir = 1; // east
@@ -1487,7 +1482,7 @@ void Driver::setFocusSoldier()
 			}
 		}
 
-		mInputState->setDriving(mSoldier->getWarriorType() == WarriorType::Vehicle);
+		mInputState->setDriving(mSoldier->mounted());
 		if(mSoldier->getRank() == SoldierRank::Lieutenant && mSoldier->getCommandees().size() > 0) {
 			mSelectedCommandee = SoldierQueryPtr(new SoldierQuery(*mSoldier->getCommandees().begin()));
 		}
@@ -1621,7 +1616,8 @@ void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery&
 {
 	float xp, yp, sxp, syp;
 	float scale;
-	boost::shared_ptr<Texture> t = soldierTexture(s, sxp, syp, xp, yp, scale);
+	boost::shared_ptr<Texture> t = soldierTexture(true, s.isDead(), s.getXYRotation(), s.getSideNum() == 0,
+			sxp, syp, xp, yp, scale);
 	sprites.insert(Sprite(s.getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
 				sxp, syp));
 	if(addbrightspot) {

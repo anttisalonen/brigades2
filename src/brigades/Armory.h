@@ -73,11 +73,11 @@ typedef boost::shared_ptr<Weapon> WeaponPtr;
 
 class Armory {
 	public:
-		WeaponPtr getAssaultRifle();
-		WeaponPtr getMachineGun();
-		WeaponPtr getBazooka();
-		WeaponPtr getPistol();
-		WeaponPtr getAutomaticCannon();
+		WeaponPtr getAssaultRifle() const;
+		WeaponPtr getMachineGun() const;
+		WeaponPtr getBazooka() const;
+		WeaponPtr getPistol() const;
+		WeaponPtr getAutomaticCannon() const;
 		virtual ~Armory() { }
 		Armory* getInstance();
 		void setInstance(Armory* a);

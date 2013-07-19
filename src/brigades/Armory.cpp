@@ -101,7 +101,7 @@ void Weapon::shoot(WorldPtr w, const SoldierPtr s, const Vector3& dir)
 
 	float var = mWeapon->getVariation();
 
-	if(s->getWarriorType() == WarriorType::Soldier && mWeapon->speedVariates()) {
+	if(!s->mounted() && mWeapon->speedVariates()) {
 		if(s->getSpeed() > 0.5f) {
 			var *= 4.0f;
 		}
@@ -164,27 +164,27 @@ bool Weapon::speedVariates() const
 }
 
 
-WeaponPtr Armory::getAssaultRifle()
+WeaponPtr Armory::getAssaultRifle() const
 {
 	return WeaponPtr(new Weapon(mAssaultRifle));
 }
 
-WeaponPtr Armory::getMachineGun()
+WeaponPtr Armory::getMachineGun() const
 {
 	return WeaponPtr(new Weapon(mMachineGun));
 }
 
-WeaponPtr Armory::getBazooka()
+WeaponPtr Armory::getBazooka() const
 {
 	return WeaponPtr(new Weapon(mBazooka));
 }
 
-WeaponPtr Armory::getPistol()
+WeaponPtr Armory::getPistol() const
 {
 	return WeaponPtr(new Weapon(mPistol));
 }
 
-WeaponPtr Armory::getAutomaticCannon()
+WeaponPtr Armory::getAutomaticCannon() const
 {
 	return WeaponPtr(new Weapon(mAutoCannon));
 }

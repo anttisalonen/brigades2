@@ -177,8 +177,9 @@ class Driver : public DebugOutput, public InfoChannel {
 				const Common::Color& c, float alpha, bool onlyframes);
 		void drawLine(const Common::Vector3& p1, const Common::Vector3& p2, const Common::Color& c);
 		void drawArrow(const Common::Vector3& start, const Common::Vector3& end, const Common::Color& c);
-		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierQuery& p,
-				float& xp, float& yp, float& sxp, float& syp, float& scale);
+		const boost::shared_ptr<Common::Texture> soldierTexture(bool soldier, bool dead, float xyrot,
+				bool firstSide, float& sxp, float& syp,
+				float& xp, float& yp, float& scale);
 		const boost::shared_ptr<Common::Texture> getUnitIconTexture(const UnitIconDescriptor& d);
 		const boost::shared_ptr<Common::Texture> unitIconTexture(const SoldierQuery& p, float& scale);
 		void drawEntities();

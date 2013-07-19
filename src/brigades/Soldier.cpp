@@ -21,7 +21,7 @@ AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, flo
 	DefenseLineToRight.y = -v.x;
 }
 
-Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt)
+Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),
 	mWorld(w),
 	mSide(w->getSide(firstside)),
@@ -30,7 +30,6 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mAlive(true),
 	mCurrentWeaponIndex(0),
 	mRank(rank),
-	mWarriorType(wt),
 	mHealth(1.0f),
 	mDictator(false),
 	mAttacking(false),
@@ -38,16 +37,7 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 	mEnemyContactTimer(1.0f)
 {
 	mName = generateName();
-	if(wt == WarriorType::Vehicle) {
-		mRadius = 3.5f;
-		mMaxSpeed = 30.0f;
-		mMaxAcceleration = 10.0f;
-		addWeapon(mWorld->getArmory().getAutomaticCannon());
-		addWeapon(mWorld->getArmory().getMachineGun());
-		mFOV = TWO_PI;
-	} else {
-		addWeapon(mWorld->getArmory().getAssaultRifle());
-	}
+	addWeapon(mWorld->getArmory().getAssaultRifle());
 }
 
 void Soldier::init()
@@ -125,6 +115,11 @@ float Soldier::getFatigueLevel() const
 float Soldier::getHungerLevel() const
 {
 	return mHunger / 48.0f;
+}
+
+bool Soldier::mounted() const
+{
+	return mMountPoint != nullptr;
 }
 
 void Soldier::handleSleep(float time)
@@ -254,6 +249,25 @@ void Soldier::dig(float time)
 void Soldier::clearWeapons()
 {
 	mWeapons.clear();
+}
+
+void Soldier::mount(ArmorPtr a)
+{
+	mMountPoint = a;
+	mBackupWeapons = mWeapons;
+	mWeapons.clear();
+	addWeapon(mWorld->getArmory().getAutomaticCannon());
+	addWeapon(mWorld->getArmory().getMachineGun());
+	mFOV = TWO_PI;
+}
+
+void Soldier::unmount()
+{
+	assert(mMountPoint);
+	mMountPoint = nullptr;
+	mWeapons = mBackupWeapons;
+	mBackupWeapons.clear();
+	mFOV = PI;
 }
 
 void Soldier::addWeapon(WeaponPtr w)
@@ -472,11 +486,6 @@ void Soldier::pruneCommandees()
 
 }
 
-WarriorType Soldier::getWarriorType() const
-{
-	return mWarriorType;
-}
-
 void Soldier::reduceHealth(float n)
 {
 	mHealth -= n;
@@ -489,11 +498,7 @@ float Soldier::getHealth() const
 
 float Soldier::damageFactorFromWeapon(const WeaponPtr w) const
 {
-	if(getWarriorType() == WarriorType::Soldier) {
-		return w->getDamageAgainstSoftTargets();
-	} else {
-		return w->getDamageAgainstLightArmor();
-	}
+	return w->getDamageAgainstSoftTargets();
 }
 
 bool Soldier::hasWeaponType(const char* wname) const
