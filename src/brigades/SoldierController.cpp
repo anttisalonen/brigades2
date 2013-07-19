@@ -1,6 +1,9 @@
 #include "SoldierController.h"
 #include "Soldier.h"
 #include "World.h"
+#include "SoldierQuery.h"
+
+#include "SoldierAgent.h"
 
 using namespace Common;
 
@@ -18,13 +21,6 @@ AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, flo
 	DefenseLineToRight.y = -v.x;
 }
 
-SoldierController::SoldierController()
-	: mLeaderStatusTimer(1.0f),
-	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME),
-	mMovementSoundTimer(1.0f)
-{
-}
-
 SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	: mWorld(s->getWorld()),
 	mSoldier(s),
@@ -33,17 +29,6 @@ SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	mObstacleCacheTimer(SOLDIERCONTROLLER_OBSTACLE_CACHE_UPDATE_TIME),
 	mMovementSoundTimer(1.0f)
 {
-}
-
-void SoldierController::setSoldier(boost::shared_ptr<Soldier> s)
-{
-	if(mSoldier) {
-		mSoldier->setAIController();
-	}
-	mSoldier = s;
-	mWorld = mSoldier->getWorld();
-	mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier));
-	mSoldier->setController(shared_from_this());
 }
 
 void SoldierController::updateObstacleCache()
@@ -56,14 +41,17 @@ void SoldierController::updateObstacleCache()
 		mObstacleCache.push_back(trees[i]);
 }
 
-Vector3 SoldierController::defaultMovement(float time)
+void SoldierController::update(float time)
 {
-	if(mSoldier->sleeping() || mSoldier->eating())
-		return Vector3();
-
 	if(mObstacleCacheTimer.check(time)) {
 		updateObstacleCache();
 	}
+}
+
+Vector3 SoldierController::defaultMovement() const
+{
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return Vector3();
 
 	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
 	std::vector<Wall*> walls(wallptrs.size());
@@ -134,9 +122,9 @@ void SoldierController::setVelocityToHeading()
 	mSoldier->setVelocityToHeading();
 }
 
-boost::shared_ptr<Common::Steering> SoldierController::getSteering()
+SoldierQuery SoldierController::getControlledSoldier() const
 {
-	return mSteering;
+	return SoldierQuery(mSoldier);
 }
 
 bool SoldierController::handleLeaderCheck(float time)
@@ -193,6 +181,15 @@ bool SoldierController::checkLeaderStatus()
 	}
 
 	return false;
+}
+
+Common::Vector3 SoldierController::createMovement(bool defmov, const Common::Vector3& mov) const
+{
+	Vector3 tot;
+	if(defmov)
+		tot = defaultMovement();
+	mSteering->accumulate(tot, mov);
+	return tot;
 }
 
 }

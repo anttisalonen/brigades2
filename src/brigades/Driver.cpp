@@ -3,6 +3,9 @@
 
 #include "Driver.h"
 #include "SensorySystem.h"
+#include "InputState.h"
+
+#include "ai/SoldierAgent.h"
 
 #include "common/Random.h"
 #include "common/Rectangle.h"
@@ -42,30 +45,49 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mScaleLevelVelocity(0.0f),
 	mFreeCamera(false),
 	mObserver(observer),
-	mShooting(false),
 	mRestarting(false),
-	mDriving(false),
 	mSpeechBubbleTimer(2.0f),
 	mNextInfoMessageIndex(0),
 	mSoldierRank(r),
+	mInputState(new InputState()),
 	mCreatingAttackOrder(false),
-	mRectangleFinished(false),
 	mTimeAcceleration(1.0f),
-	mDigging(false),
 	mMapLevel(MapLevel::Normal)
 {
+	mWorld->setSoldierListener(&mAgentDirectory);
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
 
 	loadTextures();
 	loadFont();
 	SDL_utils::setupOrthoScreen(screenWidth, screenHeight);
-	if(mSoldier)
-		mCameraMouseOffset = (getMousePositionOnField() - mSoldier->getPosition()) * 0.45f;
+}
+
+Driver::~Driver()
+{
+	if(mControlledSoldier) {
+		auto succ = mAgentDirectory.removeAgent(mControlledSoldier, mPlayerAgent);
+		assert(succ);
+	}
+	mControlledSoldier = nullptr;
+	mPlayerAgent = nullptr;
+	mWorld->setSoldierListener(nullptr);
+	delete mInputState;
 }
 
 void Driver::init()
 {
 	setFocusSoldier();
+}
+
+void Driver::updateAgents(float time)
+{
+	for(auto& p : mAgentDirectory.getAgents()) {
+		p.second->updateController(time);
+		auto actions = p.second->update(time);
+		for(auto& a : actions) {
+			a.execute();
+		}
+	}
 }
 
 void Driver::run()
@@ -81,10 +103,12 @@ void Driver::run()
 			float ta = mTimeAcceleration;
 			while(ta >= 1.0f) {
 				mWorld->update(frameTime);
+				updateAgents(frameTime);
 				ta--;
 			}
 			if(ta > 0.0f) {
 				mWorld->update(ta * frameTime);
+				updateAgents(ta * frameTime);
 			}
 		}
 
@@ -121,72 +145,7 @@ void Driver::run()
 	}
 }
 
-void Driver::act(float time)
-{
-	if(handleLeaderCheck(time)) {
-		addMessage(mSoldier, Color::White, "Rank updated");
-	}
-
-	if(mDigging) {
-		if(!mDriving && (!mPlayerControlVelocity.null() || mShooting)) {
-			mDigging = false;
-		} else {
-			mSoldier->dig(time);
-			return;
-		}
-	}
-
-	mSoldier->handleEvents();
-	Vector3 tot;
-	Vector3 mousedir = getMousePositionOnField() - mSoldier->getPosition();
-
-	if(!mDriving) {
-		tot = defaultMovement(time);
-		mSteering->accumulate(tot, mPlayerControlVelocity);
-		turnTo(mousedir);
-	} else {
-		if(mPlayerControlVelocity.y) {
-			Vector3 vec = mSoldier->getHeadingVector() * mPlayerControlVelocity.y;
-			mSteering->accumulate(tot, vec);
-		}
-		if(mPlayerControlVelocity.x) {
-			float rot(mPlayerControlVelocity.x);
-			rot *= -0.05f;
-			turnBy(rot);
-			if(mSoldier->getHeadingVector().dot(mSoldier->getVelocity()) > 0.0f) {
-				setVelocityToHeading();
-			} else {
-				mSoldier->setVelocityToNegativeHeading();
-			}
-		}
-	}
-	moveTo(tot, time, false);
-
-	if(mShooting) {
-		if(mSoldier->getCurrentWeapon() && mSoldier->getCurrentWeapon()->canShoot()) {
-			mSoldier->getCurrentWeapon()->shoot(mWorld, mSoldier, mousedir);
-		}
-	}
-
-	if(mRectangleFinished) {
-		mRectangleFinished = false;
-		if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
-				mSelectedCommandee && mSoldier->canCommunicateWith(mSelectedCommandee)) {
-			if(!mSelectedCommandee->giveAttackOrder(mDrawnAttackOrder)) {
-				addMessage(mSelectedCommandee, Color::White, "I'm unable to comply");
-			}
-		}
-	}
-
-	if(!mDesignatedDefendPosition.null()) {
-		if(!mObserver && mSoldier->getRank() == SoldierRank::Sergeant &&
-				mSelectedCommandee && mSoldier->canCommunicateWith(mSelectedCommandee)) {
-			mSelectedCommandee->setDefendPosition(mDesignatedDefendPosition);
-		}
-		mDesignatedDefendPosition = Vector3();
-	}
-}
-
+#if 0
 bool Driver::handleAttackOrder(const AttackOrder& r)
 {
 	if(mSoldier && mSoldier->getLeader())
@@ -194,21 +153,22 @@ bool Driver::handleAttackOrder(const AttackOrder& r)
 	return true;
 }
 
-bool Driver::handleAttackSuccess(SoldierPtr s, const AttackOrder& r)
+bool Driver::handleAttackSuccess(SoldierQueryPtr s, const AttackOrder& r)
 {
 	addMessage(s, Color::White, "Attack successful");
 	return true;
 }
 
-void Driver::handleAttackFailure(SoldierPtr s, const AttackOrder& r)
+void Driver::handleAttackFailure(SoldierQueryPtr s, const AttackOrder& r)
 {
 	addMessage(s, Color::White, "Attack failed");
 }
 
-void Driver::handleReinforcement(SoldierPtr s)
+void Driver::handleReinforcement(SoldierQueryPtr s)
 {
 	addMessage(s, Color::White, "Reinforcement received");
 }
+#endif
 
 void Driver::markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes)
 {
@@ -220,7 +180,7 @@ void Driver::addArrow(const Common::Color& c, const Common::Vector3& start, cons
 	mDebugSymbols.arrows.push_back(DebugSymbolCollection::Arrow(c, start, end));
 }
 
-void Driver::addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text)
+void Driver::addMessage(const SoldierQuery* s, const Common::Color& c, const char* text)
 {
 	if(s && s->getSideNum() != 0)
 		return;
@@ -234,7 +194,7 @@ void Driver::addMessage(const boost::shared_ptr<Soldier> s, const Common::Color&
 		mNextInfoMessageIndex = 0;
 }
 
-void Driver::say(boost::shared_ptr<Soldier> s, const char* msg)
+void Driver::say(const SoldierQuery& s, const char* msg)
 {
 	mSpeechBubbles[s] = SpeechBubble(msg);
 }
@@ -409,7 +369,7 @@ bool Driver::handleInput(float frameTime)
 						if(mFreeCamera)
 							mCameraVelocity.y = -1.0f;
 						else
-							mPlayerControlVelocity.y = 1.0f;
+							mInputState->setPlayerControlVelocityY(1.0f);
 						break;
 
 					case SDLK_s:
@@ -417,7 +377,7 @@ bool Driver::handleInput(float frameTime)
 						if(mFreeCamera)
 							mCameraVelocity.y = 1.0f;
 						else
-							mPlayerControlVelocity.y = -1.0f;
+							mInputState->setPlayerControlVelocityY(-1.0f);
 						break;
 
 					case SDLK_d:
@@ -425,7 +385,7 @@ bool Driver::handleInput(float frameTime)
 						if(mFreeCamera)
 							mCameraVelocity.x = -1.0f;
 						else
-							mPlayerControlVelocity.x = 1.0f;
+							mInputState->setPlayerControlVelocityX(1.0f);
 						break;
 
 					case SDLK_a:
@@ -433,7 +393,7 @@ bool Driver::handleInput(float frameTime)
 						if(mFreeCamera)
 							mCameraVelocity.x = 1.0f;
 						else
-							mPlayerControlVelocity.x = -1.0f;
+							mInputState->setPlayerControlVelocityX(-1.0f);
 						break;
 
 					case SDLK_f:
@@ -444,15 +404,18 @@ bool Driver::handleInput(float frameTime)
 
 					case SDLK_x:
 						if(!mObserver && mSoldier) {
-							mSoldier->pruneCommandees();
-							mSoldier->setLineFormation(10.0f);
+							//mSoldier->pruneCommandees();
+							//mSoldier->setLineFormation(10.0f);
+							mPendingActions.push_back(SoldierAction(SAType::LineFormation, 10.0f));
+
 						}
 						break;
 
 					case SDLK_c:
 						if(!mObserver && mSoldier) {
-							mSoldier->pruneCommandees();
-							mSoldier->setColumnFormation(10.0f);
+							//mSoldier->pruneCommandees();
+							//mSoldier->setColumnFormation(10.0f);
+							mPendingActions.push_back(SoldierAction(SAType::ColumnFormation, 10.0f));
 						}
 						break;
 
@@ -462,17 +425,17 @@ bool Driver::handleInput(float frameTime)
 						break;
 
 					case SDLK_v:
-						if(!mObserver && mSoldier && !mSoldier->isDead() &&
-								mSoldier->getLeader() && !mSoldier->defending() &&
+						if(!mObserver && !mSoldier->isDead() &&
+								mSoldier->hasLeader() && !mSoldier->defending() &&
 								(mSoldier->getRank() == SoldierRank::Sergeant ||
 								(mSoldier->getRank() == SoldierRank::Lieutenant &&
 								allCommandeesDefending()))) {
 							if(mSoldier->canCommunicateWith(mSoldier->getLeader())) {
-								InfoChannel::getInstance()->say(mSoldier, "Reporting successful attack");
-								mSoldier->setDefending();
-								if(!mSoldier->reportSuccessfulAttack()) {
-									/* TODO */
-								}
+								InfoChannel::getInstance()->say(*mSoldier, "Reporting successful attack");
+								// TODO: use mPendingActions in update()
+								mPendingActions.push_back(SoldierAction(SAType::SetDefending));
+								mPendingActions.push_back(SoldierAction(SAType::ReportSuccessfulAttack));
+								//mSoldier->setDefending();
 							} else {
 								/* TODO */
 							}
@@ -481,9 +444,12 @@ bool Driver::handleInput(float frameTime)
 
 					case SDLK_b:
 						if(!mObserver && mSoldier->getWarriorType() == WarriorType::Soldier) {
-							mDigging = !mDigging;
-							if(mDigging)
-								InfoChannel::getInstance()->say(mSoldier, "Digging a foxhole");
+							if(mInputState->isDigging()) {
+								mPendingActions.push_back(SoldierAction(SAType::StopDigging));
+							} else {
+								mPendingActions.push_back(SoldierAction(SAType::StartDigging));
+								InfoChannel::getInstance()->say(*mSoldier, "Digging a foxhole");
+							}
 						}
 						break;
 
@@ -501,7 +467,8 @@ bool Driver::handleInput(float frameTime)
 					case SDLK_8:
 						if(!mObserver) {
 							int k = event.key.keysym.sym - SDLK_1;
-							mSoldier->switchWeapon(k);
+							mPendingActions.push_back(SoldierAction(SAType::SwitchWeapon, k));
+							//mSoldier->switchWeapon(k);
 						}
 						break;
 
@@ -518,7 +485,7 @@ bool Driver::handleInput(float frameTime)
 							int i = 0;
 							for(auto c : mSoldier->getCommandees()) {
 								if(i == k) {
-									mSelectedCommandee = c;
+									mSelectedCommandee = SoldierQueryPtr(new SoldierQuery(c));
 									break;
 								}
 								i++;
@@ -545,7 +512,7 @@ bool Driver::handleInput(float frameTime)
 						if(mFreeCamera)
 							mCameraVelocity.y = 0.0f;
 						else
-							mPlayerControlVelocity.y = 0.0f;
+							mInputState->setPlayerControlVelocityY(0.0f);
 						break;
 
 					case SDLK_a:
@@ -555,7 +522,7 @@ bool Driver::handleInput(float frameTime)
 						if(mFreeCamera)
 							mCameraVelocity.x = 0.0f;
 						else
-							mPlayerControlVelocity.x = 0.0f;
+							mInputState->setPlayerControlVelocityX(0.0f);
 						break;
 
 					case SDLK_b:
@@ -572,19 +539,24 @@ bool Driver::handleInput(float frameTime)
 						if(mSoldier->isDead())
 							mRestarting = true;
 						else
-							mShooting = true;
+							mInputState->setShooting(true);
 						break;
 
 					case SDL_BUTTON_RIGHT:
 						if(!mObserver) {
 							if(mSoldier->getRank() == SoldierRank::Lieutenant) {
 								mCreatingAttackOrder = true;
+								updateMousePositionOnField();
 								Common::Vector3 p = getMousePositionOnField();
 								mDrawnAttackOrder.CenterPoint.x = p.x;
 								mDrawnAttackOrder.CenterPoint.y = p.y;
 								mDrawnAttackOrder.DefenseLineToRight = Common::Vector3();
-							} else if(mSoldier->getRank() == SoldierRank::Sergeant) {
-								mDesignatedDefendPosition = getMousePositionOnField();
+							} else if(mSoldier->getRank() == SoldierRank::Sergeant && mSelectedCommandee &&
+									mSoldier->canCommunicateWith(*mSelectedCommandee)) {
+								updateMousePositionOnField();
+								Vector3 defpos = mInputState->getMousePositionOnField();
+								mPendingActions.push_back(SoldierAction::SoldierDefendCommand(*mSelectedCommandee,
+											defpos));
 							}
 						}
 						break;
@@ -601,15 +573,18 @@ bool Driver::handleInput(float frameTime)
 							mScaleLevel /= 1.1f; break;
 
 					case SDL_BUTTON_LEFT:
-						mShooting = false;
+						mInputState->setShooting(false);
 						break;
 
 					case SDL_BUTTON_RIGHT:
 						mCreatingAttackOrder = false;
 						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
 								mSelectedCommandee &&
-								mSoldier->canCommunicateWith(mSelectedCommandee)) {
-							mRectangleFinished = true;
+								mSoldier->canCommunicateWith(*mSelectedCommandee)) {
+							mPendingActions.push_back(SoldierAction::SoldierAttackCommand(*mSelectedCommandee,
+										mDrawnAttackOrder));
+							// TODO: handle as event
+							//if(fail) { addMessage(mSelectedCommandee, Color::White, "I'm unable to comply"); }
 						}
 						break;
 
@@ -619,6 +594,7 @@ bool Driver::handleInput(float frameTime)
 				break;
 
 			case SDL_MOUSEMOTION:
+				updateMousePositionOnField();
 				if(mCreatingAttackOrder) {
 					Common::Vector3 p = getMousePositionOnField();
 					mDrawnAttackOrder.DefenseLineToRight =
@@ -717,6 +693,7 @@ void Driver::drawTexts()
 
 	{
 		// coordinates
+		updateMousePositionOnField();
 		Common::Vector3 p = getMousePositionOnField();
 		char buf[256];
 		float dist = mSoldier->getPosition().distance(p);
@@ -743,7 +720,7 @@ void Driver::drawTexts()
 		// weapons
 		int i = 0;
 		for(auto w : mSoldier->getWeapons()) {
-			drawOverlayText(w->getName(), 1.0f, w->getLoadTime() < 0.2f || w->canShoot() ?
+			drawOverlayText(w.getName(), 1.0f, w.getLoadTime() < 0.2f || w.canShoot() ?
 					Common::Color::White : Common::Color::Black,
 					40.0f, screenHeight - 100.0f - 15.0f * i, false, true);
 			if(w == mSoldier->getCurrentWeapon()) {
@@ -758,12 +735,12 @@ void Driver::drawTexts()
 		char buf[128];
 		snprintf(buf, 127, "%s %s", Soldier::rankToString(mSoldier->getRank()), mSoldier->getName().c_str());
 		buf[127] = 0;
-		drawOverlayText(buf, 1.0f, getGroupRectangleColor(mSoldier, 1.0f),
+		drawOverlayText(buf, 1.0f, getGroupRectangleColor(*mSoldier, 1.0f),
 				40.0f, screenHeight - 160.0f, false, true);
 
-		auto l = mSoldier->getLeader();
-		if(l) {
-			snprintf(buf, 127, "%s %s", Soldier::rankToString(l->getRank()), l->getName().c_str());
+		if(mSoldier->hasLeader()) {
+			auto l = mSoldier->getLeader();
+			snprintf(buf, 127, "%s %s", Soldier::rankToString(l.getRank()), l.getName().c_str());
 			buf[127] = 0;
 			drawOverlayText(buf, 1.0f, getGroupRectangleColor(l, 1.0f),
 					40.0f, screenHeight - 145.0f, false, true);
@@ -805,21 +782,22 @@ void Driver::drawTexts()
 						c = Color(207, 127, 50);
 						break;
 				}
-				drawSoldierName(s, c);
+				// TODO
+				//drawSoldierName(s, c);
 			}
 		} else {
-			auto allseen = mSoldier->getSensorySystem()->getSoldiers();
+			auto allseen = mSoldier->getSensedSoldiers();
 			// self
-			drawSoldierName(mSoldier, Color(192, 192, 192));
+			drawSoldierName(*mSoldier, Color(192, 192, 192));
 
-			if(mSoldier->getLeader()) {
+			if(mSoldier->hasLeader()) {
 				if(std::find(allseen.begin(), allseen.end(), mSoldier->getLeader()) != allseen.end()) {
 					// leader
 					drawSoldierName(mSoldier->getLeader(), Color(255, 215, 0));
 				}
 
-				for(auto s : mSoldier->getLeader()->getCommandees()) {
-					if(s != mSoldier) {
+				for(auto s : mSoldier->getLeader().getCommandees()) {
+					if(s != *mSoldier) {
 						if(std::find(allseen.begin(), allseen.end(), s) != allseen.end()) {
 							// peers
 							drawSoldierName(s, Color(192, 192, 192));
@@ -878,18 +856,18 @@ void Driver::drawTexts()
 			char buf[128];
 			buf[127] = 0;
 			if(mSoldier->getRank() == SoldierRank::Sergeant) {
-				if(s->getWarriorType() == WarriorType::Vehicle) {
-					snprintf(buf, 127, "Vehicle %s", s->getName().c_str());
+				if(s.getWarriorType() == WarriorType::Vehicle) {
+					snprintf(buf, 127, "Vehicle %s", s.getName().c_str());
 				} else {
-					snprintf(buf, 127, "%s %s%s%s", Soldier::rankToString(s->getRank()),
-							s->getName().c_str(),
-							s->hasWeaponType("Bazooka") ? " (B)" : "",
-							s->hasWeaponType("Machine Gun") ? " (MG)" : "");
+					snprintf(buf, 127, "%s %s%s%s", Soldier::rankToString(s.getRank()),
+							s.getName().c_str(),
+							s.hasWeaponType("Bazooka") ? " (B)" : "",
+							s.hasWeaponType("Machine Gun") ? " (MG)" : "");
 				}
 			} else {
 				int numcommandees = getNumberOfAvailableCommandees(s);
-				snprintf(buf, 127, "%s %s (%d)", Soldier::rankToString(s->getRank()),
-						s->getName().c_str(), numcommandees);
+				snprintf(buf, 127, "%s %s (%d)", Soldier::rankToString(s.getRank()),
+						s.getName().c_str(), numcommandees);
 			}
 			drawOverlayText(buf, 1.0f, c, 0.8f, yp, false);
 			yp -= 0.04f;
@@ -922,7 +900,7 @@ void Driver::drawOverlays()
 	{
 		// goto-positions for the crew
 		if(mSoldier->getRank() == SoldierRank::Private) {
-			drawSoldierGotoMarker(mSoldier, false);
+			drawSoldierGotoMarker(*mSoldier, false);
 		} else if(mSoldier->getRank() == SoldierRank::Sergeant) {
 			for(auto c : mSoldier->getCommandees()) {
 				drawSoldierGotoMarker(c, true);
@@ -932,8 +910,8 @@ void Driver::drawOverlays()
 
 	{
 		// big picture
-		if(mSoldier->getLeader()) {
-			drawDefenseLine(mSoldier->getLeader()->getAttackOrder(), Common::Color::Yellow, 1.0f);
+		if(mSoldier->hasLeader()) {
+			drawDefenseLine(mSoldier->getLeader().getAttackOrder(), Common::Color::Yellow, 1.0f);
 		}
 
 		// group leader
@@ -948,7 +926,7 @@ void Driver::drawOverlays()
 
 		float bright = 0.8f;
 		for(auto s : mSoldier->getCommandees()) {
-			drawDefenseLine(s->getAttackOrder(), getGroupRectangleColor(s, bright), 1.0f);
+			drawDefenseLine(s.getAttackOrder(), getGroupRectangleColor(s, bright), 1.0f);
 			bright -= 0.1f;
 		}
 	}
@@ -1020,12 +998,12 @@ void Driver::drawLine(const Common::Vector3& p1, const Common::Vector3& p2, cons
 	SDL_utils::drawLine(v1, v2, c, 1.0f);
 }
 
-const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, float& sxp, float& syp,
+const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierQuery& p, float& sxp, float& syp,
 		float& xp, float& yp, float& scale)
 {
-	int sideIndex = p->getSide()->isFirst() ? 0 : 1;
-	bool dead = p->isDead();
-	bool soldier = p->getWarriorType() == WarriorType::Soldier;
+	int sideIndex = p.getSideNum() == 0 ? 0 : 1;
+	bool dead = p.isDead();
+	bool soldier = p.getWarriorType() == WarriorType::Soldier;
 
 	if(soldier) {
 		scale = 2.0f;
@@ -1047,7 +1025,7 @@ const boost::shared_ptr<Texture> Driver::soldierTexture(const SoldierPtr p, floa
 		return mFallenSoldierTexture[sideIndex];
 	}
 
-	float r = p->getXYRotation();
+	float r = p.getXYRotation();
 	int dir = 3; // west
 	if(r < QUARTER_PI && r >= -QUARTER_PI) {
 		dir = 1; // east
@@ -1112,9 +1090,9 @@ const boost::shared_ptr<Common::Texture> Driver::getUnitIconTexture(const UnitIc
 	return t;
 }
 
-const boost::shared_ptr<Texture> Driver::unitIconTexture(const SoldierPtr p, float& scale)
+const boost::shared_ptr<Texture> Driver::unitIconTexture(const SoldierQuery& p, float& scale)
 {
-	auto r = p->getRank();
+	auto r = p.getRank();
 
 	switch(r) {
 		case SoldierRank::Sergeant:
@@ -1139,37 +1117,34 @@ const boost::shared_ptr<Texture> Driver::unitIconTexture(const SoldierPtr p, flo
 	}
 
 	scale *= 32.0f;
-	UnitIconDescriptor d(MilitaryBranch::MechInf, r, p->getSideNum() == 1);
+	UnitIconDescriptor d(MilitaryBranch::MechInf, r, p.getSideNum() == 1);
 	return getUnitIconTexture(d);
 }
 
 void Driver::drawEntities()
 {
 	static const float treeScale = 3.0f;
-	const auto soldiervec = mObserver || mSoldier->isDead() ?
-		mWorld->getSoldiersAt(mCamera, getDrawRadius()) :
-		mSoldier->getSensorySystem()->getSoldiers();
 	std::vector<Sprite> sprites;
 
 	if(mMapLevel == MapLevel::Normal) {
 		std::set<Sprite> soldiers;
-		includeSoldierSprite(soldiers, mSoldier);
+		includeSoldierSprite(soldiers, *mSoldier);
 
 		if(!mObserver) {
 			for(auto s : mSoldier->getCommandees()) {
 				if(mSoldier->canCommunicateWith(s)) {
-					bool addbrightspot = s == mSelectedCommandee;
+					bool addbrightspot = s == *mSelectedCommandee;
 					includeSoldierSprite(soldiers, s, addbrightspot);
 
-					for(auto p : s->getSensorySystem()->getSoldiers()) {
+					for(auto p : s.getSensedSoldiers()) {
 						includeSoldierSprite(soldiers, p);
 					}
 
-					for(auto c : s->getCommandees()) {
-						if(s->canCommunicateWith(c)) {
+					for(auto c : s.getCommandees()) {
+						if(s.canCommunicateWith(c)) {
 							includeSoldierSprite(soldiers, c, addbrightspot);
 
-							for(auto p : c->getSensorySystem()->getSoldiers()) {
+							for(auto p : c.getSensedSoldiers()) {
 								includeSoldierSprite(soldiers, p);
 							}
 						}
@@ -1177,23 +1152,31 @@ void Driver::drawEntities()
 				}
 			}
 
-			auto l = mSoldier->getLeader();
-			if(l && mSoldier->canCommunicateWith(l)) {
-				includeSoldierSprite(soldiers, l);
-				for(auto s : l->getCommandees()) {
-					if(mSoldier->canCommunicateWith(s)) {
-						includeSoldierSprite(soldiers, s);
+			if(mSoldier->hasLeader()) {
+				auto l = mSoldier->getLeader();
+				if(mSoldier->canCommunicateWith(l)) {
+					includeSoldierSprite(soldiers, l);
+					for(auto s : l.getCommandees()) {
+						if(mSoldier->canCommunicateWith(s)) {
+							includeSoldierSprite(soldiers, s);
+						}
 					}
 				}
 			}
 		}
 
-		for(auto s : soldiervec) {
-			includeSoldierSprite(soldiers, s);
+		if(mObserver || mSoldier->isDead()) {
+			for(auto s : mWorld->getSoldiersAt(mCamera, getDrawRadius())) {
+				includeSoldierSprite(soldiers, s);
+			}
+		} else {
+			for(auto s : mSoldier->getSensedSoldiers()) {
+				includeSoldierSprite(soldiers, s);
+			}
 		}
 
 		std::function<bool (const Vector3&)> observefunc;
-		std::set<SoldierPtr> comrades;
+		std::set<SoldierQuery> comrades;
 
 		if(mObserver) {
 			const Vector3& observerpos = mCamera;
@@ -1206,15 +1189,15 @@ void Driver::drawEntities()
 			float observerdist = mWorld->getShootSoundHearingDistance();
 			float observerdist2 = observerdist * observerdist;
 
-			comrades.insert(mSoldier);
+			comrades.insert(*mSoldier);
 
 			for(auto s : mSoldier->getCommandees()) {
 
 				if(mSoldier->canCommunicateWith(s)) {
 					comrades.insert(s);
 
-					for(auto c : s->getCommandees()) {
-						if(s->canCommunicateWith(c)) {
+					for(auto c : s.getCommandees()) {
+						if(s.canCommunicateWith(c)) {
 							comrades.insert(c);
 						}
 					}
@@ -1223,7 +1206,7 @@ void Driver::drawEntities()
 
 			observefunc = [&](const Vector3& v) -> bool {
 				for(auto s : comrades) {
-					if(s->getPosition().distance2(v) <= observerdist2)
+					if(s.getPosition().distance2(v) <= observerdist2)
 						return true;
 				}
 
@@ -1235,13 +1218,18 @@ void Driver::drawEntities()
 			sprites.push_back(s);
 		}
 
-		auto foxholes = mObserver ? mWorld->getFoxholesAt(mCamera, getDrawRadius()) :
-			mSoldier->getSensorySystem()->getFoxholes();
-
-		for(auto f : foxholes) {
-			sprites.push_back(Sprite(f->getPosition(), SpriteType::Foxhole,
-						4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
-						-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f->getDepth(), 1.0f)));
+		if(mObserver) {
+			for(auto f : mWorld->getFoxholesAt(mCamera, getDrawRadius())) {
+				sprites.push_back(Sprite(f->getPosition(), SpriteType::Foxhole,
+							4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
+							-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f->getDepth(), 1.0f)));
+			}
+		} else {
+			for(auto f : mSoldier->getSensedFoxholes()) {
+				sprites.push_back(Sprite(f.getPosition(), SpriteType::Foxhole,
+							4.0f, mFoxholeTexture, boost::shared_ptr<Texture>(),
+							-0.5f, -0.5f, 0.0f, 0.0f, clamp(0.0f, f.getDepth(), 1.0f)));
+			}
 		}
 
 		auto trees = mWorld->getTreesAt(mCamera, getDrawRadius());
@@ -1296,12 +1284,12 @@ void Driver::drawEntities()
 		std::set<Sprite> soldiers;
 		for(auto s : mSoldier->getCommandees()) {
 			if(mSoldier->canCommunicateWith(s)) {
-				bool addbrightspot = s == mSelectedCommandee;
-				if(s->getRank() == SoldierRank::Sergeant) {
+				bool addbrightspot = s == *mSelectedCommandee;
+				if(s.getRank() == SoldierRank::Sergeant) {
 					includeUnitIcon(soldiers, s, addbrightspot);
 				} else {
-					for(auto c : s->getCommandees()) {
-						if(s->canCommunicateWith(c)) {
+					for(auto c : s.getCommandees()) {
+						if(s.canCommunicateWith(c)) {
 							includeUnitIcon(soldiers, c, addbrightspot);
 						}
 					}
@@ -1309,32 +1297,32 @@ void Driver::drawEntities()
 			}
 		}
 
-		auto l = mSoldier->getLeader();
-		if(l && mSoldier->canCommunicateWith(l)) {
-			for(auto s : l->getCommandees()) {
-				if(mSoldier->canCommunicateWith(s)) {
-					includeUnitIcon(soldiers, s);
-					if(s->getRank() > SoldierRank::Sergeant) {
-						for(auto c : s->getCommandees()) {
-							if(s->canCommunicateWith(c)) {
-								includeUnitIcon(soldiers, c, false);
+		std::set<SoldierQuery> enemysoldiers;
+		if(mSoldier->hasLeader()) {
+			auto l = mSoldier->getLeader();
+			if(mSoldier->canCommunicateWith(l)) {
+				for(auto s : l.getCommandees()) {
+					if(mSoldier->canCommunicateWith(s)) {
+						includeUnitIcon(soldiers, s);
+						if(s.getRank() > SoldierRank::Sergeant) {
+							for(auto c : s.getCommandees()) {
+								if(s.canCommunicateWith(c)) {
+									includeUnitIcon(soldiers, c, false);
+								}
 							}
 						}
 					}
 				}
+				enemysoldiers = l.getKnownEnemySoldiers();
 			}
+		} else {
+			enemysoldiers = mSoldier->getKnownEnemySoldiers();
 		}
 
-		std::set<SoldierPtr> enemysoldiers;
-		if(l)
-			enemysoldiers = l->getKnownEnemySoldiers();
-		else
-			enemysoldiers = mSoldier->getKnownEnemySoldiers();
-
 		for(auto s : enemysoldiers) {
-			if(s->isAlive() && (s->getRank() == SoldierRank::Sergeant ||
-					(s->getRank() == SoldierRank::Private &&
-						enemysoldiers.find(s->getLeader()) == enemysoldiers.end()))) {
+			if(s.isAlive() && (s.getRank() == SoldierRank::Sergeant ||
+					(s.getRank() == SoldierRank::Private &&
+						enemysoldiers.find(s.getLeader()) == enemysoldiers.end()))) {
 				includeUnitIcon(soldiers, s, false);
 			}
 		}
@@ -1421,18 +1409,61 @@ void Driver::setFocusSoldier()
 	i = clamp((unsigned int)0, i, (unsigned int)soldiercandidates.size() - 1);
 
 	auto s = soldiercandidates[i];
-	mSoldier = s;
+	if(s == mControlledSoldier)
+		return;
+	auto olds = mControlledSoldier;
+
+	mControlledSoldier = s;
+	mSoldier = SoldierQueryPtr(new SoldierQuery(mControlledSoldier));
+	mSelectedCommandee = nullptr;
 	if(!mObserver) {
-		mDriving = s->getWarriorType() == WarriorType::Vehicle;
-		mDigging = false;
-		setSoldier(mSoldier);
+		bool handleOld = false;
+		// detach our agent from old soldier
+		{
+			if(mPlayerAgent) {
+				auto succ = mAgentDirectory.removeAgent(olds, mPlayerAgent);
+				assert(succ);
+				handleOld = true;
+			}
+		}
+
+		// detach AI agent from new soldier
+		{
+			bool succ = mAgentDirectory.freeSoldier(mControlledSoldier);
+			assert(succ);
+		}
+
+		// attach our agent to new soldier
+		{
+			auto controller = SoldierControllerPtr(new SoldierController(mControlledSoldier));
+			mPlayerAgent = boost::shared_ptr<PlayerAgent>(new PlayerAgent(controller, mInputState));
+			bool succ = mAgentDirectory.addAgent(mControlledSoldier, mPlayerAgent);
+			assert(succ);
+		}
+
+		// attach AI agent to old soldier
+		{
+			if(handleOld) {
+				auto controller = SoldierControllerPtr(new SoldierController(olds));
+				auto a = boost::shared_ptr<SoldierAgent>(new AI::SoldierAgent(controller));
+				bool succ = mAgentDirectory.addAgent(olds, a);
+				assert(succ);
+			}
+		}
+
+		mInputState->setDriving(mSoldier->getWarriorType() == WarriorType::Vehicle);
 		if(mSoldier->getRank() == SoldierRank::Lieutenant && mSoldier->getCommandees().size() > 0) {
-			mSelectedCommandee = *mSoldier->getCommandees().begin();
+			mSelectedCommandee = SoldierQueryPtr(new SoldierQuery(*mSoldier->getCommandees().begin()));
 		}
 	}
 }
 
 Vector3 Driver::getMousePositionOnField() const
+{
+	return mInputState->getMousePositionOnField();
+}
+
+void Driver::updateMousePositionOnField()
 {
 	int xp, yp;
 	float x, y;
@@ -1442,7 +1473,7 @@ Vector3 Driver::getMousePositionOnField() const
 	x = float(xp) / mScaleLevel + mCamera.x - (screenWidth / (2.0f * mScaleLevel));
 	y = float(yp) / mScaleLevel + mCamera.y - (screenHeight / (2.0f * mScaleLevel));
 
-	return Vector3(x, y, 0);
+	mInputState->setMousePositionOnField(Vector3(x, y, 0));
 }
 
 void Driver::drawText(const char* text, float size, const Common::Color& c,
@@ -1455,18 +1486,18 @@ void Driver::drawText(const char* text, float size, const Common::Color& c,
 			false, centered);
 }
 
-void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
+void Driver::drawSoldierName(const SoldierQuery& s, const Common::Color& c)
 {
-	auto pos(s->getPosition());
+	auto pos(s.getPosition());
 	pos.y += 2.0f;
-	drawText(s->getName().c_str(), 0.08f, c, pos, true);
+	drawText(s.getName().c_str(), 0.08f, c, pos, true);
 
-	if(!s->isDead()) {
+	if(!s.isDead()) {
 		// speech bubble
 		auto it = mSpeechBubbles.find(s);
 		if(it != mSpeechBubbles.end()) {
 			auto& sbubble = it->second.mText;
-			auto sbpos(it->first->getPosition());
+			auto sbpos(it->first.getPosition());
 			sbpos.y += 3.0f;
 			drawText(sbubble.c_str(), 0.4f, Common::Color::White, sbpos, true);
 		}
@@ -1474,22 +1505,23 @@ void Driver::drawSoldierName(const SoldierPtr s, const Common::Color& c)
 
 }
 
-void Driver::drawSoldierGotoMarker(const SoldierPtr s, bool alwaysdraw)
+void Driver::drawSoldierGotoMarker(const SoldierQuery& s, bool alwaysdraw)
 {
-	auto leader = s->getLeader();
-	if(leader) {
-		auto& offset = s->getFormationOffset();
-		if(!offset.null()) {
-			Vector3 rotatedOffset = Math::rotate2D(offset, leader->getXYRotation());
-			rotatedOffset += leader->getPosition();
-			if(alwaysdraw || rotatedOffset.distance2(s->getPosition()) > 8.0f)
-				drawText("x", 0.32f, Common::Color::White, rotatedOffset, true);
-		} else {
-			auto& defpos = s->getDefendPosition();
-			if(!defpos.null()) {
-				if(alwaysdraw || defpos.distance2(s->getPosition()) > 8.0f)
-					drawText("x", 0.40f, Common::Color::White, defpos, true);
-			}
+	if(!s.hasLeader())
+		return;
+
+	auto leader = s.getLeader();
+	auto offset = s.getFormationOffset();
+	if(!offset.null()) {
+		Vector3 rotatedOffset = Math::rotate2D(offset, leader.getXYRotation());
+		rotatedOffset += leader.getPosition();
+		if(alwaysdraw || rotatedOffset.distance2(s.getPosition()) > 8.0f)
+			drawText("x", 0.32f, Common::Color::White, rotatedOffset, true);
+	} else {
+		auto defpos = s.getDefendPosition();
+		if(!defpos.null()) {
+			if(alwaysdraw || defpos.distance2(s.getPosition()) > 8.0f)
+				drawText("x", 0.40f, Common::Color::White, defpos, true);
 		}
 	}
 }
@@ -1509,20 +1541,20 @@ void Driver::drawOverlayText(const char* text, float size, const Common::Color& 
 			true, centered);
 }
 
-Common::Color Driver::getGroupRectangleColor(const SoldierPtr commandee, float brightness)
+Common::Color Driver::getGroupRectangleColor(const SoldierQuery& commandee, float brightness)
 {
 	Color c;
 	if(!mSoldier->canCommunicateWith(commandee)) {
 		c = Color::Black;
-	} else if(commandee->hasEnemyContact()) {
+	} else if(commandee.hasEnemyContact()) {
 		c = Color::Red;
-	} else if(commandee->defending()) {
+	} else if(commandee.defending()) {
 		c = Color::White;
 	} else {
 		c = Color::Yellow;
 	}
 
-	if(commandee != mSelectedCommandee) {
+	if(mSelectedCommandee && commandee != *mSelectedCommandee) {
 		c.r *= brightness;
 		c.g *= brightness;
 		c.b *= brightness;
@@ -1531,12 +1563,12 @@ Common::Color Driver::getGroupRectangleColor(const SoldierPtr commandee, float b
 	return c;
 }
 
-int Driver::getNumberOfAvailableCommandees(const SoldierPtr p)
+int Driver::getNumberOfAvailableCommandees(const SoldierQuery& p)
 {
 	int num = 0;
 
-	for(auto s : p->getCommandees()) {
-		if(p->canCommunicateWith(s)) {
+	for(auto s : p.getCommandees()) {
+		if(p.canCommunicateWith(s)) {
 			num++;
 		}
 	}
@@ -1546,13 +1578,18 @@ int Driver::getNumberOfAvailableCommandees(const SoldierPtr p)
 
 void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot)
 {
+	includeSoldierSprite(sprites, SoldierQuery(s), addbrightspot);
+}
+
+void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot)
+{
 	float xp, yp, sxp, syp;
 	float scale;
 	boost::shared_ptr<Texture> t = soldierTexture(s, sxp, syp, xp, yp, scale);
-	sprites.insert(Sprite(s->getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
+	sprites.insert(Sprite(s.getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
 				sxp, syp));
 	if(addbrightspot) {
-		Vector3 p = s->getPosition();
+		Vector3 p = s.getPosition();
 		p.y -= 0.001f;
 		sprites.insert(Sprite(p, SpriteType::BrightSpot, scale, mBrightSpot,
 					boost::shared_ptr<Common::Texture>(), xp, yp,
@@ -1560,11 +1597,11 @@ void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s,
 	}
 }
 
-void Driver::includeUnitIcon(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot)
+void Driver::includeUnitIcon(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot)
 {
 	float scale = 0.0f;
 	boost::shared_ptr<Texture> t = unitIconTexture(s, scale);
-	auto pos = s->getUnitPosition();
+	auto pos = s.getUnitPosition();
 	sprites.insert(Sprite(pos, SpriteType::Icon, scale, t,
 				mUnitIconShadowTexture, 0.0f, 0.0f,
 				0.0f, 0.0f));
@@ -1582,7 +1619,7 @@ void Driver::includeUnitIcon(std::set<Sprite>& sprites, const SoldierPtr s, bool
 bool Driver::allCommandeesDefending() const
 {
 	for(auto s : mSoldier->getCommandees()) {
-		if(s->isAlive() && !s->defending())
+		if(s.isAlive() && !s.defending())
 			return false;
 	}
 	return true;

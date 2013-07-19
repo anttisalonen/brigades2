@@ -17,6 +17,9 @@
 #include "World.h"
 #include "DebugOutput.h"
 #include "InfoChannel.h"
+#include "PlayerAgent.h"
+#include "AgentDirectory.h"
+#include "SoldierAction.h"
 
 
 namespace Brigades {
@@ -143,20 +146,16 @@ bool UnitIconDescriptor::operator<(const UnitIconDescriptor& f) const
 	return blue < f.blue;
 }
 
-class Driver : public SoldierController, public DebugOutput, public InfoChannel {
+class Driver : public DebugOutput, public InfoChannel {
 	public:
 		Driver(WorldPtr w, bool observer, SoldierRank r);
+		~Driver();
 		void init();
 		void run();
-		void act(float time) override;
-		bool handleAttackOrder(const AttackOrder& r) override;
-		bool handleAttackSuccess(SoldierPtr s, const AttackOrder& r) override;
-		void handleAttackFailure(SoldierPtr s, const AttackOrder& r) override;
-		void handleReinforcement(SoldierPtr s) override;
 		void markArea(const Common::Color& c, const Common::Rectangle& r, bool onlyframes);
 		void addArrow(const Common::Color& c, const Common::Vector3& start, const Common::Vector3& arrow);
-		void addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text);
-		void say(boost::shared_ptr<Soldier> s, const char* msg) override;
+		void addMessage(const SoldierQuery* s, const Common::Color& c, const char* text);
+		void say(const SoldierQuery& s, const char* msg);
 
 	private:
 		void loadTextures();
@@ -178,26 +177,29 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 				const Common::Color& c, float alpha, bool onlyframes);
 		void drawLine(const Common::Vector3& p1, const Common::Vector3& p2, const Common::Color& c);
 		void drawArrow(const Common::Vector3& start, const Common::Vector3& end, const Common::Color& c);
-		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierPtr p,
+		const boost::shared_ptr<Common::Texture> soldierTexture(const SoldierQuery& p,
 				float& xp, float& yp, float& sxp, float& syp, float& scale);
 		const boost::shared_ptr<Common::Texture> getUnitIconTexture(const UnitIconDescriptor& d);
-		const boost::shared_ptr<Common::Texture> unitIconTexture(const SoldierPtr p, float& scale);
+		const boost::shared_ptr<Common::Texture> unitIconTexture(const SoldierQuery& p, float& scale);
 		void drawEntities();
 		void setFocusSoldier();
 		Common::Vector3 getMousePositionOnField() const;
+		void updateMousePositionOnField();
 		void drawText(const char* text, float size, const Common::Color& c,
 				const Common::Vector3& pos, bool centered);
-		void drawSoldierName(const SoldierPtr s, const Common::Color& c);
-		void drawSoldierGotoMarker(const SoldierPtr s, bool alwaysdraw);
+		void drawSoldierName(const SoldierQuery& s, const Common::Color& c);
+		void drawSoldierGotoMarker(const SoldierQuery& s, bool alwaysdraw);
 		float getDrawRadius() const;
 		void drawOverlayText(const char* text, float size, const Common::Color& c,
 				float x, float y, bool centered, bool pixelcoords = false);
-		Common::Color getGroupRectangleColor(const SoldierPtr commandee, float brightness = 1.0f);
-		int getNumberOfAvailableCommandees(const SoldierPtr p);
+		Common::Color getGroupRectangleColor(const SoldierQuery& commandee, float brightness = 1.0f);
+		int getNumberOfAvailableCommandees(const SoldierQuery& p);
 		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
-		void includeUnitIcon(std::set<Sprite>& sprites, const SoldierPtr s, bool addbrightspot = false);
+		void includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot = false);
+		void includeUnitIcon(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot = false);
 		bool allCommandeesDefending() const;
 		void setLight();
+		void updateAgents(float time);
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
@@ -210,7 +212,6 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		Common::Vector3 mCamera;
 		Common::Vector3 mCameraMouseOffset;
 		Common::Vector3 mCameraVelocity;
-		Common::Vector3 mPlayerControlVelocity;
 		boost::shared_ptr<Common::Texture> mTankTexture[NUM_SIDES][4];
 		boost::shared_ptr<Common::Texture> mDestroyedTankTexture[NUM_SIDES][4];
 		boost::shared_ptr<Common::Texture> mSoldierTexture[NUM_SIDES][4];
@@ -224,29 +225,29 @@ class Driver : public SoldierController, public DebugOutput, public InfoChannel 
 		boost::shared_ptr<Common::Texture> mBrightSpot;
 		boost::shared_ptr<Common::Texture> mUnitIconShadowTexture;
 		Common::TextMap mTextMap;
-		SoldierPtr mSoldier;
+		SoldierQueryPtr mSoldier;
+		SoldierPtr mControlledSoldier;
 		bool mObserver;
-		bool mShooting;
 		bool mRestarting;
-		bool mDriving;
 		DebugSymbolCollection mDebugSymbols;
 		std::array<InfoMessage, 5> mInfoMessages;
-		std::map<SoldierPtr, SpeechBubble> mSpeechBubbles;
+		std::map<SoldierQuery, SpeechBubble> mSpeechBubbles;
 		Common::Countdown mSpeechBubbleTimer;
 		unsigned int mNextInfoMessageIndex;
 		SoldierRank mSoldierRank;
+		InputState* mInputState;
+		boost::shared_ptr<PlayerAgent> mPlayerAgent;
 
 		AttackOrder mDrawnAttackOrder;
-		Common::Vector3 mDesignatedDefendPosition;
 		bool mCreatingAttackOrder;
-		bool mRectangleFinished;
-		SoldierPtr mSelectedCommandee;
+		SoldierQueryPtr mSelectedCommandee;
 		float mTimeAcceleration;
-		bool mDigging;
 		MapLevel mMapLevel;
 		std::map<UnitIconDescriptor, boost::shared_ptr<Common::Texture>> mUnitIconTextures;
+		AgentDirectory mAgentDirectory;
 
 		Common::Color mLight;
+		std::vector<SoldierAction> mPendingActions;
 };
 
 typedef boost::shared_ptr<Driver> DriverPtr;

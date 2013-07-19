@@ -95,6 +95,8 @@ int main(int argc, char** argv)
 	bool arcade = false;
 	bool skirmish = false;
 
+	int seed = time(NULL);
+
 	for(int i = 1; i < argc; i++) {
 		if(!strcmp(argv[i], "-o")) {
 			observer = true;
@@ -116,6 +118,13 @@ int main(int argc, char** argv)
 						r)) {
 				exit(1);
 			}
+		} else if(!strcmp(argv[i], "-s")) {
+			i++;
+			if(i == argc) {
+				std::cerr << "-s requires a parameter.\n";
+				exit(1);
+			}
+			seed = atoi(argv[i]);
 		} else {
 			std::cerr << "Unknown parameter '" << argv[i] << "'.\n";
 			exit(1);
@@ -156,7 +165,6 @@ int main(int argc, char** argv)
 
 	InfoChannel::setInstance(driver);
 
-	int seed = time(NULL);
 	srand(seed);
 	std::cout << "Seed: " << seed << "\n";
 	world->create();

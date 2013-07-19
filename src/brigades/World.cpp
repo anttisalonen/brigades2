@@ -7,6 +7,8 @@
 #include "DebugOutput.h"
 #include "InfoChannel.h"
 
+#include "SoldierController.h"
+
 #include "common/Random.h"
 
 using namespace Common;
@@ -474,7 +476,9 @@ void World::update(float time)
 					if(std::find(rootCommandees.begin(), rootCommandees.end(), s) == rootCommandees.end()) {
 						// new commandee for the root leader
 						mRootLeader[i]->addCommandee(s);
-						mRootLeader[i]->getController()->handleReinforcement(s);
+						// TODO: add event creation
+						//addAgentEvent(mRootLeader[i], handleReinforcement);
+						//mRootLeader[i]->getController()->handleReinforcement(s);
 					}
 					float oldTime = mReinforcementTimer[i].getMaxTime();
 					float newTime = oldTime + 3600.0f / TimeCoefficient;
@@ -484,7 +488,7 @@ void World::update(float time)
 					snprintf(buf, 127, "The %s team got reinforcement",
 							i == 0 ? "Red" : "Blue");
 					buf[127] = 0;
-					InfoChannel::getInstance()->addMessage(SoldierPtr(), Common::Color::White, buf);
+					InfoChannel::getInstance()->addMessage(nullptr, Common::Color::White, buf);
 				} else {
 					c.rewind();
 				}
@@ -562,6 +566,11 @@ void World::createMovementSound(const SoldierPtr s)
 	mTriggerSystem.tryOneShotTrigger(trigger, nearbySoldiers);
 }
 
+void World::setSoldierListener(SoldierListener* l)
+{
+	mSoldierListener = l;
+}
+
 Foxhole* World::getFoxholeAt(const Common::Vector3& pos)
 {
 	Foxhole* p = nullptr;
@@ -612,6 +621,8 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, WarriorType wt, bool 
 
 	SoldierPtr s = SoldierPtr(new Soldier(shared_from_this(), first, rank, wt));
 	s->init();
+	if(mSoldierListener)
+		mSoldierListener->soldierAdded(s);
 
 	if(dictator) {
 		s->setDictator(true);
@@ -764,6 +775,8 @@ void World::killSoldier(SoldierPtr s)
 		return;
 
 	s->die();
+	if(mSoldierListener)
+		mSoldierListener->soldierRemoved(s);
 	if(s->getWarriorType() == WarriorType::Soldier) {
 		for(auto w : s->getWeapons()) {
 			Vector3 offset = Vector3(1.0f * Random::clamped(), 1.0f * Random::clamped(), 0.0f);
@@ -831,7 +844,9 @@ SoldierPtr World::addPlatoon(int side, bool reuseLeader)
 		platoonleader->addCommandee(s);
 		if(reusing) {
 			// new commandee for an own leader - notify controller
-			platoonleader->getController()->handleReinforcement(s);
+			// TODO: add event creation
+			//platoonleader->getController()->handleReinforcement(s);
+			//addAgentEvent(platoonleader, handleReinforcement);
 		}
 	}
 

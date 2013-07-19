@@ -46,9 +46,6 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		int getSideNum() const;
 		void update(float time) override;
 		float getFOV() const; // total FOV in radians
-		void setController(SoldierControllerPtr p);
-		void setAIController();
-		SoldierControllerPtr getController();
 		void die();
 		bool isDead() const;
 		bool isAlive() const;
@@ -128,7 +125,6 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		SidePtr mSide;
 		int mID;
 		float mFOV;
-		SoldierControllerPtr mController;
 		bool mAlive;
 		std::vector<WeaponPtr> mWeapons;
 		unsigned int mCurrentWeaponIndex;

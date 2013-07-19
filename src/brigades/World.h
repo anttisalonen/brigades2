@@ -17,7 +17,6 @@
 #include "common/CellSpacePartition.h"
 
 #include "Soldier.h"
-#include "SoldierController.h"
 #include "Side.h"
 #include "Armory.h"
 #include "Trigger.h"
@@ -36,18 +35,6 @@ class Tree : public Common::Obstacle {
 typedef boost::shared_ptr<Tree> TreePtr;
 typedef boost::shared_ptr<Soldier> SoldierPtr;
 typedef boost::shared_ptr<World> WorldPtr;
-
-class SoldierAction {
-	public:
-		SoldierAction(SoldierPtr p) : mSoldier(p) { }
-		virtual ~SoldierAction() { }
-		virtual void apply() = 0;
-
-	protected:
-		SoldierPtr mSoldier;
-};
-
-typedef boost::shared_ptr<SoldierAction> SoldierActionPtr;
 
 typedef boost::shared_ptr<Common::Wall> WallPtr;
 
@@ -103,6 +90,13 @@ struct Timestamp {
 	void addMilliseconds(unsigned int ms);
 };
 
+class SoldierListener {
+	public:
+		virtual ~SoldierListener() { }
+		virtual void soldierAdded(SoldierPtr p) = 0;
+		virtual void soldierRemoved(SoldierPtr p) = 0;
+};
+
 class World : public boost::enable_shared_from_this<World> {
 
 	public:
@@ -137,10 +131,10 @@ class World : public boost::enable_shared_from_this<World> {
 
 		// modifiers
 		void update(float time);
-		bool addSoldierAction(const SoldierPtr s, const SoldierAction& a);
 		void addBullet(const WeaponPtr w, const SoldierPtr s, const Common::Vector3& dir);
 		void dig(float time, const Common::Vector3& pos);
 		void createMovementSound(const SoldierPtr s);
+		void setSoldierListener(SoldierListener* l);
 
 	private:
 		void setupSides();
@@ -188,6 +182,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 		Timestamp mTime;
 		Common::Countdown mReinforcementTimer[NUM_SIDES];
+		SoldierListener* mSoldierListener = nullptr;
 
 		static const float TimeCoefficient;
 };

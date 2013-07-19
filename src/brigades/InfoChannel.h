@@ -9,7 +9,7 @@
 
 namespace Brigades {
 
-class Soldier;
+class SoldierQuery;
 
 class InfoChannel {
 	public:
@@ -17,14 +17,14 @@ class InfoChannel {
 		static inline void setInstance(boost::shared_ptr<InfoChannel> d);
 		virtual ~InfoChannel() { }
 
-		virtual void say(const boost::shared_ptr<Soldier> s, const char* msg) = 0;
-		virtual void addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text) = 0;
+		virtual void say(const SoldierQuery& s, const char* msg) = 0;
+		virtual void addMessage(const SoldierQuery* s, const Common::Color& c, const char* text) = 0;
 };
 
 class DummyInfoChannel : public InfoChannel {
 	public:
-		virtual void say(const boost::shared_ptr<Soldier> s, const char* msg) { }
-		virtual void addMessage(const boost::shared_ptr<Soldier> s, const Common::Color& c, const char* text) { }
+		virtual void say(const SoldierQuery& s, const char* msg) { }
+		virtual void addMessage(const SoldierQuery* s, const Common::Color& c, const char* text) { }
 };
 
 extern boost::shared_ptr<InfoChannel> InfoChannelInstance;

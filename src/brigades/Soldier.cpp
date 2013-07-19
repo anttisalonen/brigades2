@@ -8,8 +8,6 @@
 #include "SensorySystem.h"
 #include "InfoChannel.h"
 
-#include "ai/SoldierController.h"
-
 using namespace Common;
 
 namespace Brigades {
@@ -45,7 +43,6 @@ Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, W
 
 void Soldier::init()
 {
-	setAIController();
 	mSensorySystem = SensorySystemPtr(new SensorySystem(shared_from_this()));
 }
 
@@ -168,7 +165,6 @@ void Soldier::update(float time)
 
 	if(sleeping()) {
 		handleSleep(worldTime);
-		InfoChannel::getInstance()->say(shared_from_this(), "Sleeping");
 		return;
 	}
 
@@ -189,9 +185,6 @@ void Soldier::update(float time)
 	mSensorySystem->update(time);
 	if(mCurrentWeaponIndex < mWeapons.size())
 		mWeapons[mCurrentWeaponIndex]->update(time);
-	if(mController) {
-		mController->act(time);
-	}
 
 	mEnemyContactTimer.doCountdown(time);
 	if(mEnemyContactTimer.checkAndRewind()) {
@@ -218,7 +211,6 @@ void Soldier::update(float time)
 
 	if(eating()) {
 		handleEating(time);
-		InfoChannel::getInstance()->say(shared_from_this(), "Eating");
 		return;
 	}
 }
@@ -226,21 +218,6 @@ void Soldier::update(float time)
 float Soldier::getFOV() const
 {
 	return mFOV;
-}
-
-void Soldier::setController(SoldierControllerPtr p)
-{
-	mController = p;
-}
-
-void Soldier::setAIController()
-{
-	setController(SoldierControllerPtr(new AI::SoldierController(shared_from_this())));
-}
-
-SoldierControllerPtr Soldier::getController()
-{
-	return mController;
 }
 
 void Soldier::die()
@@ -559,6 +536,7 @@ bool Soldier::giveAttackOrder(const AttackOrder& r)
 {
 	// set mAttackOrder for handleAttackOrder(), then set it back in case of failure
 	mAttacking = true;
+#if 0
 	auto old = mAttackOrder;
 	mAttackOrder = r;
 	if(!mController->handleAttackOrder(r)) {
@@ -567,8 +545,11 @@ bool Soldier::giveAttackOrder(const AttackOrder& r)
 		mAttackOrder = old;
 		return false;
 	} else {
+#endif
 		return true;
+#if 0
 	}
+#endif
 }
 
 const AttackOrder& Soldier::getAttackOrder() const
@@ -586,7 +567,8 @@ void Soldier::globalMessage(const char* s)
 	char buf[256];
 	snprintf(buf, 255, "%s %s: %s", rankToString(mRank), mName.c_str(), s);
 	buf[255] = 0;
-	InfoChannel::getInstance()->addMessage(shared_from_this(), Common::Color::White, buf);
+	// TODO
+	//InfoChannel::getInstance()->addMessage(shared_from_this(), Common::Color::White, buf);
 }
 
 bool Soldier::reportSuccessfulAttack()
@@ -604,12 +586,16 @@ bool Soldier::reportSuccessfulAttack()
 
 bool Soldier::successfulAttackReported(const AttackOrder& r)
 {
+#if 0
 	if(!mController->handleAttackSuccess(shared_from_this(), r)) {
 		std::cerr << "Warning: controller couldn't handle successful attack\n";
 		return false;
 	} else {
+#endif
 		return true;
+#if 0
 	}
+#endif
 }
 
 }
