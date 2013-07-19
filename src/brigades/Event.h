@@ -10,7 +10,6 @@ namespace Brigades {
 enum class EventType {
 	Sound,
 	WeaponPickup,
-	Orders
 };
 
 class Soldier;

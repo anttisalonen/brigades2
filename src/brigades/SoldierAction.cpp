@@ -4,6 +4,8 @@
 
 namespace Brigades {
 
+AgentDirectory* SoldierAction::AgentDir = nullptr;
+
 SoldierAction::SoldierAction(SAType type)
 	: mType(type)
 {
@@ -62,11 +64,22 @@ SoldierAction::SoldierAction(SAType type, float val)
 	}
 }
 
+SoldierAction::SoldierAction(const SoldierQuery& s, OrderType order, const Common::Vector3& pos)
+	: mType(SAType::Communication),
+	mVec(pos),
+	mOrder(order),
+	mCommunication(CommunicationType::Order),
+	mCommandedSoldier(s)
+{
+}
+
 
 bool SoldierAction::execute(SoldierPtr s, boost::shared_ptr<SoldierController>& controller, float time)
 {
 	switch(mType) {
 		case SAType::StartDigging:
+			return false;
+
 		case SAType::StopDigging:
 			return false;
 
@@ -102,21 +115,52 @@ bool SoldierAction::execute(SoldierPtr s, boost::shared_ptr<SoldierController>& 
 			return true;
 
 		case SAType::LineFormation:
+			return false;
+
 		case SAType::ColumnFormation:
-		case SAType::GiveOrder:
+			return false;
+
+		case SAType::Communication:
+			return doCommunication(s, controller);
+	}
+	return false;
+}
+
+bool SoldierAction::doCommunication(SoldierPtr s, boost::shared_ptr<SoldierController>& controller)
+{
+	switch(mCommunication) {
+		case CommunicationType::Order:
+			{
+				assert(mCommandedSoldier.queryIsValid());
+				SoldierQuery me(s);
+				if(!me.canCommunicateWith(mCommandedSoldier)) {
+					return false;
+				}
+				auto cs = mCommandedSoldier.mSoldier;
+				assert(cs);
+				assert(AgentDir);
+				auto cntr = AgentDir->getControllerFor(cs);
+				assert(cntr);
+				switch(mOrder) {
+					case OrderType::GotoPosition:
+						cntr->addGotoOrder(s, mVec);
+						return true;
+
+					default:
+						return false;
+				}
+			}
+			return true;
+
+		default:
 			return false;
 	}
 	return false;
 }
 
-SoldierAction SoldierAction::SoldierDefendCommand(const SoldierQuery& s, const Common::Vector3& pos)
+void SoldierAction::setAgentDirectory(AgentDirectory* dir)
 {
-	return SoldierAction(SAType::GiveOrder);
-}
-
-SoldierAction SoldierAction::SoldierAttackCommand(const SoldierQuery& s, const AttackOrder& pos)
-{
-	return SoldierAction(SAType::GiveOrder);
+	AgentDir = dir;
 }
 
 }

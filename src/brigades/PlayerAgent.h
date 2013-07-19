@@ -16,6 +16,7 @@ class PlayerAgent : public SoldierAgent {
 	public:
 		PlayerAgent(boost::shared_ptr<SoldierController> s, const InputState* is);
 		virtual std::vector<SoldierAction> update(float time) override;
+		virtual void newCommunication(const SoldierCommunication& comm) override;
 
 	private:
 		const InputState* mInputState;

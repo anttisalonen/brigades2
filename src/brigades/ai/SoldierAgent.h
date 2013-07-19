@@ -18,6 +18,7 @@ class SoldierAgent : public Brigades::SoldierAgent {
 	public:
 		SoldierAgent(boost::shared_ptr<SoldierController> s);
 		virtual std::vector<SoldierAction> update(float time) override;
+		virtual void newCommunication(const SoldierCommunication& comm) override;
 
 	private:
 };

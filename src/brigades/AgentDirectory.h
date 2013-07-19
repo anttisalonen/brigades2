@@ -5,10 +5,11 @@
 
 #include "World.h"
 #include "Soldier.h"
-#include "SoldierAgent.h"
 #include "SoldierController.h"
 
 namespace Brigades {
+
+class SoldierAgent;
 
 class AgentDirectory : public SoldierListener {
 	public:
@@ -18,6 +19,8 @@ class AgentDirectory : public SoldierListener {
 		std::map<SoldierPtr, std::pair<boost::shared_ptr<SoldierController>, boost::shared_ptr<SoldierAgent>>>& getAgents();
 		virtual void soldierAdded(SoldierPtr p) override;
 		virtual void soldierRemoved(SoldierPtr p) override;
+
+		boost::shared_ptr<SoldierController> getControllerFor(const boost::shared_ptr<Soldier> s);
 
 	private:
 		std::map<SoldierPtr, std::pair<boost::shared_ptr<SoldierController>, boost::shared_ptr<SoldierAgent>>> mAgents;

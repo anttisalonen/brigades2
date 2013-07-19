@@ -55,7 +55,9 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 	mMapLevel(MapLevel::Normal)
 {
 	mWorld->setSoldierListener(&mAgentDirectory);
+	SoldierAction::setAgentDirectory(&mAgentDirectory);
 	mScreen = SDL_utils::initSDL(screenWidth, screenHeight, "Brigades");
+
 
 	loadTextures();
 	loadFont();
@@ -64,26 +66,40 @@ Driver::Driver(WorldPtr w, bool observer, SoldierRank r)
 
 Driver::~Driver()
 {
-	if(mControlledSoldier) {
-		auto succ = mAgentDirectory.removeAgent(mControlledSoldier, mPlayerAgent);
+	if(mFocusSoldier) {
+		auto succ = mAgentDirectory.removeAgent(mFocusSoldier, mPlayerAgent);
 		assert(succ);
 	}
-	mControlledSoldier = nullptr;
+	mFocusSoldier = nullptr;
 	mPlayerAgent = nullptr;
 	mWorld->setSoldierListener(nullptr);
+	SoldierAction::setAgentDirectory(nullptr);
 	delete mInputState;
 }
 
 void Driver::init()
 {
 	setFocusSoldier();
+	assert(mSoldier);
+	assert(mFocusSoldier);
 }
 
 void Driver::updateAgents(float time)
 {
 	for(auto& p : mAgentDirectory.getAgents()) {
-		p.second.second->updateController(time);
+		// update controller
+		p.second.first->update(time);
+
+		// add comms from the controller to the agent
+		auto comms = p.second.first->fetchCommunications();
+		for(auto& c : comms) {
+			p.second.second->newCommunication(c);
+		}
+
+		// get actions from the agent
 		auto actions = p.second.second->update(time);
+
+		// execute actions
 		for(auto& a : actions) {
 			bool succ = a.execute(p.first, p.second.first, time);
 			assert(succ);
@@ -93,18 +109,19 @@ void Driver::updateAgents(float time)
 
 void Driver::applyPendingActions()
 {
-	if(!mControlledSoldier)
+	if(!mFocusSoldier)
 		return;
 
-	auto it = mAgentDirectory.getAgents().find(mControlledSoldier);
+	auto it = mAgentDirectory.getAgents().find(mFocusSoldier);
 	assert(it != mAgentDirectory.getAgents().end());
 
 	auto controller = it->second.first;
 
 	for(auto& a : mPendingActions) {
-		bool succ = a.execute(mControlledSoldier, controller, 0.0f);
+		bool succ = a.execute(mFocusSoldier, controller, 0.0f);
 		assert(succ);
 	}
+	mPendingActions.clear();
 }
 
 void Driver::run()
@@ -573,7 +590,8 @@ bool Driver::handleInput(float frameTime)
 									mSoldier->canCommunicateWith(*mSelectedCommandee)) {
 								updateMousePositionOnField();
 								Vector3 defpos = mInputState->getMousePositionOnField();
-								mPendingActions.push_back(SoldierAction::SoldierDefendCommand(*mSelectedCommandee,
+								mPendingActions.push_back(SoldierAction(*mSelectedCommandee,
+											OrderType::GotoPosition,
 											defpos));
 							}
 						}
@@ -599,8 +617,8 @@ bool Driver::handleInput(float frameTime)
 						if(!mObserver && mSoldier->getRank() == SoldierRank::Lieutenant &&
 								mSelectedCommandee &&
 								mSoldier->canCommunicateWith(*mSelectedCommandee)) {
-							mPendingActions.push_back(SoldierAction::SoldierAttackCommand(*mSelectedCommandee,
-										mDrawnAttackOrder));
+							//mPendingActions.push_back(SoldierAction::SoldierAttackCommand(*mSelectedCommandee,
+							//			mDrawnAttackOrder));
 							// TODO: handle as event
 							//if(fail) { addMessage(mSelectedCommandee, Color::White, "I'm unable to comply"); }
 						}
@@ -1151,7 +1169,7 @@ void Driver::drawEntities()
 		if(!mObserver) {
 			for(auto s : mSoldier->getCommandees()) {
 				if(mSoldier->canCommunicateWith(s)) {
-					bool addbrightspot = s == *mSelectedCommandee;
+					bool addbrightspot = mSelectedCommandee && s == *mSelectedCommandee;
 					includeSoldierSprite(soldiers, s, addbrightspot);
 
 					for(auto p : s.getSensedSoldiers()) {
@@ -1302,7 +1320,7 @@ void Driver::drawEntities()
 		std::set<Sprite> soldiers;
 		for(auto s : mSoldier->getCommandees()) {
 			if(mSoldier->canCommunicateWith(s)) {
-				bool addbrightspot = s == *mSelectedCommandee;
+				bool addbrightspot = mSelectedCommandee && s == *mSelectedCommandee;
 				if(s.getRank() == SoldierRank::Sergeant) {
 					includeUnitIcon(soldiers, s, addbrightspot);
 				} else {
@@ -1427,12 +1445,12 @@ void Driver::setFocusSoldier()
 	i = clamp((unsigned int)0, i, (unsigned int)soldiercandidates.size() - 1);
 
 	auto s = soldiercandidates[i];
-	if(s == mControlledSoldier)
+	if(s == mFocusSoldier)
 		return;
-	auto olds = mControlledSoldier;
+	auto olds = mFocusSoldier;
 
-	mControlledSoldier = s;
-	mSoldier = SoldierQueryPtr(new SoldierQuery(mControlledSoldier));
+	mFocusSoldier = s;
+	mSoldier = SoldierQueryPtr(new SoldierQuery(mFocusSoldier));
 	mSelectedCommandee = nullptr;
 	if(!mObserver) {
 		bool handleOld = false;
@@ -1447,15 +1465,15 @@ void Driver::setFocusSoldier()
 
 		// detach AI agent from new soldier
 		{
-			bool succ = mAgentDirectory.freeSoldier(mControlledSoldier);
+			bool succ = mAgentDirectory.freeSoldier(mFocusSoldier);
 			assert(succ);
 		}
 
 		// attach our agent to new soldier
 		{
-			auto controller = SoldierControllerPtr(new SoldierController(mControlledSoldier));
+			auto controller = SoldierControllerPtr(new SoldierController(mFocusSoldier));
 			mPlayerAgent = boost::shared_ptr<PlayerAgent>(new PlayerAgent(controller, mInputState));
-			bool succ = mAgentDirectory.addAgent(mControlledSoldier, controller, mPlayerAgent);
+			bool succ = mAgentDirectory.addAgent(mFocusSoldier, controller, mPlayerAgent);
 			assert(succ);
 		}
 

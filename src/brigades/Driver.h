@@ -227,7 +227,7 @@ class Driver : public DebugOutput, public InfoChannel {
 		boost::shared_ptr<Common::Texture> mUnitIconShadowTexture;
 		Common::TextMap mTextMap;
 		SoldierQueryPtr mSoldier;
-		SoldierPtr mControlledSoldier;
+		SoldierPtr mFocusSoldier;
 		bool mObserver;
 		bool mRestarting;
 		DebugSymbolCollection mDebugSymbols;

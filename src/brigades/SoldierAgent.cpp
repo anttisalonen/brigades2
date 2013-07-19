@@ -17,11 +17,6 @@ Common::Vector3 SoldierAgent::createMovement(bool defmov, const Common::Vector3&
 	return mController->createMovement(defmov, mov);
 }
 
-void SoldierAgent::updateController(float time)
-{
-	mController->update(time);
-}
-
 
 }
 

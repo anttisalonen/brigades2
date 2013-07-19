@@ -32,7 +32,6 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 		}
 	}
 
-	//soldier.handleEvents();
 	Vector3 tot;
 	Vector3 mousedir = mInputState->getMousePositionOnField() - soldier.getPosition();
 
@@ -61,6 +60,12 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 	}
 
 	return actions;
+}
+
+void PlayerAgent::newCommunication(const SoldierCommunication& comm)
+{
+	// TODO
+	return;
 }
 
 }

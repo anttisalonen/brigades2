@@ -5,6 +5,7 @@
 
 #include "SoldierQuery.h"
 #include "SoldierAction.h"
+#include "SoldierController.h"
 
 namespace Brigades {
 
@@ -13,8 +14,8 @@ class SoldierController;
 class SoldierAgent {
 	public:
 		SoldierAgent(const boost::shared_ptr<SoldierController> s);
-		void updateController(float time);
 		virtual std::vector<SoldierAction> update(float time) = 0;
+		virtual void newCommunication(const SoldierCommunication& comm) = 0;
 
 	protected:
 		SoldierQuery getControlledSoldier() const;

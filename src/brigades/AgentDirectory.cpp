@@ -61,6 +61,15 @@ void AgentDirectory::soldierRemoved(SoldierPtr p)
 	mAgents.erase(pair);
 }
 
+boost::shared_ptr<SoldierController> AgentDirectory::getControllerFor(const boost::shared_ptr<Soldier> s)
+{
+	auto pair = mAgents.find(s);
+	if(pair == mAgents.end())
+		return boost::shared_ptr<SoldierController>();
+	else
+		return pair->second.first;
+}
+
 
 }
 

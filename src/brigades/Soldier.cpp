@@ -261,6 +261,14 @@ void Soldier::addWeapon(WeaponPtr w)
 	mWeapons.push_back(w);
 }
 
+const WeaponPtr Soldier::getCurrentWeapon() const
+{
+	if(mCurrentWeaponIndex < mWeapons.size())
+		return mWeapons[mCurrentWeaponIndex];
+	else
+		return WeaponPtr();
+}
+
 WeaponPtr Soldier::getCurrentWeapon()
 {
 	if(mCurrentWeaponIndex < mWeapons.size())
@@ -301,6 +309,11 @@ Common::Vector3 Soldier::getUnitPosition() const
 		midp /= mCommandees.size();
 		return midp;
 	}
+}
+
+const SensorySystemPtr Soldier::getSensorySystem() const
+{
+	return mSensorySystem;
 }
 
 SensorySystemPtr Soldier::getSensorySystem()
@@ -367,6 +380,11 @@ void Soldier::removeCommandee(SoldierPtr s)
 	s->setLeader(SoldierPtr());
 }
 
+const std::list<SoldierPtr>& Soldier::getCommandees() const
+{
+	return mCommandees;
+}
+
 std::list<SoldierPtr>& Soldier::getCommandees()
 {
 	return mCommandees;
@@ -375,6 +393,11 @@ std::list<SoldierPtr>& Soldier::getCommandees()
 void Soldier::setLeader(SoldierPtr s)
 {
 	mLeader = s;
+}
+
+const SoldierPtr Soldier::getLeader() const
+{
+	return mLeader;
 }
 
 SoldierPtr Soldier::getLeader()
@@ -496,10 +519,10 @@ bool Soldier::isDictator() const
 	return mDictator;
 }
 
-bool Soldier::canCommunicateWith(const SoldierPtr p) const
+bool Soldier::canCommunicateWith(const Soldier& p) const
 {
-	return !isDead() && !p->isDead() && ((hasRadio() && p->hasRadio() && Entity::distanceBetween(*this, *p) < 1000.0f) ||
-			(Entity::distanceBetween(*this, *p) < 100.0f));
+	return !isDead() && !p.isDead() && ((hasRadio() && p.hasRadio() && Entity::distanceBetween(*this, p) < 1000.0f) ||
+			(Entity::distanceBetween(*this, p) < 100.0f));
 }
 
 bool Soldier::hasRadio() const

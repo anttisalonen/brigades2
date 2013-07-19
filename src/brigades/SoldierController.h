@@ -5,6 +5,7 @@
 #include <boost/shared_ptr.hpp>
 
 #include "Soldier.h"
+#include "SoldierQuery.h"
 
 #include "common/Vehicle.h"
 #include "common/Clock.h"
@@ -15,7 +16,24 @@ namespace Brigades {
 
 class Soldier;
 class World;
-class SoldierQuery;
+
+enum class CommunicationType {
+	Order,
+	Acknowledgement,
+	ReportSuccess,
+	ReportFail
+};
+
+enum class OrderType {
+	GotoPosition,
+};
+
+struct SoldierCommunication {
+	SoldierQuery from;
+	CommunicationType comm;
+	OrderType order;
+	void* data;
+};
 
 class SoldierController : public boost::enable_shared_from_this<SoldierController> {
 	public:
@@ -23,11 +41,9 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		virtual ~SoldierController() { }
 		SoldierQuery getControlledSoldier() const;
 		void update(float time);
-		bool handleAttackOrder(const AttackOrder& r);
-		bool handleAttackSuccess(boost::shared_ptr<Soldier> s, const AttackOrder& r);
-		void handleAttackFailure(boost::shared_ptr<Soldier> s, const AttackOrder& r);
-		void handleReinforcement(boost::shared_ptr<Soldier> s);
 		Common::Vector3 createMovement(bool defmov, const Common::Vector3& mov) const;
+		std::vector<SoldierCommunication> fetchCommunications();
+
 
 	private:
 		Common::Vector3 defaultMovement() const;
@@ -38,6 +54,11 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		bool setVelocityToNegativeHeading();
 		boost::shared_ptr<Common::Steering> getSteering();
 		bool handleLeaderCheck(float time);
+
+		void addGotoOrder(boost::shared_ptr<Soldier> from, const Common::Vector3& pos);
+		void addAcknowledgement(boost::shared_ptr<Soldier> from);
+		void addSuccessReport(boost::shared_ptr<Soldier> from);
+		void addFailReport(boost::shared_ptr<Soldier> from);
 
 		bool checkLeaderStatus();
 		void updateObstacleCache();
@@ -50,6 +71,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		std::vector<Common::Obstacle*> mObstacleCache;
 		Common::SteadyTimer mObstacleCacheTimer;
 		Common::Countdown mMovementSoundTimer;
+		std::vector<SoldierCommunication> mCommunications;
 
 		friend class SoldierAction;
 };

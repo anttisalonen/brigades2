@@ -21,10 +21,10 @@ BRIGADESBINNAME = brigades
 BRIGADESBIN     = $(BINDIR)/$(BRIGADESBINNAME)
 BRIGADESSRCDIR = src/brigades
 BRIGADESSRCFILES = Side.cpp World.cpp Soldier.cpp \
-		   SoldierQuery.cpp WeaponQuery.cpp SoldierAction.cpp SoldierController.cpp \
-		   SoldierAgent.cpp PlayerAgent.cpp ai/SoldierAgent.cpp \
+		   SoldierQuery.cpp WeaponQuery.cpp \
+		   SoldierController.cpp SoldierAgent.cpp PlayerAgent.cpp ai/SoldierAgent.cpp \
 		   Armory.cpp SensorySystem.cpp Trigger.cpp Event.cpp \
-		   InputState.cpp AgentDirectory.cpp Driver.cpp \
+		   InputState.cpp AgentDirectory.cpp SoldierAction.cpp Driver.cpp \
 		   InfoChannel.cpp DebugOutput.cpp main.cpp
 
 BRIGADESSRCS = $(addprefix $(BRIGADESSRCDIR)/, $(BRIGADESSRCFILES))

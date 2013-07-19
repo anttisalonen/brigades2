@@ -8,6 +8,7 @@
 #include "Soldier.h"
 #include "SoldierQuery.h"
 #include "SoldierController.h"
+#include "AgentDirectory.h"
 
 namespace Brigades {
 
@@ -25,7 +26,7 @@ enum class SAType {
 	SwitchWeapon,
 	LineFormation,
 	ColumnFormation,
-	GiveOrder,
+	Communication,
 };
 
 class SoldierAction {
@@ -34,19 +35,27 @@ class SoldierAction {
 		SoldierAction(SAType type, const Common::Vector3& vec);
 		SoldierAction(SAType type, int val);
 		SoldierAction(SAType type, float val);
+		SoldierAction(const SoldierQuery& s, OrderType order, const Common::Vector3& pos);
 		bool execute(SoldierPtr s, boost::shared_ptr<SoldierController>& controller, float time);
 
-		static SoldierAction SoldierDefendCommand(const SoldierQuery& s, const Common::Vector3& pos);
-		static SoldierAction SoldierAttackCommand(const SoldierQuery& s, const AttackOrder& pos);
+		static void setAgentDirectory(AgentDirectory* dir);
+
 
 	private:
+		bool doCommunication(SoldierPtr s, boost::shared_ptr<SoldierController>& controller);
+
 		SAType mType;
 		Common::Vector3 mVec;
 		union {
 			float mVal;
 			int mIntValue;
 		};
-		AttackOrder mOrder;
+		AttackOrder mAttackOrder;
+		OrderType mOrder;
+		CommunicationType mCommunication;
+		SoldierQuery mCommandedSoldier;
+
+		static AgentDirectory* AgentDir;
 };
 
 }

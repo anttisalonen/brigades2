@@ -64,11 +64,13 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void clearWeapons();
 		void addWeapon(WeaponPtr w);
 		WeaponPtr getCurrentWeapon();
+		const WeaponPtr getCurrentWeapon() const;
 		void switchWeapon(unsigned int index);
 		const std::vector<WeaponPtr>& getWeapons() const;
 		const boost::shared_ptr<World> getWorld() const;
 		Common::Vector3 getUnitPosition() const;
 		boost::shared_ptr<World> getWorld();
+		const boost::shared_ptr<SensorySystem> getSensorySystem() const;
 		boost::shared_ptr<SensorySystem> getSensorySystem();
 		std::set<SoldierPtr> getKnownEnemySoldiers() const;
 		void addEvent(EventPtr e);
@@ -79,8 +81,10 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void addCommandee(SoldierPtr s);
 		void removeCommandee(SoldierPtr s);
 		std::list<SoldierPtr>& getCommandees();
+		const std::list<SoldierPtr>& getCommandees() const;
 		void setLeader(SoldierPtr s);
 		SoldierPtr getLeader();
+		const SoldierPtr getLeader() const;
 		bool seesSoldier(const SoldierPtr s);
 
 		void setLineFormation(float dist);
@@ -93,7 +97,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool hasWeaponType(const char* wname) const;
 		void setDictator(bool d);
 		bool isDictator() const;
-		bool canCommunicateWith(const SoldierPtr p) const;
+		bool canCommunicateWith(const Soldier& p) const;
 		bool hasRadio() const;
 		bool hasEnemyContact() const;
 		const std::string& getName() const;

@@ -1,3 +1,5 @@
+#include <stdio.h>
+
 #include <cassert>
 #include <cfloat>
 #include <climits>
@@ -33,6 +35,13 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 	std::vector<SoldierAction> actions;
 
 	return actions;
+}
+
+void SoldierAgent::newCommunication(const SoldierCommunication& comm)
+{
+	// TODO
+	printf("Received communication!\n");
+	return;
 }
 
 }

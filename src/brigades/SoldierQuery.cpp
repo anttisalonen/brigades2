@@ -38,6 +38,10 @@ bool FoxholeQuery::operator<(const FoxholeQuery& f) const
 }
 
 
+SoldierQuery::SoldierQuery()
+{
+}
+
 SoldierQuery::SoldierQuery(const SoldierPtr s)
 	: mSoldier(s)
 {
@@ -46,7 +50,7 @@ SoldierQuery::SoldierQuery(const SoldierPtr s)
 bool SoldierQuery::queryIsValid() const
 {
 	// TODO
-	return true;
+	return mSoldier != nullptr;
 }
 
 int SoldierQuery::getID() const
@@ -163,13 +167,13 @@ SoldierQuery SoldierQuery::getLeader() const
 	return SoldierQuery(l);
 }
 
-bool SoldierQuery::seesSoldier(const SoldierQueryPtr s) const
+bool SoldierQuery::seesSoldier(const SoldierQuery& s) const
 {
 	soldier_query_check();
 	std::vector<SoldierQuery> ret;
 	auto sps = mSoldier->getSensorySystem()->getSoldiers();
 	for(auto ss : sps) {
-		if(ss == s->mSoldier)
+		if(ss == s.mSoldier)
 			return true;
 	}
 	return false;
@@ -196,7 +200,7 @@ bool SoldierQuery::isDictator() const
 bool SoldierQuery::canCommunicateWith(const SoldierQuery& p) const
 {
 	soldier_query_check();
-	return mSoldier->canCommunicateWith(p.mSoldier);
+	return mSoldier->canCommunicateWith(*p.mSoldier);
 }
 
 bool SoldierQuery::hasRadio() const

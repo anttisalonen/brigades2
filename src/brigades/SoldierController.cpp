@@ -196,5 +196,50 @@ Common::Vector3 SoldierController::createMovement(bool defmov, const Common::Vec
 	return tot;
 }
 
+void SoldierController::addGotoOrder(boost::shared_ptr<Soldier> from, const Common::Vector3& pos)
+{
+	SoldierCommunication comm;
+	comm.from = from;
+	comm.comm = CommunicationType::Order;
+	comm.order = OrderType::GotoPosition;
+	Vector3* d = new Vector3(pos);
+	comm.data = (void*)d;
+	mCommunications.push_back(comm);
+}
+
+void SoldierController::addAcknowledgement(boost::shared_ptr<Soldier> from)
+{
+	SoldierCommunication comm;
+	comm.from = from;
+	comm.comm = CommunicationType::Acknowledgement;
+	comm.data = nullptr;
+	mCommunications.push_back(comm);
+}
+
+void SoldierController::addSuccessReport(boost::shared_ptr<Soldier> from)
+{
+	SoldierCommunication comm;
+	comm.from = from;
+	comm.comm = CommunicationType::ReportSuccess;
+	comm.data = nullptr;
+	mCommunications.push_back(comm);
+}
+
+void SoldierController::addFailReport(boost::shared_ptr<Soldier> from)
+{
+	SoldierCommunication comm;
+	comm.from = from;
+	comm.comm = CommunicationType::ReportFail;
+	comm.data = nullptr;
+	mCommunications.push_back(comm);
+}
+
+std::vector<SoldierCommunication> SoldierController::fetchCommunications()
+{
+	auto ret = mCommunications;
+	mCommunications.clear();
+	return ret;
+}
+
 }
 

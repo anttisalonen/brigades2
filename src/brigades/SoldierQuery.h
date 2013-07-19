@@ -26,6 +26,7 @@ class FoxholeQuery {
 
 class SoldierQuery {
 	public:
+		SoldierQuery();
 		SoldierQuery(const boost::shared_ptr<Soldier> s);
 		bool queryIsValid() const;
 		int getID() const;
@@ -41,7 +42,7 @@ class SoldierQuery {
 		std::vector<SoldierQuery> getCommandees() const;
 		bool hasLeader() const;
 		SoldierQuery getLeader() const;
-		bool seesSoldier(const SoldierQueryPtr s) const;
+		bool seesSoldier(const SoldierQuery& s) const;
 		std::set<SoldierQuery> getSensedSoldiers() const;
 		std::set<FoxholeQuery> getSensedFoxholes() const;
 
@@ -75,8 +76,9 @@ class SoldierQuery {
 		bool operator<(const SoldierQuery& f) const;
 
 	private:
-		const boost::shared_ptr<Soldier> mSoldier;
+		boost::shared_ptr<Soldier> mSoldier;
 		friend SoldierQuery;
+		friend class SoldierAction;
 };
 
 };
