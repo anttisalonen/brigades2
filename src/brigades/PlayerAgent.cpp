@@ -37,12 +37,11 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 	Vector3 mousedir = mInputState->getMousePositionOnField() - soldier.getPosition();
 
 	if(!mInputState->isDriving()) {
-		tot = createMovement(true, pcv);
 		actions.push_back(SoldierAction(SAType::Turn, mousedir));
+		tot = createMovement(true, pcv);
+		actions.push_back(SoldierAction(SAType::Move, tot));
 	} else {
-		if(pcv.y) {
-			tot = createMovement(false, pcv);
-		}
+		actions.push_back(SoldierAction(SAType::Move, soldier.getHeadingVector() * pcv.y));
 		if(pcv.x) {
 			float rot(pcv.x);
 			rot *= -0.05f;
@@ -54,12 +53,10 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 			}
 		}
 	}
-	actions.push_back(SoldierAction(SAType::Move, tot));
 
 	if(mInputState->isShooting()) {
 		if(soldier.hasCurrentWeapon() && soldier.getCurrentWeapon().canShoot()) {
 			actions.push_back(SoldierAction(SAType::Shoot, mousedir));
-			//soldier.getCurrentWeapon()->shoot(mWorld, soldier.mousedir);
 		}
 	}
 

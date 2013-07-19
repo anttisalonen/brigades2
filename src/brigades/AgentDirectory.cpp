@@ -5,12 +5,11 @@
 
 namespace Brigades {
 
-bool AgentDirectory::addAgent(const SoldierPtr s, boost::shared_ptr<SoldierAgent> a)
+bool AgentDirectory::addAgent(const SoldierPtr s, boost::shared_ptr<SoldierController> c, boost::shared_ptr<SoldierAgent> a)
 {
-	printf("Adding agent %p for soldier %p - have %zd agents\n", a.get(), s.get(), mAgents.size());
 	auto sold = mAgents.find(s);
 	if(sold == mAgents.end()) {
-		mAgents.insert({s, a});
+		mAgents.insert({s, {c, a}});
 		return true;
 	} else {
 		return false;
@@ -29,12 +28,11 @@ bool AgentDirectory::freeSoldier(const SoldierPtr s)
 
 bool AgentDirectory::removeAgent(const SoldierPtr s, boost::shared_ptr<SoldierAgent> a)
 {
-	printf("Removing agent %p for soldier %p\n", a.get(), s.get());
 	auto pair = mAgents.find(s);
 	if(pair == mAgents.end())
 		return false;
 
-	if(pair->second == a) {
+	if(pair->second.second == a) {
 		mAgents.erase(pair);
 		return true;
 	}
@@ -42,7 +40,7 @@ bool AgentDirectory::removeAgent(const SoldierPtr s, boost::shared_ptr<SoldierAg
 	return false;
 }
 
-std::map<SoldierPtr, boost::shared_ptr<SoldierAgent>>& AgentDirectory::getAgents()
+std::map<SoldierPtr, std::pair<boost::shared_ptr<SoldierController>, boost::shared_ptr<SoldierAgent>>>& AgentDirectory::getAgents()
 {
 	return mAgents;
 }
@@ -53,7 +51,7 @@ void AgentDirectory::soldierAdded(SoldierPtr p)
 	auto a = boost::shared_ptr<SoldierAgent>(new AI::SoldierAgent(controller));
 	auto pair = mAgents.find(p);
 	assert(pair == mAgents.end());
-	mAgents.insert({p, a});
+	mAgents.insert({p, {controller, a}});
 }
 
 void AgentDirectory::soldierRemoved(SoldierPtr p)

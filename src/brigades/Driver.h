@@ -200,6 +200,7 @@ class Driver : public DebugOutput, public InfoChannel {
 		bool allCommandeesDefending() const;
 		void setLight();
 		void updateAgents(float time);
+		void applyPendingActions();
 
 		WorldPtr mWorld;
 		Common::Clock mClock;

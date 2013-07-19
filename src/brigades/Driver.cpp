@@ -82,11 +82,28 @@ void Driver::init()
 void Driver::updateAgents(float time)
 {
 	for(auto& p : mAgentDirectory.getAgents()) {
-		p.second->updateController(time);
-		auto actions = p.second->update(time);
+		p.second.second->updateController(time);
+		auto actions = p.second.second->update(time);
 		for(auto& a : actions) {
-			a.execute();
+			bool succ = a.execute(p.first, p.second.first, time);
+			assert(succ);
 		}
+	}
+}
+
+void Driver::applyPendingActions()
+{
+	if(!mControlledSoldier)
+		return;
+
+	auto it = mAgentDirectory.getAgents().find(mControlledSoldier);
+	assert(it != mAgentDirectory.getAgents().end());
+
+	auto controller = it->second.first;
+
+	for(auto& a : mPendingActions) {
+		bool succ = a.execute(mControlledSoldier, controller, 0.0f);
+		assert(succ);
 	}
 }
 
@@ -99,7 +116,9 @@ void Driver::run()
 		prevTime = newTime;
 		frameTime = std::min(frameTime, 0.1);
 
-		if(!mPaused) {
+		if(!mPaused && frameTime) {
+			applyPendingActions();
+
 			float ta = mTimeAcceleration;
 			while(ta >= 1.0f) {
 				mWorld->update(frameTime);
@@ -468,7 +487,6 @@ bool Driver::handleInput(float frameTime)
 						if(!mObserver) {
 							int k = event.key.keysym.sym - SDLK_1;
 							mPendingActions.push_back(SoldierAction(SAType::SwitchWeapon, k));
-							//mSoldier->switchWeapon(k);
 						}
 						break;
 
@@ -723,7 +741,7 @@ void Driver::drawTexts()
 			drawOverlayText(w.getName(), 1.0f, w.getLoadTime() < 0.2f || w.canShoot() ?
 					Common::Color::White : Common::Color::Black,
 					40.0f, screenHeight - 100.0f - 15.0f * i, false, true);
-			if(w == mSoldier->getCurrentWeapon()) {
+			if(mSoldier->hasCurrentWeapon() && w == mSoldier->getCurrentWeapon()) {
 				drawOverlayText("*", 1.0f, Common::Color::White, 30.0f, screenHeight - 100.0f - 15.0f * i, false, true);
 			}
 			i++;
@@ -1437,7 +1455,7 @@ void Driver::setFocusSoldier()
 		{
 			auto controller = SoldierControllerPtr(new SoldierController(mControlledSoldier));
 			mPlayerAgent = boost::shared_ptr<PlayerAgent>(new PlayerAgent(controller, mInputState));
-			bool succ = mAgentDirectory.addAgent(mControlledSoldier, mPlayerAgent);
+			bool succ = mAgentDirectory.addAgent(mControlledSoldier, controller, mPlayerAgent);
 			assert(succ);
 		}
 
@@ -1446,7 +1464,7 @@ void Driver::setFocusSoldier()
 			if(handleOld) {
 				auto controller = SoldierControllerPtr(new SoldierController(olds));
 				auto a = boost::shared_ptr<SoldierAgent>(new AI::SoldierAgent(controller));
-				bool succ = mAgentDirectory.addAgent(olds, a);
+				bool succ = mAgentDirectory.addAgent(olds, controller, a);
 				assert(succ);
 			}
 		}

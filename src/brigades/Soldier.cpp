@@ -3,7 +3,6 @@
 #include "common/Color.h"
 
 #include "Soldier.h"
-#include "SoldierController.h"
 #include "World.h"
 #include "SensorySystem.h"
 #include "InfoChannel.h"
@@ -11,6 +10,16 @@
 using namespace Common;
 
 namespace Brigades {
+
+AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, float width)
+	: CenterPoint(p)
+{
+	Vector3 v = d - p;
+	v.normalize();
+	v *= width;
+	DefenseLineToRight.x = v.y;
+	DefenseLineToRight.y = -v.x;
+}
 
 Soldier::Soldier(boost::shared_ptr<World> w, bool firstside, SoldierRank rank, WarriorType wt)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),

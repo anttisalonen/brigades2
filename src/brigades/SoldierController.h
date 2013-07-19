@@ -4,6 +4,8 @@
 #include <boost/enable_shared_from_this.hpp>
 #include <boost/shared_ptr.hpp>
 
+#include "Soldier.h"
+
 #include "common/Vehicle.h"
 #include "common/Clock.h"
 #include "common/Steering.h"
@@ -14,18 +16,6 @@ namespace Brigades {
 class Soldier;
 class World;
 class SoldierQuery;
-
-struct AttackOrder {
-	AttackOrder() { }
-	AttackOrder(const Common::Vector3& p)
-		: CenterPoint(p) { }
-	AttackOrder(const Common::Vector3& p, const Common::Vector3& d)
-		: CenterPoint(p),
-		DefenseLineToRight(d) { }
-	AttackOrder(const Common::Vector3& p, const Common::Vector3& d, float width);
-	Common::Vector3 CenterPoint;
-	Common::Vector3 DefenseLineToRight;
-};
 
 class SoldierController : public boost::enable_shared_from_this<SoldierController> {
 	public:
@@ -41,14 +31,13 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 
 	private:
 		Common::Vector3 defaultMovement() const;
-		void moveTo(const Common::Vector3& dir, float time, bool autorotate);
-		void turnTo(const Common::Vector3& dir);
-		void turnBy(float rad);
-		void setVelocityToHeading();
+		bool moveTo(const Common::Vector3& dir, float time, bool autorotate);
+		bool turnTo(const Common::Vector3& dir);
+		bool turnBy(float rad);
+		bool setVelocityToHeading();
+		bool setVelocityToNegativeHeading();
 		boost::shared_ptr<Common::Steering> getSteering();
 		bool handleLeaderCheck(float time);
-
-		virtual void say(boost::shared_ptr<Soldier> s, const char* msg) { }
 
 		bool checkLeaderStatus();
 		void updateObstacleCache();
@@ -61,6 +50,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		std::vector<Common::Obstacle*> mObstacleCache;
 		Common::SteadyTimer mObstacleCacheTimer;
 		Common::Countdown mMovementSoundTimer;
+
+		friend class SoldierAction;
 };
 
 typedef boost::shared_ptr<SoldierController> SoldierControllerPtr;

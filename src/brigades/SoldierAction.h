@@ -3,8 +3,11 @@
 
 #include <boost/shared_ptr.hpp>
 
-#include "SoldierQuery.h"
 #include "common/Vector3.h"
+
+#include "Soldier.h"
+#include "SoldierQuery.h"
+#include "SoldierController.h"
 
 namespace Brigades {
 
@@ -29,11 +32,21 @@ class SoldierAction {
 	public:
 		SoldierAction(SAType type);
 		SoldierAction(SAType type, const Common::Vector3& vec);
+		SoldierAction(SAType type, int val);
 		SoldierAction(SAType type, float val);
-		bool execute();
+		bool execute(SoldierPtr s, boost::shared_ptr<SoldierController>& controller, float time);
 
 		static SoldierAction SoldierDefendCommand(const SoldierQuery& s, const Common::Vector3& pos);
 		static SoldierAction SoldierAttackCommand(const SoldierQuery& s, const AttackOrder& pos);
+
+	private:
+		SAType mType;
+		Common::Vector3 mVec;
+		union {
+			float mVal;
+			int mIntValue;
+		};
+		AttackOrder mOrder;
 };
 
 }

@@ -11,16 +11,6 @@ using namespace Common;
 
 namespace Brigades {
 
-AttackOrder::AttackOrder(const Common::Vector3& p, const Common::Vector3& d, float width)
-	: CenterPoint(p)
-{
-	Vector3 v = d - p;
-	v.normalize();
-	v *= width;
-	DefenseLineToRight.x = v.y;
-	DefenseLineToRight.y = -v.x;
-}
-
 SoldierController::SoldierController(boost::shared_ptr<Soldier> s)
 	: mWorld(s->getWorld()),
 	mSoldier(s),
@@ -68,15 +58,15 @@ Vector3 SoldierController::defaultMovement() const
 	return tot;
 }
 
-void SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
+bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
 	if(mSoldier->sleeping() || mSoldier->eating()) {
-		return;
+		return false;
 	}
 
 	if(isnan(dir.x) || isnan(dir.y)) {
 		std::cout << "moveTo: warning: dir: " << dir << "\n";
-		return;
+		return false;
 	}
 
 	if(dir.null() && !mSoldier->getVelocity().null()) {
@@ -96,30 +86,44 @@ void SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 	if(mMovementSoundTimer.checkAndRewind()) {
 		mWorld->createMovementSound(mSoldier);
 	}
+
+	return true;
 }
 
-void SoldierController::turnTo(const Common::Vector3& dir)
+bool SoldierController::turnTo(const Common::Vector3& dir)
 {
 	if(mSoldier->sleeping() || mSoldier->eating())
-		return;
+		return false;
 
 	mSoldier->setXYRotation(atan2(dir.y, dir.x));
+	return true;
 }
 
-void SoldierController::turnBy(float rad)
+bool SoldierController::turnBy(float rad)
 {
 	if(mSoldier->sleeping() || mSoldier->eating())
-		return;
+		return false;
 
 	mSoldier->addXYRotation(rad);
+	return true;
 }
 
-void SoldierController::setVelocityToHeading()
+bool SoldierController::setVelocityToHeading()
 {
 	if(mSoldier->sleeping() || mSoldier->eating())
-		return;
+		return false;
 
 	mSoldier->setVelocityToHeading();
+	return true;
+}
+
+bool SoldierController::setVelocityToNegativeHeading()
+{
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return false;
+
+	mSoldier->setVelocityToNegativeHeading();
+	return true;
 }
 
 SoldierQuery SoldierController::getControlledSoldier() const

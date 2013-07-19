@@ -12,7 +12,6 @@
 #include "common/Steering.h"
 
 #include "Side.h"
-#include "SoldierController.h"
 #include "Armory.h"
 #include "Event.h"
 
@@ -35,6 +34,18 @@ class SensorySystem;
 
 class Soldier;
 typedef boost::shared_ptr<Soldier> SoldierPtr;
+
+struct AttackOrder {
+	AttackOrder() { }
+	AttackOrder(const Common::Vector3& p)
+		: CenterPoint(p) { }
+	AttackOrder(const Common::Vector3& p, const Common::Vector3& d)
+		: CenterPoint(p),
+		DefenseLineToRight(d) { }
+	AttackOrder(const Common::Vector3& p, const Common::Vector3& d, float width);
+	Common::Vector3 CenterPoint;
+	Common::Vector3 DefenseLineToRight;
+};
 
 
 class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<Soldier> {

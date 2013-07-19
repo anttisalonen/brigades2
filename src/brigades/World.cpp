@@ -7,8 +7,6 @@
 #include "DebugOutput.h"
 #include "InfoChannel.h"
 
-#include "SoldierController.h"
-
 #include "common/Random.h"
 
 using namespace Common;
