@@ -62,7 +62,6 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 
 		bool checkLeaderStatus();
 		void updateObstacleCache();
-		void syncWithVehicle();
 
 		boost::shared_ptr<World> mWorld;
 		boost::shared_ptr<Soldier> mSoldier;

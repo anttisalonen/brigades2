@@ -1226,7 +1226,10 @@ void Driver::drawEntities()
 				includeSoldierSprite(soldiers, s);
 			}
 			for(auto s : mSoldier->getSensedVehicles()) {
-				includeArmorSprite(soldiers, s);
+				bool brightspot = mSelectedCommandee &&
+					mSelectedCommandee->mounted() &&
+					mSelectedCommandee->getMountPoint() == s;
+				includeArmorSprite(soldiers, s, brightspot);
 			}
 		}
 
@@ -1657,7 +1660,7 @@ void Driver::includeSoldierSprite(std::set<Sprite>& sprites, const SoldierQuery&
 	}
 }
 
-void Driver::includeArmorSprite(std::set<Sprite>& sprites, const ArmorQuery& s)
+void Driver::includeArmorSprite(std::set<Sprite>& sprites, const ArmorQuery& s, bool addbrightspot)
 {
 	float xp, yp, sxp, syp;
 	float scale;
@@ -1665,6 +1668,14 @@ void Driver::includeArmorSprite(std::set<Sprite>& sprites, const ArmorQuery& s)
 			sxp, syp, xp, yp, scale);
 	sprites.insert(Sprite(s.getPosition(), SpriteType::Soldier, scale, t, mSoldierShadowTexture, xp, yp,
 				sxp, syp));
+
+	if(addbrightspot) {
+		Vector3 p = s.getPosition();
+		p.y -= 0.001f;
+		sprites.insert(Sprite(p, SpriteType::BrightSpot, scale, mBrightSpot,
+					boost::shared_ptr<Common::Texture>(), xp, yp,
+					0.0f, 0.0f, 0.5f));
+	}
 }
 
 void Driver::includeUnitIcon(std::set<Sprite>& sprites, const SoldierQuery& s, bool addbrightspot)

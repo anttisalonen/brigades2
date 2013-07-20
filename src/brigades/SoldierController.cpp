@@ -102,9 +102,10 @@ bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 		mWorld->createMovementSound(mSoldier);
 	}
 
-	if(mSoldier->mounted()) {
-		syncWithVehicle();
-	}
+	// world will ensure the soldier and the vehicle are in the
+	// same location. Do not change the position here as it will
+	// mess up the CSP in world.
+
 	return true;
 }
 
@@ -270,16 +271,6 @@ std::vector<SoldierCommunication> SoldierController::fetchCommunications()
 	auto ret = mCommunications;
 	mCommunications.clear();
 	return ret;
-}
-
-void SoldierController::syncWithVehicle()
-{
-	if(mSoldier->mounted()) {
-		auto armor = mSoldier->getMountPoint();
-		assert(armor);
-		mSoldier->setPosition(armor->getPosition());
-		mSoldier->setXYRotation(armor->getXYRotation());
-	}
 }
 
 }

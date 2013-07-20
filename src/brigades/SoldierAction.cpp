@@ -178,6 +178,10 @@ bool SoldierAction::tryMount(SoldierPtr s, boost::shared_ptr<SoldierController>&
 	float mindist = 100.0f;
 	ArmorPtr found = nullptr;
 	for(auto& a : allseen) {
+		if(a->occupied()) {
+			continue;
+		}
+
 		float dist = s->getPosition().distance(a->getPosition());
 		if(dist < mindist && dist < 5.0f) {
 			found = a;

@@ -59,6 +59,16 @@ float Armor::damageFactorFromWeapon(const WeaponPtr w) const
 	return w->getDamageAgainstLightArmor();
 }
 
+void Armor::setOccupied(bool o)
+{
+	mOccupied = o;
+}
+
+bool Armor::occupied() const
+{
+	return mOccupied;
+}
+
 
 #define armor_query_check() do { if(!queryIsValid()) {assert(0); throw std::runtime_error("invalid armor query"); } } while(0)
 
@@ -121,11 +131,28 @@ Common::Vector3 ArmorQuery::getVelocity() const
 	return mArmor->getVelocity();
 }
 
+bool ArmorQuery::occupied() const
+{
+	armor_query_check();
+	return mArmor->occupied();
+}
+
+
+bool ArmorQuery::operator==(const ArmorQuery& f) const
+{
+	return mArmor == f.mArmor;
+}
+
+bool ArmorQuery::operator!=(const ArmorQuery& f) const
+{
+	return !(*this == f);
+}
 
 bool ArmorQuery::operator<(const ArmorQuery& f) const
 {
 	return mArmor < f.mArmor;
 }
+
 
 }
 

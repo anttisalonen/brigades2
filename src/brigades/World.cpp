@@ -397,20 +397,8 @@ Common::Rectangle World::getArea() const
 // modifiers
 void World::update(float time)
 {
-	for(auto sit : mSoldierMap) {
-		auto s = sit.second;
-		if(!s->isDead()) {
-			auto oldpos = s->getPosition();
-			assert(!isnan(s->getPosition().x));
-			s->update(time);
-
-			assert(!isnan(s->getPosition().x));
-			checkVehiclePosition(*s);
-			assert(!isnan(s->getPosition().x));
-			mSoldierCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
-		}
-	}
-
+	// update vehicles before soldiers to ensure
+	// mounted soldiers have the correct position.
 	for(auto sit : mArmorMap) {
 		auto s = sit.second;
 		if(!s->isDestroyed()) {
@@ -422,6 +410,24 @@ void World::update(float time)
 			checkVehiclePosition(*s);
 			assert(!isnan(s->getPosition().x));
 			mArmorCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
+		}
+	}
+
+	for(auto sit : mSoldierMap) {
+		auto s = sit.second;
+		if(!s->isDead()) {
+			auto oldpos = s->getPosition();
+			assert(!isnan(s->getPosition().x));
+			s->update(time);
+			if(s->mounted()) {
+				auto a = s->getMountPoint();
+				assert(a);
+				s->setPosition(a->getPosition());
+				s->setXYRotation(a->getXYRotation());
+			}
+
+			assert(!isnan(s->getPosition().x));
+			mSoldierCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
 		}
 	}
 

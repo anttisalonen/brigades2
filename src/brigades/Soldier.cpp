@@ -255,12 +255,14 @@ void Soldier::clearWeapons()
 void Soldier::mount(ArmorPtr a)
 {
 	assert(a);
+	assert(!a->occupied());
 	mMountPoint = a;
 	mBackupWeapons = mWeapons;
 	mWeapons.clear();
 	addWeapon(mWorld->getArmory().getAutomaticCannon());
 	addWeapon(mWorld->getArmory().getMachineGun());
 	mRotation = a->getXYRotation();
+	a->setOccupied(true);
 	mFOV = TWO_PI;
 }
 
@@ -277,6 +279,8 @@ const ArmorPtr Soldier::getMountPoint() const
 void Soldier::unmount()
 {
 	assert(mMountPoint);
+	assert(mMountPoint->occupied());
+	mMountPoint->setOccupied(false);
 	mMountPoint = nullptr;
 	mWeapons = mBackupWeapons;
 	mBackupWeapons.clear();

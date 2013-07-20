@@ -45,6 +45,16 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 			actions.push_back(SoldierAction(SAType::Move, tot));
 			actions.push_back(SoldierAction(SAType::Turn, moveDiff));
 		}
+
+		if(!soldier.mounted()) {
+			auto veh = soldier.getSensedVehicles();
+			for(auto& v : veh) {
+				if(!v.occupied() && soldier.getPosition().distance(v.getPosition()) < 5.0f) {
+					actions.push_back(SoldierAction(SAType::Mount));
+					break;
+				}
+			}
+		}
 	}
 
 	return actions;
