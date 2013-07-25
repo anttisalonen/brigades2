@@ -425,6 +425,7 @@ void World::update(float time)
 				s->setPosition(a->getPosition());
 				s->setXYRotation(a->getXYRotation());
 			}
+			checkVehiclePosition(*s);
 
 			assert(!isnan(s->getPosition().x));
 			mSoldierCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
@@ -789,7 +790,7 @@ void World::addTrees()
 
 void World::addWalls()
 {
-	const float wallDistance = 0.1f;
+	const float wallDistance = 0.5f;
 	Vector3 a(-mWidth * 0.5f + wallDistance, -mHeight * 0.5f + wallDistance, 0.0f);
 	Vector3 b( mWidth * 0.5f - wallDistance, -mHeight * 0.5f + wallDistance, 0.0f);
 	Vector3 c(-mWidth * 0.5f + wallDistance,  mHeight * 0.5f - wallDistance, 0.0f);

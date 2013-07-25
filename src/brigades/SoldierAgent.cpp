@@ -12,9 +12,9 @@ SoldierQuery SoldierAgent::getControlledSoldier() const
 	return mController->getControlledSoldier();
 }
 
-Common::Vector3 SoldierAgent::createMovement(bool defmov, const Common::Vector3& mov) const
+Common::Vector3 SoldierAgent::createMovement(const Common::Vector3& mov) const
 {
-	return mController->createMovement(defmov, mov);
+	return mController->createMovement(mov);
 }
 
 

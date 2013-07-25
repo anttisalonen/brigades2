@@ -41,7 +41,7 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 	if(!mMoveTarget.null()) {
 		Vector3 moveDiff = mMoveTarget - soldier.getPosition();
 		if(moveDiff.length2() > 1.0f) {
-			Vector3 tot = createMovement(true, moveDiff);
+			Vector3 tot = createMovement(moveDiff);
 			actions.push_back(SoldierAction(SAType::Move, tot));
 			actions.push_back(SoldierAction(SAType::Turn, moveDiff));
 		}

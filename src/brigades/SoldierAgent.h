@@ -19,7 +19,7 @@ class SoldierAgent {
 
 	protected:
 		SoldierQuery getControlledSoldier() const;
-		Common::Vector3 createMovement(bool defmov, const Common::Vector3& mov) const;
+		Common::Vector3 createMovement(const Common::Vector3& mov) const;
 
 	private:
 		const boost::shared_ptr<SoldierController> mController;

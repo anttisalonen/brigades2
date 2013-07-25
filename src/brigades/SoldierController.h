@@ -41,7 +41,7 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		virtual ~SoldierController() { }
 		SoldierQuery getControlledSoldier() const;
 		void update(float time);
-		Common::Vector3 createMovement(bool defmov, const Common::Vector3& mov) const;
+		Common::Vector3 createMovement(const Common::Vector3& mov) const;
 		std::vector<SoldierCommunication> fetchCommunications();
 
 

@@ -51,20 +51,20 @@ void SoldierController::update(float time)
 
 Vector3 SoldierController::defaultMovement() const
 {
-	if(mSoldier->sleeping() || mSoldier->eating())
-		return Vector3();
-
 	std::vector<WallPtr> wallptrs = mWorld->getWallsAt(mSoldier->getPosition(), mSoldier->getVelocity().length());
 	std::vector<Wall*> walls(wallptrs.size());
 	for(unsigned int i = 0; i < wallptrs.size(); i++)
 		walls[i] = wallptrs[i].get();
 
-	Vector3 obs = mSteering->obstacleAvoidance(mObstacleCache) * 100.0f;
+	Vector3 obs;
+	if(!mSoldier->mounted())
+		obs = mSteering->obstacleAvoidance(mObstacleCache) * 100.0f;
+
 	Vector3 wal = mSteering->wallAvoidance(walls) * 100.0f;
 
 	Vector3 tot;
-	mSteering->accumulate(tot, wal);
 	mSteering->accumulate(tot, obs);
+	mSteering->accumulate(tot, wal);
 
 	return tot;
 }
@@ -93,7 +93,6 @@ bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 		assert(time);
 		veh->setAcceleration(dir * (10.0f / time));
 	}
-	veh->Vehicle::update(time);
 	if(autorotate && veh->getVelocity().length() > 0.3f)
 		veh->setAutomaticHeading();
 
@@ -219,11 +218,13 @@ bool SoldierController::checkLeaderStatus()
 	return false;
 }
 
-Common::Vector3 SoldierController::createMovement(bool defmov, const Common::Vector3& mov) const
+Common::Vector3 SoldierController::createMovement(const Common::Vector3& mov) const
 {
 	Vector3 tot;
-	if(defmov)
-		tot = defaultMovement();
+	if(mSoldier->sleeping() || mSoldier->eating())
+		return Vector3();
+
+	tot = defaultMovement();
 	mSteering->accumulate(tot, mov);
 	return tot;
 }

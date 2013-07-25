@@ -218,6 +218,8 @@ void Soldier::update(float time)
 		handleEating(time);
 		return;
 	}
+
+	Vehicle::update(time);
 }
 
 float Soldier::getFOV() const
