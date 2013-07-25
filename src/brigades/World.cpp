@@ -656,10 +656,10 @@ SoldierPtr World::addUnit(UnitSize u, unsigned int side, bool reuseLeader)
 {
 	switch(u) {
 		case UnitSize::Squad:
-			return addSquad(side, reuseLeader);
+			return addSquad(side, reuseLeader, 0);
 
 		case UnitSize::Platoon:
-			return addPlatoon(side, reuseLeader);
+			return addPlatoon(side, reuseLeader, 0);
 
 		case UnitSize::Company:
 			return addCompany(side, reuseLeader);
@@ -678,7 +678,7 @@ void World::setupSides()
 	mSoldiersAtStart = mSoldiersAlive[0];
 }
 
-SoldierPtr World::addSoldier(bool first, SoldierRank rank, bool dictator)
+SoldierPtr World::addSoldier(bool first, SoldierRank rank, bool dictator, int sector)
 {
 	if(mSoldierMap.size() >= mMaxSoldiers) {
 		assert(0);
@@ -699,13 +699,21 @@ SoldierPtr World::addSoldier(bool first, SoldierRank rank, bool dictator)
 		mSoldiersAlive[first ? 0 : 1]++;
 	}
 
-	s->setPosition(getHomeBasePosition(first));
+	Vector3 pos = getHomeBasePosition(first);
+	pos.x += rand() % 30 - 15;
+	if(first)
+		pos.x += sector * 100.0f;
+	else
+		pos.x -= sector * 100.0f;
+	pos.y += rand() % 30 - 15;
+
+	s->setPosition(pos);
 	mSoldierCSP.add(s, Vector2(s->getPosition().x, s->getPosition().y));
 	mSoldierMap.insert(std::make_pair(s->getID(), s));
 	return s;
 }
 
-ArmorPtr World::addArmor(bool first)
+ArmorPtr World::addArmor(bool first, int sector)
 {
 	if(mArmorMap.size() >= mMaxArmors) {
 		assert(0);
@@ -714,7 +722,15 @@ ArmorPtr World::addArmor(bool first)
 
 	ArmorPtr s = ArmorPtr(new Armor(first ? 0 : 1));
 
-	s->setPosition(getHomeBasePosition(first));
+	Vector3 pos = getHomeBasePosition(first);
+	pos.x += rand() % 30 - 15;
+	if(first)
+		pos.x += sector * 100.0f;
+	else
+		pos.x -= sector * 100.0f;
+	pos.y += rand() % 30 - 15;
+
+	s->setPosition(pos);
 	mArmorCSP.add(s, Vector2(s->getPosition().x, s->getPosition().y));
 	mArmorMap.insert(std::make_pair(s->getID(), s));
 	return s;
@@ -897,10 +913,10 @@ SoldierPtr World::addCompany(int side, bool reuseLeader)
 {
 	SoldierPtr companyleader;
 
-	companyleader = addSoldier(side == 0, SoldierRank::Captain, false);
+	companyleader = addSoldier(side == 0, SoldierRank::Captain, false, 0);
 
 	for(int k = 0; k < 3; k++) {
-		auto s = addPlatoon(side, reuseLeader);
+		auto s = addPlatoon(side, reuseLeader, k);
 		assert(s);
 		companyleader->addCommandee(s);
 	}
@@ -908,7 +924,7 @@ SoldierPtr World::addCompany(int side, bool reuseLeader)
 	return companyleader;
 }
 
-SoldierPtr World::addPlatoon(int side, bool reuseLeader)
+SoldierPtr World::addPlatoon(int side, bool reuseLeader, int sector)
 {
 	SoldierPtr platoonleader;
 	bool reusing = false;
@@ -928,11 +944,11 @@ SoldierPtr World::addPlatoon(int side, bool reuseLeader)
 	}
 
 	if(!platoonleader) {
-		platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, false);
+		platoonleader = addSoldier(side == 0, SoldierRank::Lieutenant, false, sector);
 	}
 
 	for(int k = 0; k < 3; k++) {
-		auto s = addSquad(side, reuseLeader);
+		auto s = addSquad(side, reuseLeader, sector * 4 + k);
 		assert(s);
 		platoonleader->addCommandee(s);
 		if(reusing) {
@@ -946,11 +962,11 @@ SoldierPtr World::addPlatoon(int side, bool reuseLeader)
 	return platoonleader;
 }
 
-SoldierPtr World::addSquad(int side, bool reuseLeader)
+SoldierPtr World::addSquad(int side, bool reuseLeader, int sector)
 {
 	SoldierPtr squadleader;
 	for(int j = 0; j < 8; j++) {
-		auto s = addSoldier(side == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, false);
+		auto s = addSoldier(side == 0, j == 0 ? SoldierRank::Sergeant : SoldierRank::Private, false, sector);
 		if(j == 0) {
 			squadleader = s;
 		}
@@ -966,14 +982,14 @@ SoldierPtr World::addSquad(int side, bool reuseLeader)
 		}
 	}
 
-	addArmor(side == 0);
+	addArmor(side == 0, sector);
 
 	return squadleader;
 }
 
 void World::addDictator(int side)
 {
-	addSoldier(side == 0, SoldierRank::Private, true);
+	addSoldier(side == 0, SoldierRank::Private, true, 0);
 }
 
 void World::setHomeBasePositions()

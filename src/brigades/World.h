@@ -141,8 +141,8 @@ class World : public boost::enable_shared_from_this<World> {
 	private:
 		void setupSides();
 		SoldierPtr addUnit(UnitSize u, unsigned int side, bool reuseLeader = false);
-		SoldierPtr addSoldier(bool first, SoldierRank rank, bool dictator);
-		ArmorPtr addArmor(bool first);
+		SoldierPtr addSoldier(bool first, SoldierRank rank, bool dictator, int sector);
+		ArmorPtr addArmor(bool first, int sector);
 		void addTrees();
 		void addWalls();
 		void checkVehiclePosition(Common::Vehicle& s);
@@ -152,8 +152,8 @@ class World : public boost::enable_shared_from_this<World> {
 		void updateTriggerSystem(float time);
 		void updateVisibility();
 		SoldierPtr addCompany(int side, bool reuseLeader);
-		SoldierPtr addPlatoon(int side, bool reuseLeader);
-		SoldierPtr addSquad(int side, bool reuseLeader);
+		SoldierPtr addPlatoon(int side, bool reuseLeader, int sector);
+		SoldierPtr addSquad(int side, bool reuseLeader, int sector);
 		void addDictator(int side);
 		void setHomeBasePositions();
 		void reapDeadSoldiers();
