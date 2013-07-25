@@ -37,9 +37,10 @@ void SoldierController::update(float time)
 		updateObstacleCache();
 	}
 
-	if(mSoldier->mounted() != mMountedSteering) {
-		mMountedSteering = mSoldier->mounted();
-		if(mSoldier->mounted()) {
+	if(mSoldier->driving() != mDriverSteering) {
+		mDriverSteering = mSoldier->driving();
+		if(mSoldier->driving()) {
+			assert(mSoldier->getMountPoint());
 			mSteering = boost::shared_ptr<Steering>(new Steering(*mSoldier->getMountPoint()));
 		}
 		else {
@@ -57,7 +58,7 @@ Vector3 SoldierController::defaultMovement() const
 		walls[i] = wallptrs[i].get();
 
 	Vector3 obs;
-	if(!mSoldier->mounted())
+	if(!mSoldier->driving())
 		obs = mSteering->obstacleAvoidance(mObstacleCache) * 100.0f;
 
 	Vector3 wal = mSteering->wallAvoidance(walls) * 100.0f;
@@ -72,10 +73,10 @@ Vector3 SoldierController::defaultMovement() const
 bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool autorotate)
 {
 	boost::shared_ptr<Vehicle> veh = mSoldier;
-	if(mSoldier->mounted())
+	if(mSoldier->driving())
 		veh = mSoldier->getMountPoint();
 
-	if(mSoldier->sleeping() || mSoldier->eating()) {
+	if(!ableToMove()) {
 		return false;
 	}
 
@@ -110,10 +111,10 @@ bool SoldierController::moveTo(const Common::Vector3& dir, float time, bool auto
 
 bool SoldierController::turnTo(const Common::Vector3& dir)
 {
-	if(mSoldier->sleeping() || mSoldier->eating())
+	if(!ableToMove())
 		return false;
 
-	if(mSoldier->mounted())
+	if(mSoldier->driving())
 		mSoldier->getMountPoint()->setXYRotation(atan2(dir.y, dir.x));
 
 	mSoldier->setXYRotation(atan2(dir.y, dir.x));
@@ -121,12 +122,17 @@ bool SoldierController::turnTo(const Common::Vector3& dir)
 	return true;
 }
 
+bool SoldierController::ableToMove() const
+{
+	return !mSoldier->sleeping() && !mSoldier->eating() && (!mSoldier->mounted() || mSoldier->driving());
+}
+
 bool SoldierController::turnBy(float rad)
 {
-	if(mSoldier->sleeping() || mSoldier->eating())
+	if(!ableToMove())
 		return false;
 
-	if(mSoldier->mounted())
+	if(mSoldier->driving())
 		mSoldier->getMountPoint()->addXYRotation(rad);
 
 	mSoldier->addXYRotation(rad);
@@ -136,10 +142,10 @@ bool SoldierController::turnBy(float rad)
 
 bool SoldierController::setVelocityToHeading()
 {
-	if(mSoldier->sleeping() || mSoldier->eating())
+	if(!ableToMove())
 		return false;
 
-	if(mSoldier->mounted())
+	if(mSoldier->driving())
 		mSoldier->getMountPoint()->setVelocityToHeading();
 
 	mSoldier->setVelocityToHeading();
@@ -149,10 +155,10 @@ bool SoldierController::setVelocityToHeading()
 
 bool SoldierController::setVelocityToNegativeHeading()
 {
-	if(mSoldier->sleeping() || mSoldier->eating())
+	if(!ableToMove())
 		return false;
 
-	if(mSoldier->mounted())
+	if(mSoldier->driving())
 		mSoldier->getMountPoint()->setVelocityToNegativeHeading();
 
 	mSoldier->setVelocityToNegativeHeading();
@@ -221,7 +227,7 @@ bool SoldierController::checkLeaderStatus()
 Common::Vector3 SoldierController::createMovement(const Common::Vector3& mov) const
 {
 	Vector3 tot;
-	if(mSoldier->sleeping() || mSoldier->eating())
+	if(!ableToMove())
 		return Vector3();
 
 	tot = defaultMovement();

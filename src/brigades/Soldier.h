@@ -61,6 +61,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		void addWeapon(WeaponPtr w);
 		void mount(ArmorPtr a);
 		const ArmorPtr getMountPoint() const;
+		bool driving() const;
 		ArmorPtr getMountPoint();
 		void unmount();
 		WeaponPtr getCurrentWeapon();
@@ -169,6 +170,7 @@ class Soldier : public Common::Vehicle, public boost::enable_shared_from_this<So
 		bool mEnemyContact;
 		Common::Countdown mEnemyContactTimer;
 		ArmorPtr mMountPoint;
+		bool mDriving = false;
 
 		static int getNextID();
 		static std::string generateName();

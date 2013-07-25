@@ -59,14 +59,30 @@ float Armor::damageFactorFromWeapon(const WeaponPtr w) const
 	return w->getDamageAgainstLightArmor();
 }
 
-void Armor::setOccupied(bool o)
+void Armor::setDriverOccupied(bool o)
 {
 	mOccupied = o;
 }
 
-bool Armor::occupied() const
+bool Armor::driverOccupied() const
 {
 	return mOccupied;
+}
+
+void Armor::addPassenger()
+{
+	assert(mFreeSeats > 0);
+	mFreeSeats--;
+}
+
+void Armor::removePassenger()
+{
+	mFreeSeats++;
+}
+
+int Armor::freePassengerSeats() const
+{
+	return mFreeSeats;
 }
 
 
@@ -131,10 +147,16 @@ Common::Vector3 ArmorQuery::getVelocity() const
 	return mArmor->getVelocity();
 }
 
-bool ArmorQuery::occupied() const
+bool ArmorQuery::driverOccupied() const
 {
 	armor_query_check();
-	return mArmor->occupied();
+	return mArmor->driverOccupied();
+}
+
+int ArmorQuery::freePassengerSeats() const
+{
+	armor_query_check();
+	return mArmor->freePassengerSeats();
 }
 
 

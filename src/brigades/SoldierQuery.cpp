@@ -161,6 +161,12 @@ ArmorQuery SoldierQuery::getMountPoint() const
 	return ArmorQuery(wp);
 }
 
+bool SoldierQuery::driving() const
+{
+	soldier_query_check();
+	return mSoldier->driving();
+}
+
 std::vector<SoldierQuery> SoldierQuery::getCommandees() const
 {
 	soldier_query_check();

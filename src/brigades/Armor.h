@@ -19,8 +19,11 @@ class Armor : public Common::Vehicle {
 		void reduceHealth(float n);
 		float getHealth() const;
 		float damageFactorFromWeapon(const WeaponPtr w) const;
-		void setOccupied(bool o);
-		bool occupied() const;
+		void setDriverOccupied(bool o);
+		bool driverOccupied() const;
+		void addPassenger();
+		void removePassenger();
+		int freePassengerSeats() const;
 
 	private:
 		static int getNextID();
@@ -29,6 +32,7 @@ class Armor : public Common::Vehicle {
 		int mSide;
 		float mHealth = 1.0f;
 		bool mOccupied = false;
+		int mFreeSeats = 8;
 };
 
 typedef boost::shared_ptr<Armor> ArmorPtr;
@@ -45,7 +49,8 @@ class ArmorQuery {
 		float getXYRotation() const;
 		Common::Vector3 getHeadingVector() const;
 		Common::Vector3 getVelocity() const;
-		bool occupied() const;
+		bool driverOccupied() const;
+		int freePassengerSeats() const;
 
 		bool operator==(const ArmorQuery& f) const;
 		bool operator!=(const ArmorQuery& f) const;

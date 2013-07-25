@@ -178,7 +178,7 @@ bool SoldierAction::tryMount(SoldierPtr s, boost::shared_ptr<SoldierController>&
 	float mindist = 100.0f;
 	ArmorPtr found = nullptr;
 	for(auto& a : allseen) {
-		if(a->occupied()) {
+		if(a->driverOccupied() && a->freePassengerSeats() < 1) {
 			continue;
 		}
 

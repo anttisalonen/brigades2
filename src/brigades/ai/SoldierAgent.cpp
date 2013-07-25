@@ -38,7 +38,7 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 	mPendingActions.clear();
 
 	auto soldier = getControlledSoldier();
-	if(!mMoveTarget.null()) {
+	if(!mMoveTarget.null() && (!soldier.mounted() || soldier.driving())) {
 		Vector3 moveDiff = mMoveTarget - soldier.getPosition();
 		if(moveDiff.length2() > 1.0f) {
 			Vector3 tot = createMovement(moveDiff);
@@ -49,7 +49,7 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 		if(!soldier.mounted()) {
 			auto veh = soldier.getSensedVehicles();
 			for(auto& v : veh) {
-				if(!v.occupied() && soldier.getPosition().distance(v.getPosition()) < 5.0f) {
+				if(!v.driverOccupied() && soldier.getPosition().distance(v.getPosition()) < 5.0f) {
 					actions.push_back(SoldierAction(SAType::Mount));
 					break;
 				}

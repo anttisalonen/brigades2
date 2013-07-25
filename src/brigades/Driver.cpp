@@ -102,7 +102,10 @@ void Driver::updateAgents(float time)
 		// execute actions
 		for(auto& a : actions) {
 			bool succ = a.execute(p.first, p.second.first, time);
-			assert(succ);
+			if(!succ) {
+				fprintf(stderr, "Error: action %d failed.\n", (int)a.getType());
+				assert(0);
+			}
 		}
 	}
 }

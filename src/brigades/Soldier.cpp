@@ -257,14 +257,19 @@ void Soldier::clearWeapons()
 void Soldier::mount(ArmorPtr a)
 {
 	assert(a);
-	assert(!a->occupied());
+	assert(!a->driverOccupied() || a->freePassengerSeats());
 	mMountPoint = a;
 	mBackupWeapons = mWeapons;
 	mWeapons.clear();
 	addWeapon(mWorld->getArmory().getAutomaticCannon());
 	addWeapon(mWorld->getArmory().getMachineGun());
 	mRotation = a->getXYRotation();
-	a->setOccupied(true);
+	if(!a->driverOccupied()) {
+		a->setDriverOccupied(true);
+		mDriving = true;
+	} else {
+		a->addPassenger();
+	}
 	mFOV = TWO_PI;
 }
 
@@ -278,11 +283,18 @@ const ArmorPtr Soldier::getMountPoint() const
 	return mMountPoint;
 }
 
+bool Soldier::driving() const
+{
+	return mDriving;
+}
+
 void Soldier::unmount()
 {
 	assert(mMountPoint);
-	assert(mMountPoint->occupied());
-	mMountPoint->setOccupied(false);
+	if(mDriving) {
+		mDriving = false;
+		mMountPoint->setDriverOccupied(false);
+	}
 	mMountPoint = nullptr;
 	mWeapons = mBackupWeapons;
 	mBackupWeapons.clear();

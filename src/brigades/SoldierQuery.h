@@ -47,6 +47,7 @@ class SoldierQuery {
 		std::set<FoxholeQuery> getSensedFoxholes() const;
 		std::set<ArmorQuery> getSensedVehicles() const;
 		ArmorQuery getMountPoint() const;
+		bool driving() const;
 
 		bool hasWeaponType(const char* wname) const;
 		bool isDictator() const;
