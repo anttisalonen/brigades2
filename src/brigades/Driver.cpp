@@ -541,7 +541,11 @@ bool Driver::handleInput(float frameTime)
 							int i = 0;
 							for(auto c : mSoldier->getCommandees()) {
 								if(i == k) {
+									auto oldSelection = mSelectedCommandee;
 									mSelectedCommandee = SoldierQueryPtr(new SoldierQuery(c));
+									if(oldSelection && *oldSelection == *mSelectedCommandee) {
+										mSelectedCommandee = nullptr;
+									}
 									break;
 								}
 								i++;
