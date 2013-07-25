@@ -64,8 +64,20 @@ std::vector<SoldierAction> PlayerAgent::update(float time)
 
 void PlayerAgent::newCommunication(const SoldierCommunication& comm)
 {
-	// TODO
-	return;
+	switch(comm.comm) {
+		case CommunicationType::Order:
+			printf("Received order\n");
+			break;
+		case CommunicationType::Acknowledgement:
+			printf("Received ack\n");
+			break;
+		case CommunicationType::ReportSuccess:
+			printf("Received success\n");
+			break;
+		case CommunicationType::ReportFail:
+			printf("Received fail\n");
+			break;
+	}
 }
 
 }

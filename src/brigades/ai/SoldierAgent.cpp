@@ -38,22 +38,52 @@ std::vector<SoldierAction> SoldierAgent::update(float time)
 	mPendingActions.clear();
 
 	auto soldier = getControlledSoldier();
-	if(!mMoveTarget.null() && (!soldier.mounted() || soldier.driving())) {
-		Vector3 moveDiff = mMoveTarget - soldier.getPosition();
+	if(!mMountTarget.null() && soldier.mounted()) {
+		mMountTarget = Vector3();
+		actions.push_back(SoldierAction(soldier.getLeader(), CommunicationType::ReportSuccess));
+	}
+
+	if((!mMoveTarget.null() || !mMountTarget.null()) && (!soldier.mounted() || soldier.driving())) {
+		const auto& movetgt = !mMoveTarget.null() ? mMoveTarget : mMountTarget;
+		Vector3 moveDiff = movetgt - soldier.getPosition();
 		if(moveDiff.length2() > 1.0f) {
 			Vector3 tot = createMovement(moveDiff);
 			actions.push_back(SoldierAction(SAType::Move, tot));
 			actions.push_back(SoldierAction(SAType::Turn, moveDiff));
-		}
 
-		if(!soldier.mounted()) {
-			auto veh = soldier.getSensedVehicles();
-			for(auto& v : veh) {
-				if(!v.driverOccupied() && soldier.getPosition().distance(v.getPosition()) < 5.0f) {
-					actions.push_back(SoldierAction(SAType::Mount));
-					break;
+			if(!mMountTarget.null()) {
+				assert(!soldier.mounted());
+				auto veh = soldier.getSensedVehicles();
+				for(auto& v : veh) {
+					if((!v.driverOccupied() || v.freePassengerSeats() > 0) &&
+							soldier.getPosition().distance(v.getPosition()) < 5.0f) {
+						actions.push_back(SoldierAction(SAType::Mount));
+						break;
+					}
 				}
 			}
+		} else {
+			if(!mMoveTarget.null()) {
+				mMoveTarget = Vector3();
+				actions.push_back(SoldierAction(soldier.getLeader(), CommunicationType::ReportSuccess));
+			}
+
+			if(!mMountTarget.null()) {
+				mMountTarget = Vector3();
+				actions.push_back(SoldierAction(soldier.getLeader(), CommunicationType::ReportFail));
+			}
+		}
+	}
+
+	if(actions.empty() && (!soldier.mounted() || soldier.driving()))
+		actions.push_back(SoldierAction(SAType::Move, Vector3()));
+
+	if(mWantUnmount) {
+		if(soldier.mounted()) {
+			actions.push_back(SoldierAction(SAType::Unmount));
+		} else {
+			actions.push_back(SoldierAction(soldier.getLeader(), CommunicationType::ReportSuccess));
+			mWantUnmount = false;
 		}
 	}
 
@@ -73,6 +103,21 @@ void SoldierAgent::newCommunication(const SoldierCommunication& comm)
 					{
 						Vector3* pos = (Vector3*)comm.data;
 						mMoveTarget = *pos;
+						delete pos;
+					}
+					break;
+
+				case OrderType::UnmountVehicle:
+					{
+						mWantUnmount = true;
+					}
+					break;
+
+				case OrderType::MountVehicle:
+					{
+						// TODO: check not already mounted
+						Vector3* pos = (Vector3*)comm.data;
+						mMountTarget = *pos;
 						delete pos;
 					}
 					break;

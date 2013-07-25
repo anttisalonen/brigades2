@@ -23,6 +23,8 @@ class SoldierAgent : public Brigades::SoldierAgent {
 	private:
 		std::vector<SoldierAction> mPendingActions;
 		Common::Vector3 mMoveTarget;
+		Common::Vector3 mMountTarget;
+		bool mWantUnmount = false;
 };
 
 }

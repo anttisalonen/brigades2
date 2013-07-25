@@ -46,6 +46,7 @@ SoldierAction::SoldierAction(SAType type, const Common::Vector3& vec)
 		case SAType::Move:
 		case SAType::Shoot:
 			break;
+
 		default:
 			fprintf(stderr, "Error: action %d with vector data\n", (int)mType);
 			assert(0);
@@ -67,6 +68,14 @@ SoldierAction::SoldierAction(SAType type, float val)
 	}
 }
 
+SoldierAction::SoldierAction(const SoldierQuery& s, OrderType order)
+	: mType(SAType::Communication),
+	mOrder(order),
+	mCommunication(CommunicationType::Order),
+	mCommandedSoldier(s)
+{
+}
+
 SoldierAction::SoldierAction(const SoldierQuery& s, OrderType order, const Common::Vector3& pos)
 	: mType(SAType::Communication),
 	mVec(pos),
@@ -76,6 +85,13 @@ SoldierAction::SoldierAction(const SoldierQuery& s, OrderType order, const Commo
 {
 }
 
+SoldierAction::SoldierAction(const SoldierQuery& s, CommunicationType comm)
+	: mType(SAType::Communication),
+	mCommunication(comm),
+	mCommandedSoldier(s)
+{
+	assert(comm != CommunicationType::Order);
+}
 
 bool SoldierAction::execute(SoldierPtr s, boost::shared_ptr<SoldierController>& controller, float time)
 {
@@ -155,14 +171,42 @@ bool SoldierAction::doCommunication(SoldierPtr s, boost::shared_ptr<SoldierContr
 						cntr->addGotoOrder(s, mVec);
 						return true;
 
-					default:
-						return false;
+					case OrderType::MountVehicle:
+						cntr->addMountVehicleOrder(s, mVec);
+						return true;
+
+					case OrderType::UnmountVehicle:
+						cntr->addUnmountVehicleOrder(s);
+						return true;
 				}
 			}
 			return true;
 
-		default:
-			return false;
+		case CommunicationType::Acknowledgement:
+		case CommunicationType::ReportSuccess:
+		case CommunicationType::ReportFail:
+			{
+				assert(mCommandedSoldier.queryIsValid());
+				SoldierQuery me(s);
+				if(!me.canCommunicateWith(mCommandedSoldier)) {
+					return false;
+				}
+				auto cs = mCommandedSoldier.mSoldier;
+				assert(cs);
+				assert(AgentDir);
+				auto cntr = AgentDir->getControllerFor(cs);
+				assert(cntr);
+				if(mCommunication == CommunicationType::Acknowledgement) {
+					cntr->addAcknowledgement(s);
+				} else if(mCommunication == CommunicationType::ReportSuccess) {
+					cntr->addSuccessReport(s);
+				} else if(mCommunication == CommunicationType::ReportFail) {
+					cntr->addFailReport(s);
+				} else {
+					assert(0);
+				}
+			}
+			return true;
 	}
 	return false;
 }

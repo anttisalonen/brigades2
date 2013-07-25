@@ -502,10 +502,22 @@ bool Driver::handleInput(float frameTime)
 
 					case SDLK_m:
 						if(!mObserver) {
-							if(!mSoldier->mounted()) {
-								mPendingActions.push_back(SoldierAction(SAType::Mount));
+							if(mSelectedCommandee) {
+								if(SDL_GetModState() & KMOD_SHIFT) {
+									mPendingActions.push_back(SoldierAction(*mSelectedCommandee,
+												OrderType::UnmountVehicle));
+								} else {
+									Vector3 pos = mInputState->getMousePositionOnField();
+									mPendingActions.push_back(SoldierAction(*mSelectedCommandee,
+												OrderType::MountVehicle,
+												pos));
+								}
 							} else {
-								mPendingActions.push_back(SoldierAction(SAType::Unmount));
+								if(!mSoldier->mounted()) {
+									mPendingActions.push_back(SoldierAction(SAType::Mount));
+								} else {
+									mPendingActions.push_back(SoldierAction(SAType::Unmount));
+								}
 							}
 						}
 						break;

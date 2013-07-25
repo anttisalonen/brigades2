@@ -246,6 +246,26 @@ void SoldierController::addGotoOrder(boost::shared_ptr<Soldier> from, const Comm
 	mCommunications.push_back(comm);
 }
 
+void SoldierController::addMountVehicleOrder(boost::shared_ptr<Soldier> from, const Common::Vector3& pos)
+{
+	SoldierCommunication comm;
+	comm.from = from;
+	comm.comm = CommunicationType::Order;
+	comm.order = OrderType::MountVehicle;
+	Vector3* d = new Vector3(pos);
+	comm.data = (void*)d;
+	mCommunications.push_back(comm);
+}
+
+void SoldierController::addUnmountVehicleOrder(boost::shared_ptr<Soldier> from)
+{
+	SoldierCommunication comm;
+	comm.from = from;
+	comm.comm = CommunicationType::Order;
+	comm.order = OrderType::UnmountVehicle;
+	mCommunications.push_back(comm);
+}
+
 void SoldierController::addAcknowledgement(boost::shared_ptr<Soldier> from)
 {
 	SoldierCommunication comm;

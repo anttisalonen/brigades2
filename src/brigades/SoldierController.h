@@ -26,6 +26,8 @@ enum class CommunicationType {
 
 enum class OrderType {
 	GotoPosition,
+	MountVehicle,
+	UnmountVehicle,
 };
 
 struct SoldierCommunication {
@@ -56,6 +58,8 @@ class SoldierController : public boost::enable_shared_from_this<SoldierControlle
 		bool handleLeaderCheck(float time);
 
 		void addGotoOrder(boost::shared_ptr<Soldier> from, const Common::Vector3& pos);
+		void addMountVehicleOrder(boost::shared_ptr<Soldier> from, const Common::Vector3& pos);
+		void addUnmountVehicleOrder(boost::shared_ptr<Soldier> from);
 		void addAcknowledgement(boost::shared_ptr<Soldier> from);
 		void addSuccessReport(boost::shared_ptr<Soldier> from);
 		void addFailReport(boost::shared_ptr<Soldier> from);

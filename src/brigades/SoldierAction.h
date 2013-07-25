@@ -37,7 +37,9 @@ class SoldierAction {
 		SoldierAction(SAType type, const Common::Vector3& vec);
 		SoldierAction(SAType type, int val);
 		SoldierAction(SAType type, float val);
+		SoldierAction(const SoldierQuery& s, OrderType order);
 		SoldierAction(const SoldierQuery& s, OrderType order, const Common::Vector3& pos);
+		SoldierAction(const SoldierQuery& s, CommunicationType comm);
 		bool execute(SoldierPtr s, boost::shared_ptr<SoldierController>& controller, float time);
 		SAType getType() const;
 
