@@ -1317,6 +1317,17 @@ void Driver::drawEntities()
 						-0.5f, -0.8f));
 		}
 
+		auto roads = mWorld->getRoadsAt(mCamera, getDrawRadius());
+		for(auto r : roads) {
+			auto len = r->getStart().distance(r->getEnd()) / 8.0f;
+			for(int i = 0; i < (int)len; i++) {
+				auto pos = r->getStart() + ((r->getEnd() - r->getStart()) * (i / len));
+				sprites.push_back(Sprite(pos, SpriteType::Foxhole,
+							5.0f, mFoxholeTexture, boost::shared_ptr<Texture>(), -0.5f, -0.5f,
+							0.0f, 0.0f));
+			}
+		}
+
 		for(auto b : mWorld->getBulletsAt(mCamera, getDrawRadius())) {
 			if(!observefunc(b->getPosition())) {
 				continue;

@@ -13,13 +13,13 @@
 #include "common/Rectangle.h"
 #include "common/Vehicle.h"
 #include "common/Steering.h"
-#include "common/QuadTree.h"
 #include "common/CellSpacePartition.h"
 
 #include "Soldier.h"
 #include "Side.h"
 #include "Armory.h"
 #include "Trigger.h"
+#include "Terrain.h"
 
 #define NUM_SIDES 2
 
@@ -27,12 +27,6 @@ namespace Brigades {
 
 class World;
 
-class Tree : public Common::Obstacle {
-	public:
-		Tree(const Common::Vector3& pos, float radius);
-};
-
-typedef boost::shared_ptr<Tree> TreePtr;
 typedef boost::shared_ptr<Soldier> SoldierPtr;
 typedef boost::shared_ptr<World> WorldPtr;
 
@@ -106,6 +100,7 @@ class World : public boost::enable_shared_from_this<World> {
 
 		// accessors
 		std::vector<Tree*> getTreesAt(const Common::Vector3& v, float radius) const;
+		std::vector<Road*> getRoadsAt(const Common::Vector3& v, float radius) const;
 		std::vector<SoldierPtr> getSoldiersAt(const Common::Vector3& v, float radius);
 		std::vector<ArmorPtr> getArmorsAt(const Common::Vector3& v, float radius);
 		std::list<BulletPtr> getBulletsAt(const Common::Vector3& v, float radius) const;
@@ -126,7 +121,6 @@ class World : public boost::enable_shared_from_this<World> {
 		float getVisibilityFactor() const;
 		float getShootSoundHearingDistance() const;
 		Armory& getArmory() const;
-		Common::Rectangle getArea() const;
 		const Timestamp& getCurrentTime() const;
 		std::string getCurrentTimeAsString() const;
 		float getTimeCoefficient() const; // world time = frame time * time coefficient
@@ -145,6 +139,7 @@ class World : public boost::enable_shared_from_this<World> {
 		ArmorPtr addArmor(bool first, int sector);
 		void addTrees();
 		void addWalls();
+		void addRoads();
 		void checkVehiclePosition(Common::Vehicle& s);
 		void checkForWin();
 		void killSoldier(SoldierPtr s);
@@ -160,8 +155,7 @@ class World : public boost::enable_shared_from_this<World> {
 		bool vehicleVisible(const SoldierPtr p, const Common::Vehicle& s,
 				const std::vector<Tree*>& nearbytrees) const;
 
-		float mWidth;
-		float mHeight;
+		Terrain mTerrain;
 		const unsigned int mMaxSoldiers;
 		const unsigned int mMaxArmors;
 		SidePtr mSides[NUM_SIDES];
@@ -169,7 +163,6 @@ class World : public boost::enable_shared_from_this<World> {
 		Common::CellSpacePartition<ArmorPtr> mArmorCSP;
 		std::map<int, SoldierPtr> mSoldierMap;
 		std::map<int, ArmorPtr> mArmorMap;
-		Common::QuadTree<Tree*> mTrees;
 		Common::QuadTree<Foxhole*> mFoxholes;
 		std::vector<WallPtr> mWalls;
 		float mVisibility;

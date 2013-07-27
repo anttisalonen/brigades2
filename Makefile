@@ -20,7 +20,7 @@ COMMONLIB = $(COMMONSRCDIR)/libcommon.a
 BRIGADESBINNAME = brigades
 BRIGADESBIN     = $(BINDIR)/$(BRIGADESBINNAME)
 BRIGADESSRCDIR = src/brigades
-BRIGADESSRCFILES = Side.cpp Armor.cpp World.cpp Soldier.cpp \
+BRIGADESSRCFILES = Side.cpp Armor.cpp Road.cpp Terrain.cpp World.cpp Soldier.cpp \
 		   SoldierQuery.cpp WeaponQuery.cpp \
 		   SoldierController.cpp SoldierAgent.cpp PlayerAgent.cpp ai/SoldierAgent.cpp \
 		   Armory.cpp SensorySystem.cpp Trigger.cpp Event.cpp \

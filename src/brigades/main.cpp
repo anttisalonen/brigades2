@@ -158,6 +158,10 @@ int main(int argc, char** argv)
 			height = 1536.0f;
 		}
 	}
+
+	srand(seed);
+	std::cout << "Seed: " << seed << "\n";
+
 	WorldPtr world(new World(width, height, visibility, sounddistance, u, u == UnitSize::Company, *a));
 	DriverPtr driver(new Driver(world, observer, r));
 	if(debug)
@@ -165,11 +169,8 @@ int main(int argc, char** argv)
 
 	InfoChannel::setInstance(driver);
 
-	srand(seed);
-	std::cout << "Seed: " << seed << "\n";
 	world->create();
 	driver->init();
-
 
 	driver->run();
 

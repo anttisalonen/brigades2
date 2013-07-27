@@ -13,12 +13,6 @@ using namespace Common;
 
 namespace Brigades {
 
-Tree::Tree(const Vector3& pos, float radius)
-	: Obstacle(radius)
-{
-	mPosition = pos;
-}
-
 
 Bullet::Bullet(const SoldierPtr shooter, const Vector3& pos, const Vector3& vel, float timeleft)
 	: mShooter(shooter),
@@ -136,14 +130,12 @@ const float World::TimeCoefficient = 60.0f;
 
 World::World(float width, float height, float visibility, 
 		float sounddistance, UnitSize unitsize, bool dictator, Armory& armory)
-	: mWidth(width),
-	mHeight(height),
+	: mTerrain(width, height),
 	mMaxSoldiers(1024),
 	mMaxArmors(256),
-	mSoldierCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxSoldiers),
-	mArmorCSP(mWidth, mHeight, mWidth / 32, mHeight / 32, mMaxArmors),
-	mTrees(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
-	mFoxholes(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f))),
+	mSoldierCSP(width, height, width / 32, height / 32, mMaxSoldiers),
+	mArmorCSP(width, height, width / 32, height / 32, mMaxArmors),
+	mFoxholes(AABB(Vector2(0, 0), Vector2(width * 0.5f, height * 0.5f))),
 	mMaxVisibility(visibility),
 	mSoundDistance(sounddistance),
 	mTeamWon(-1),
@@ -172,14 +164,18 @@ World::World(float width, float height, float visibility,
 void World::create()
 {
 	addWalls();
-	addTrees();
 	setupSides();
 }
 
 // accessors
 std::vector<Tree*> World::getTreesAt(const Vector3& v, float radius) const
 {
-	return mTrees.query(AABB(Vector2(v.x, v.y), Vector2(radius, radius)));
+	return mTerrain.getTreesAt(v, radius);
+}
+
+std::vector<Road*> World::getRoadsAt(const Vector3& v, float radius) const
+{
+	return mTerrain.getRoadsAt(v, radius);
 }
 
 std::vector<SoldierPtr> World::getSoldiersAt(const Vector3& v, float radius)
@@ -219,12 +215,12 @@ std::vector<Foxhole*> World::getFoxholesAt(const Common::Vector3& v, float radiu
 
 float World::getWidth() const
 {
-	return mWidth;
+	return mTerrain.getWidth();
 }
 
 float World::getHeight() const
 {
-	return mHeight;
+	return mTerrain.getHeight();
 }
 
 SidePtr World::getSide(bool first) const
@@ -386,11 +382,6 @@ float World::getShootSoundHearingDistance() const
 Armory& World::getArmory() const
 {
 	return mArmory;
-}
-
-Common::Rectangle World::getArea() const
-{
-	return Rectangle(-mWidth * 0.5f, -mHeight * 0.5f, mWidth, mHeight);
 }
 
 
@@ -737,64 +728,15 @@ ArmorPtr World::addArmor(bool first, int sector)
 	return s;
 }
 
-void World::addTrees()
-{
-	int numXSquares = mWidth / mSquareSide;
-	int numYSquares = mHeight / mSquareSide;
-
-	for(int k = -numYSquares / 2; k < numYSquares / 2; k++) {
-		for(int j = -numXSquares / 2; j < numXSquares / 2; j++) {
-			if((k == -numYSquares / 2 && j == -numXSquares / 2) ||
-				       (k == numYSquares / 2 - 1 && j == numXSquares / 2 -1))
-				continue;
-
-			int treefactor = Random::uniform() * 10;
-			for(int i = 0; i < treefactor; i++) {
-				float x = Random::uniform();
-				float y = Random::uniform();
-				float r = Random::uniform();
-
-				const float maxRadius = 8.0f;
-
-				x *= mSquareSide;
-				y *= mSquareSide;
-				x += j * mSquareSide;
-				y += k * mSquareSide;
-				r = Common::clamp(2.0f, r * maxRadius, maxRadius);
-
-				bool tooclose = false;
-				for(auto t : mTrees.query(AABB(Vector2(x, y), Vector2(maxRadius * 2.0f, maxRadius * 2.0f)))) {
-					float maxdist = r + t->getRadius();
-					if(Vector3(x, y, 0.0f).distance2(t->getPosition()) <
-							maxdist * maxdist) {
-						tooclose = true;
-						break;
-					}
-				}
-				if(tooclose) {
-					continue;
-				}
-
-				// we're leaking the trees for now.
-				Tree* tree = new Tree(Vector3(x, y, 0), r);
-				bool ret = mTrees.insert(tree, Vector2(x, y));
-				if(!ret) {
-					std::cout << "Error: couldn't add tree at " << x << ", " << y << "\n";
-					assert(0);
-				}
-			}
-		}
-	}
-	std::cout << "Added " << mTrees.size() << " trees.\n";
-}
-
 void World::addWalls()
 {
+	float width = getWidth();
+	float height = getHeight();
 	const float wallDistance = 0.5f;
-	Vector3 a(-mWidth * 0.5f + wallDistance, -mHeight * 0.5f + wallDistance, 0.0f);
-	Vector3 b( mWidth * 0.5f - wallDistance, -mHeight * 0.5f + wallDistance, 0.0f);
-	Vector3 c(-mWidth * 0.5f + wallDistance,  mHeight * 0.5f - wallDistance, 0.0f);
-	Vector3 d( mWidth * 0.5f - wallDistance,  mHeight * 0.5f - wallDistance, 0.0f);
+	Vector3 a(-width * 0.5f + wallDistance, -height * 0.5f + wallDistance, 0.0f);
+	Vector3 b( width * 0.5f - wallDistance, -height * 0.5f + wallDistance, 0.0f);
+	Vector3 c(-width * 0.5f + wallDistance,  height * 0.5f - wallDistance, 0.0f);
+	Vector3 d( width * 0.5f - wallDistance,  height * 0.5f - wallDistance, 0.0f);
 
 	mWalls.push_back(WallPtr(new Wall(a, b)));
 	mWalls.push_back(WallPtr(new Wall(a, c)));
@@ -817,8 +759,8 @@ void World::checkVehiclePosition(Common::Vehicle& s)
 		}
 	}
 
-	if(fabs(s.getPosition().x) > mWidth * 0.5f) {
-		float nx = mWidth * 0.5f - 1.0f;
+	if(fabs(s.getPosition().x) > getWidth() * 0.5f) {
+		float nx = getWidth() * 0.5f - 1.0f;
 		Vector3 p = s.getPosition();
 		if(s.getPosition().x < 0.0f) {
 			p.x = -nx;
@@ -829,8 +771,8 @@ void World::checkVehiclePosition(Common::Vehicle& s)
 		s.setVelocity(Vector3());
 	}
 
-	if(fabs(s.getPosition().y) > mHeight * 0.5f) {
-		float ny = mHeight * 0.5f - 1.0f;
+	if(fabs(s.getPosition().y) > getHeight() * 0.5f) {
+		float ny = getHeight() * 0.5f - 1.0f;
 		Vector3 p = s.getPosition();
 		if(s.getPosition().y < 0.0f) {
 			p.y = -ny;
@@ -995,8 +937,8 @@ void World::addDictator(int side)
 
 void World::setHomeBasePositions()
 {
-	float x = mWidth * 0.5f - mSquareSide * 0.5f;
-	float y = mHeight * 0.5f - mSquareSide * 0.5f;
+	float x = getWidth() * 0.5f - mSquareSide * 0.5f;
+	float y = getHeight() * 0.5f - mSquareSide * 0.5f;
 	mHomeBasePositions[0] = Vector3(-x, -y, 0);
 	mHomeBasePositions[1] = Vector3(x, y, 0);
 }
