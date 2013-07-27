@@ -38,7 +38,7 @@ void Terrain::addTrees()
 				       (k == numYSquares / 2 - 1 && j == numXSquares / 2 -1))
 				continue;
 
-			int treefactor = Random::uniform() * 10;
+			int treefactor = 10 + Random::uniform() * 10;
 			for(int i = 0; i < treefactor; i++) {
 				float x = Random::uniform();
 				float y = Random::uniform();
@@ -162,6 +162,7 @@ std::list<GraphNode> RoadSolver::solve(const GraphNode& start)
 
 void Terrain::addRoads()
 {
+	printf("Creating roads...\n");
 	Common::QuadTree<GraphNode*> nodes(AABB(Vector2(0, 0), Vector2(mWidth * 0.5f, mHeight * 0.5f)));
 
 	static const int squareSide = 64;
@@ -293,24 +294,28 @@ void Terrain::addRoads()
 	for(const auto& road : r.getRoads()) {
 		const auto& s1 = road.first;
 		for(const auto& s2 : road.second) {
-			auto midpoint = (s1 + s2) * 0.5f;
 			auto s13 = Vector3(s1.x, s1.y, 0.0f);
 			auto s23 = Vector3(s2.x, s2.y, 0.0f);
-			auto trees = getTreesAt(Vector3(midpoint.x, midpoint.y, 0.0f), midpoint.distance(s2));
-			for(auto& t : trees) {
-				if(Math::segmentCircleIntersect(s13, s23,
-							t->getPosition(), t->getRadius() + mRoadRadius)) {
-					bool succ = mTrees.deleteT(t, Vector2(t->getPosition().x, t->getPosition().y));
-					assert(succ);
-					removedTrees++;
-				}
-			}
 
-			// leaking roads for now
-			auto robj = new Road(s13, s23);
-			bool succ = mRoads.insert(robj, AABB(midpoint, Vector2(fabs(midpoint.x - s2.x),
-							fabs(midpoint.y - s2.y))));
-			assert(succ);
+			// do not add duplicate roads
+			if(s13 < s23) {
+				auto midpoint = (s1 + s2) * 0.5f;
+				auto trees = getTreesAt(Vector3(midpoint.x, midpoint.y, 0.0f), midpoint.distance(s2));
+				for(auto& t : trees) {
+					if(Math::segmentCircleIntersect(s13, s23,
+								t->getPosition(), t->getRadius() + mRoadRadius)) {
+						bool succ = mTrees.deleteT(t, Vector2(t->getPosition().x, t->getPosition().y));
+						assert(succ);
+						removedTrees++;
+					}
+				}
+
+				// leaking roads for now
+				auto robj = new Road(s13, s23);
+				bool succ = mRoads.insert(robj, AABB(midpoint, Vector2(fabs(midpoint.x - s2.x),
+								fabs(midpoint.y - s2.y))));
+				assert(succ);
+			}
 		}
 	}
 
@@ -326,6 +331,8 @@ void Terrain::addRoads()
 		delete *it;
 	}
 	nodes.clear();
+
+	printf("Done creating roads.\n");
 }
 
 std::vector<Tree*> Terrain::getTreesAt(const Vector3& v, float radius) const

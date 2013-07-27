@@ -183,6 +183,7 @@ class Driver : public DebugOutput, public InfoChannel {
 		const boost::shared_ptr<Common::Texture> getUnitIconTexture(const UnitIconDescriptor& d);
 		const boost::shared_ptr<Common::Texture> unitIconTexture(const SoldierQuery& p, float& scale);
 		void drawEntities();
+		void drawRoads();
 		void setFocusSoldier();
 		Common::Vector3 getMousePositionOnField() const;
 		void updateMousePositionOnField();
@@ -203,6 +204,7 @@ class Driver : public DebugOutput, public InfoChannel {
 		void setLight();
 		void updateAgents(float time);
 		void applyPendingActions();
+		Common::Vector3 terrainPositionToScreenPosition(const Common::Vector3& pos);
 
 		WorldPtr mWorld;
 		Common::Clock mClock;
@@ -227,6 +229,7 @@ class Driver : public DebugOutput, public InfoChannel {
 		boost::shared_ptr<Common::Texture> mWeaponPickupTextures[int(WeaponPickupTexture::END)];
 		boost::shared_ptr<Common::Texture> mBrightSpot;
 		boost::shared_ptr<Common::Texture> mUnitIconShadowTexture;
+		boost::shared_ptr<Common::Texture> mRoadTexture;
 		Common::TextMap mTextMap;
 		SoldierQueryPtr mSoldier;
 		SoldierPtr mFocusSoldier;

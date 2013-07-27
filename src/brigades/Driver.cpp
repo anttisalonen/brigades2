@@ -290,6 +290,7 @@ void Driver::loadTextures()
 	mSoldierShadowTexture = boost::shared_ptr<Texture>(new Texture("share/soldier1shadow.png", 0, 32));
 	mTreeTexture = boost::shared_ptr<Texture>(new Texture("share/tree.png", 0, 0));
 	mFoxholeTexture = boost::shared_ptr<Texture>(new Texture("share/foxhole.png", 0, 0));
+	mRoadTexture = boost::shared_ptr<Texture>(new Texture("share/road.png", 0, 0));
 	mTreeShadowTexture = mSoldierShadowTexture;
 	mBrightSpot = boost::shared_ptr<Texture>(new Texture("share/spot.png", 0, 0));
 	mUnitIconShadowTexture = boost::shared_ptr<Texture>(new Texture("share/iconshadow.png", 0, 0));
@@ -745,6 +746,13 @@ void Driver::startFrame()
 void Driver::finishFrame()
 {
 	SDL_GL_SwapBuffers();
+}
+
+Common::Vector3 Driver::terrainPositionToScreenPosition(const Common::Vector3& pos)
+{
+	return Vector3((-mCamera.x + pos.x + pos.z * 0.15f) * mScaleLevel + screenWidth * 0.5f,
+			(-mCamera.y + pos.y - pos.z * 0.20f) * mScaleLevel + screenHeight * 0.5f,
+			0.0f);
 }
 
 void Driver::drawTerrain()
@@ -1317,17 +1325,6 @@ void Driver::drawEntities()
 						-0.5f, -0.8f));
 		}
 
-		auto roads = mWorld->getRoadsAt(mCamera, getDrawRadius());
-		for(auto r : roads) {
-			auto len = r->getStart().distance(r->getEnd()) / 8.0f;
-			for(int i = 0; i < (int)len; i++) {
-				auto pos = r->getStart() + ((r->getEnd() - r->getStart()) * (i / len));
-				sprites.push_back(Sprite(pos, SpriteType::Foxhole,
-							5.0f, mFoxholeTexture, boost::shared_ptr<Texture>(), -0.5f, -0.5f,
-							0.0f, 0.0f));
-			}
-		}
-
 		for(auto b : mWorld->getBulletsAt(mCamera, getDrawRadius())) {
 			if(!observefunc(b->getPosition())) {
 				continue;
@@ -1442,6 +1439,8 @@ void Driver::drawEntities()
 
 	std::sort(sprites.begin(), sprites.end());
 
+	drawRoads();
+
 	for(auto s : sprites) {
 		if(!s.mTexture && s.mSpriteType != SpriteType::Bullet) {
 			std::cout << "texture missing.\n";
@@ -1467,6 +1466,43 @@ void Driver::drawEntities()
 				mScaleLevel * s.mScale / treeScale);
 		setLight(); // reset glColor
 #endif
+	}
+}
+
+void Driver::drawRoads()
+{
+	static const float roadWidth = 5.0f;
+	auto roads = mWorld->getRoadsAt(mCamera, getDrawRadius());
+
+	for(auto r : roads) {
+		auto p1 = r->getStart();
+		auto p2 = r->getEnd();
+		auto dir = p1 - p2;
+		const auto roadlen = dir.length();
+		dir = dir.normalized() * roadWidth;
+		// extend segments to avoid holes inbetween
+		p1 = p1 + dir * 0.5f;
+		p2 = p2 - dir * 0.5f;
+		const auto& p1l = terrainPositionToScreenPosition(p1 + Math::rotate2D(dir, -90.0f));
+		const auto& p1r = terrainPositionToScreenPosition(p1 + Math::rotate2D(dir, 90.0f));
+		const auto& p2l = terrainPositionToScreenPosition(p2 + Math::rotate2D(dir, -90.0f));
+		const auto& p2r = terrainPositionToScreenPosition(p2 + Math::rotate2D(dir, 90.0f));
+
+		assert(roadlen);
+
+		glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, mRoadTexture->getTexture());
+		glBegin(GL_QUADS);
+		glTexCoord2f(1.0f, 0.0f);
+		glVertex3f(p1l.x, p1l.y, 0.0f);
+		glTexCoord2f(0.0f, 0.0f);
+		glVertex3f(p1r.x, p1r.y, 0.0f);
+		glTexCoord2f(0.0f, roadlen * 0.1f);
+		glVertex3f(p2r.x, p2r.y, 0.0f);
+		glTexCoord2f(1.0f, roadlen * 0.1f);
+		glVertex3f(p2l.x, p2l.y, 0.0f);
+		glEnd();
 	}
 }
 
