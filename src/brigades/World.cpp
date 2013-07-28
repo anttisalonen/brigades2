@@ -311,6 +311,24 @@ bool World::vehicleVisible(const SoldierPtr p, const Vehicle& s, const std::vect
 	return true;
 }
 
+void World::checkVehicleRoadVelocity(Armor& p)
+{
+	std::vector<Road*> roads = getRoadsAt(p.getPosition(), p.getRadius() + mTerrain.getRoadWidth());
+	bool onRoad = false;
+
+	for(auto r : roads) {
+		if(Math::segmentCircleIntersect(r->getStart(), r->getEnd(),
+					p.getPosition(), p.getRadius() + mTerrain.getRoadWidth())) {
+			onRoad = true;
+			break;
+		}
+	}
+
+	// TODO: get these constants from the armor
+	float maxspeed = onRoad ? 30.0f : 15.0f;
+	p.setMaxSpeed(maxspeed);
+}
+
 std::vector<SoldierPtr> World::getSoldiersInFOV(const SoldierPtr p)
 {
 	std::vector<SoldierPtr> nearbysoldiers = getSoldiersAt(p->getPosition(), mVisibility);
@@ -401,6 +419,12 @@ void World::update(float time)
 			checkVehiclePosition(*s);
 			assert(!isnan(s->getPosition().x));
 			mArmorCSP.update(s, Vector2(oldpos.x, oldpos.y), Vector2(s->getPosition().x, s->getPosition().y));
+
+			if(!s->getVelocity().null()) {
+				if(s->roadCheck(time)) {
+					checkVehicleRoadVelocity(*s);
+				}
+			}
 		}
 	}
 

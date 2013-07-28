@@ -24,6 +24,7 @@ class Armor : public Common::Vehicle {
 		void addPassenger();
 		void removePassenger();
 		int freePassengerSeats() const;
+		bool roadCheck(float time);
 
 	private:
 		static int getNextID();
@@ -33,6 +34,7 @@ class Armor : public Common::Vehicle {
 		float mHealth = 1.0f;
 		bool mOccupied = false;
 		int mFreeSeats = 8;
+		Common::SteadyTimer mRoadCheck;
 };
 
 typedef boost::shared_ptr<Armor> ArmorPtr;

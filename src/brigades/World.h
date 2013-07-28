@@ -154,6 +154,7 @@ class World : public boost::enable_shared_from_this<World> {
 		void reapDeadSoldiers();
 		bool vehicleVisible(const SoldierPtr p, const Common::Vehicle& s,
 				const std::vector<Tree*>& nearbytrees) const;
+		void checkVehicleRoadVelocity(Armor& p);
 
 		Terrain mTerrain;
 		const unsigned int mMaxSoldiers;

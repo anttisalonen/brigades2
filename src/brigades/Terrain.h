@@ -26,6 +26,7 @@ class Terrain {
 		std::vector<Road*> getRoadsAt(const Common::Vector3& v, float radius) const;
 		float getWidth() const { return mWidth; }
 		float getHeight() const { return mHeight; }
+		float getRoadWidth() const { return mRoadWidth; }
 
 	private:
 		void addTrees();
@@ -37,7 +38,7 @@ class Terrain {
 		Common::LineQuadTree<Road*> mRoads;
 		Common::Vector3 mStart;
 		Common::Vector3 mEnd;
-		float mRoadRadius;
+		float mRoadWidth;
 };
 
 }

@@ -7,7 +7,8 @@ namespace Brigades {
 Armor::Armor(int sidenum)
 	: Common::Vehicle(0.5f, 10.0f, 100.0f),
 	mID(getNextID()),
-	mSide(sidenum)
+	mSide(sidenum),
+	mRoadCheck(0.5f)
 {
 	mRadius = 3.5f;
 	mMaxSpeed = 30.0f;
@@ -83,6 +84,11 @@ void Armor::removePassenger()
 int Armor::freePassengerSeats() const
 {
 	return mFreeSeats;
+}
+
+bool Armor::roadCheck(float time)
+{
+	return mRoadCheck.check(time);
 }
 
 

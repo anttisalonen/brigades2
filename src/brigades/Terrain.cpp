@@ -20,7 +20,7 @@ Terrain::Terrain(int w, int h)
 	mHeight(h),
 	mTrees(AABB(Vector2(0, 0), Vector2(w * 0.5f, h * 0.5f))),
 	mRoads(Common::LineQuadTree<Road*>(AABB(Vector2(0, 0), Vector2(w * 0.5f, h * 0.5f)))),
-	mRoadRadius(5.0f)
+	mRoadWidth(5.0f)
 {
 	addTrees();
 	addRoads();
@@ -303,7 +303,7 @@ void Terrain::addRoads()
 				auto trees = getTreesAt(Vector3(midpoint.x, midpoint.y, 0.0f), midpoint.distance(s2));
 				for(auto& t : trees) {
 					if(Math::segmentCircleIntersect(s13, s23,
-								t->getPosition(), t->getRadius() + mRoadRadius)) {
+								t->getPosition(), t->getRadius() + mRoadWidth)) {
 						bool succ = mTrees.deleteT(t, Vector2(t->getPosition().x, t->getPosition().y));
 						assert(succ);
 						removedTrees++;
